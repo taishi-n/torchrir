@@ -11,6 +11,16 @@ Apache-2.0. See `LICENSE` and `NOTICE`.
 pip install torchrir
 ```
 
+## Current Capabilities
+- ISM-based static and dynamic RIR simulation (2D/3D shoebox rooms).
+- Directivity patterns: `omni`, `cardioid`, `hypercardioid`, `subcardioid`, `bidir` with orientation handling.
+- Acoustic parameters: `beta` or `t60` (Sabine), optional diffuse tail via `tdiff`.
+- Dynamic convolution via `DynamicConvolver` (`trajectory` or `hop` modes).
+- GPU acceleration for ISM accumulation (CUDA/MPS; MPS disables LUT).
+- Dataset utilities with CMU ARCTIC support and example pipelines.
+- Plotting utilities for static and dynamic scenes.
+- Unified CLI with JSON/YAML config and deterministic flag support.
+
 ## Example Usage
 ```bash
 # CMU ARCTIC + static RIR (fixed sources/mics)
@@ -64,6 +74,19 @@ y = DynamicConvolver(mode="trajectory").convolve(signal, rirs)
 y = DynamicConvolver(mode="hop", hop=1024).convolve(signal, rirs)
 ```
 Dynamic convolution is exposed via `DynamicConvolver` only (no legacy function wrappers).
+
+## Limitations and Potential Errors
+- Ray tracing and FDTD simulators are placeholders and raise `NotImplementedError`.
+- `TemplateDataset` methods are not implemented and will raise `NotImplementedError`.
+- `simulate_rir`/`simulate_dynamic_rir` require `max_order` (or `SimulationConfig.max_order`) and either `nsample` or `tmax`.
+- Non-`omni` directivity requires orientation; mismatched shapes raise `ValueError`.
+- `beta` must have 4 (2D) or 6 (3D) elements; invalid sizes raise `ValueError`.
+- `simulate_dynamic_rir` requires `src_traj` and `mic_traj` to have matching time steps.
+- Dynamic simulation currently loops per time step; very long trajectories can be slow.
+- MPS disables the sinc LUT path (falls back to direct sinc), which can be slower and slightly different numerically.
+- Deterministic mode is best-effort; some backends may still be non-deterministic.
+- YAML configs require `PyYAML`; otherwise a `ModuleNotFoundError` is raised.
+- CMU ARCTIC downloads require network access.
 
 ### Dataset-agnostic utilities
 ```python
