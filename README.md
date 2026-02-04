@@ -65,6 +65,13 @@ scene = Scene(room=room, sources=sources, mics=mics, src_traj=src_traj, mic_traj
 scene.validate()
 ```
 
+### Result container
+```python
+from torchrir import RIRResult
+
+result = RIRResult(rirs=rirs, scene=scene, config=config)
+```
+
 ## Device Selection
 - `device="cpu"`: CPU execution
 - `device="cuda"`: NVIDIA GPU (CUDA) if available, otherwise fallback to CPU
