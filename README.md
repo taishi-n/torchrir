@@ -21,7 +21,7 @@ y = DynamicConvolver(mode="trajectory").convolve(signal, rirs)
 # Hop-mode dynamic convolution
 y = DynamicConvolver(mode="hop", hop=1024).convolve(signal, rirs)
 ```
-`convolve_dynamic_rir(hop=...)` is deprecated; use `DynamicConvolver(mode="hop")`.
+Dynamic convolution is exposed via `DynamicConvolver` only (no legacy function wrappers).
 
 ### Dataset-agnostic utilities
 ```python

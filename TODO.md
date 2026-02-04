@@ -36,7 +36,7 @@ This TODO list is ordered by priority (higher priority items appear first).
 - [x] Define a `RIRSimulator` interface with `simulate(scene, config) -> RIRResult`.
 - [x] Implement `ISMSimulator` using current core logic.
 - [x] Add placeholder `RayTracingSimulator` and `FDTDSimulator` shells to clarify extension points.
-- [ ] Ensure `simulate_rir`/`simulate_dynamic_rir` remain as thin wrappers for backward compatibility.
+- [x] Remove backward-compatibility wrappers; keep direct simulation APIs only.
 
 ## CLI / Recipes
 - [ ] Consolidate examples into a single CLI with `--mode` (static/dynamic_src/dynamic_mic).

@@ -10,7 +10,7 @@ from .room import MicrophoneArray, Room, Source
 from .scene import Scene
 from .results import RIRResult
 from .simulators import FDTDSimulator, ISMSimulator, RIRSimulator, RayTracingSimulator
-from .signal import convolve_dynamic_rir, convolve_rir, dynamic_convolve, fft_convolve
+from .signal import convolve_rir, fft_convolve
 from .datasets import (
     BaseDataset,
     CmuArcticDataset,
@@ -45,9 +45,7 @@ __all__ = [
     "ISMSimulator",
     "RayTracingSimulator",
     "FDTDSimulator",
-    "convolve_dynamic_rir",
     "convolve_rir",
-    "dynamic_convolve",
     "att2t_SabineEstimation",
     "att2t_sabine_estimation",
     "beta_SabineEstimation",

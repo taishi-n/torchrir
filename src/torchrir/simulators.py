@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-"""Simulation strategy interfaces and implementations."""
+"""Simulation strategy interfaces and implementations.
+
+Note:
+    RayTracingSimulator and FDTDSimulator are work in progress placeholders.
+"""
 
 from dataclasses import dataclass
 from typing import Protocol
@@ -54,7 +58,14 @@ class ISMSimulator:
 
 @dataclass(frozen=True)
 class RayTracingSimulator:
-    """Placeholder for future ray tracing simulation."""
+    """Work in progress placeholder for ray tracing simulation.
+
+    Goal:
+        Provide a geometric acoustics backend that traces specular/diffuse
+        reflection paths, supports frequency-dependent absorption/scattering,
+        and returns a RIRResult compatible with the ISM path. The intent is to
+        reuse Scene/SimulationConfig for inputs and keep output shape parity.
+    """
 
     def simulate(self, scene: Scene, config: SimulationConfig | None = None) -> RIRResult:
         raise NotImplementedError("RayTracingSimulator is not implemented yet")
@@ -62,7 +73,14 @@ class RayTracingSimulator:
 
 @dataclass(frozen=True)
 class FDTDSimulator:
-    """Placeholder for future FDTD simulation."""
+    """Work in progress placeholder for FDTD simulation.
+
+    Goal:
+        Provide a wave-based solver (finite-difference time-domain) with
+        configurable grid resolution, boundary conditions, and stability
+        constraints. The solver should target CPU/GPU execution and return
+        RIRResult with the same metadata contract as ISM.
+    """
 
     def simulate(self, scene: Scene, config: SimulationConfig | None = None) -> RIRResult:
         raise NotImplementedError("FDTDSimulator is not implemented yet")

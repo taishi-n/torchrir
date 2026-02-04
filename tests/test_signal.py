@@ -1,8 +1,6 @@
-import warnings
-
 import torch
 
-from torchrir import DynamicConvolver, convolve_dynamic_rir, convolve_rir, dynamic_convolve, fft_convolve
+from torchrir import DynamicConvolver, convolve_rir, fft_convolve
 
 
 def test_fft_convolve_length():
@@ -26,18 +24,8 @@ def test_convolve_rir_multi_mic():
     assert out.shape[0] == 3
 
 
-def test_convolve_dynamic_rir_multi_mic():
+def test_dynamic_convolver_multi_mic():
     signal = torch.randn(2, 512)
     rirs = torch.randn(6, 2, 3, 64)
     out = DynamicConvolver(mode="hop", hop=128).convolve(signal, rirs)
     assert out.shape[0] == 3
-
-
-def test_convolve_dynamic_rir_hop_deprecated():
-    signal = torch.randn(512)
-    rirs = torch.randn(6, 1, 1, 64)
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
-        out = convolve_dynamic_rir(signal, rirs, hop=128)
-    assert out.numel() >= signal.numel()
-    assert any(issubclass(w.category, DeprecationWarning) for w in caught)

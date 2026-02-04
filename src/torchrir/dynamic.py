@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-"""Dynamic convolution utilities."""
+"""Dynamic convolution utilities.
+
+DynamicConvolver is the public API for time-varying convolution. Lower-level
+helpers live in signal.py and are not part of the stable surface.
+"""
 
 from dataclasses import dataclass
 from typing import Optional

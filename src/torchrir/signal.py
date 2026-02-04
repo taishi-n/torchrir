@@ -1,9 +1,12 @@
 from __future__ import annotations
 
-"""Signal convolution utilities."""
+"""Signal convolution utilities.
+
+Static convolution helpers are public. Dynamic convolution is exposed via
+DynamicConvolver; internal dynamic helpers are prefixed with `_`.
+"""
 
 import math
-import warnings
 
 import torch
 from torch import Tensor
@@ -56,56 +59,6 @@ def convolve_rir(signal: Tensor, rirs: Tensor) -> Tensor:
             out[m] += fft_convolve(signal[s], rirs[s, m])
 
     return out.squeeze(0) if n_mic == 1 else out
-
-
-def convolve_dynamic_rir(
-    signal: Tensor,
-    rirs: Tensor,
-    hop: int | None = None,
-    *,
-    timestamps: Tensor | None = None,
-    fs: float | None = None,
-) -> Tensor:
-    """Convolve signals with time-varying RIRs using hop or trajectory mode.
-
-    Args:
-        signal: (n_src, n_samples) or (n_samples,) tensor.
-        rirs: (T, n_src, n_mic, rir_len) or compatible shape.
-        hop: Fixed hop size for block convolution (deprecated; use DynamicConvolver).
-        timestamps: Optional time stamps (seconds) for each RIR step.
-        fs: Sample rate required when timestamps are provided.
-
-    Returns:
-        (n_mic, n_samples + rir_len - 1) tensor or 1D for single mic.
-    """
-    if hop is not None:
-        warnings.warn(
-            "convolve_dynamic_rir(hop=...) is deprecated; use DynamicConvolver(mode='hop').",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        if hop <= 0:
-            raise ValueError("hop must be positive")
-    if hop is not None and timestamps is not None:
-        raise ValueError("use either hop or timestamps, not both")
-
-    from .dynamic import DynamicConvolver
-
-    if hop is not None:
-        return DynamicConvolver(mode="hop", hop=hop).convolve(signal, rirs)
-    return DynamicConvolver(mode="trajectory", timestamps=timestamps, fs=fs).convolve(signal, rirs)
-
-
-def dynamic_convolve(
-    signal: Tensor,
-    rirs: Tensor,
-    hop: int | None = None,
-    *,
-    timestamps: Tensor | None = None,
-    fs: float | None = None,
-) -> Tensor:
-    """Alias for convolve_dynamic_rir."""
-    return convolve_dynamic_rir(signal, rirs, hop, timestamps=timestamps, fs=fs)
 
 
 def _convolve_dynamic_rir_hop(signal: Tensor, rirs: Tensor, hop: int) -> Tensor:
