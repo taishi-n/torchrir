@@ -3,6 +3,7 @@ from __future__ import annotations
 """Utility functions for geometry, acoustics, and tensor handling."""
 
 import math
+import warnings
 from typing import Iterable, Optional, Tuple
 
 import torch
@@ -19,6 +20,8 @@ def as_tensor(
     dtype: Optional[torch.dtype] = None,
 ) -> Tensor:
     """Convert a value to a tensor while preserving device/dtype when possible."""
+    if isinstance(device, str) and device.lower() == "auto":
+        device = None
     if torch.is_tensor(value):
         out = value
         if device is not None:
@@ -29,23 +32,71 @@ def as_tensor(
     return torch.as_tensor(value, device=device, dtype=dtype)
 
 
+def resolve_device(
+    device: Optional[torch.device | str],
+    *,
+    prefer: Tuple[str, ...] = ("cuda", "mps", "cpu"),
+) -> torch.device:
+    """Resolve a device string (including 'auto') into a torch.device.
+
+    Falls back to CPU when the requested backend is unavailable.
+    """
+    if device is None:
+        return torch.device("cpu")
+    if isinstance(device, torch.device):
+        return device
+
+    dev = str(device).lower()
+    if dev == "auto":
+        for backend in prefer:
+            if backend == "cuda" and torch.cuda.is_available():
+                return torch.device("cuda")
+            if backend == "mps" and torch.backends.mps.is_available():
+                return torch.device("mps")
+            if backend == "cpu":
+                return torch.device("cpu")
+        return torch.device("cpu")
+
+    if dev.startswith("cuda"):
+        if torch.cuda.is_available():
+            return torch.device(device)
+        warnings.warn("CUDA not available; falling back to CPU.", RuntimeWarning)
+        return torch.device("cpu")
+    if dev == "mps":
+        if torch.backends.mps.is_available():
+            return torch.device("mps")
+        warnings.warn("MPS not available; falling back to CPU.", RuntimeWarning)
+        return torch.device("cpu")
+    if dev == "cpu":
+        return torch.device("cpu")
+
+    return torch.device(device)
+
+
 def infer_device_dtype(
     *values,
     device: Optional[torch.device | str] = None,
     dtype: Optional[torch.dtype] = None,
 ) -> Tuple[torch.device, torch.dtype]:
     """Infer device/dtype from inputs with optional overrides."""
-    if device is None or dtype is None:
-        for value in values:
-            if torch.is_tensor(value):
-                if device is None:
-                    device = value.device
-                if dtype is None:
-                    dtype = value.dtype
-    if device is None:
-        device = torch.device("cpu")
+    tensor_device: Optional[torch.device] = None
+    tensor_dtype: Optional[torch.dtype] = None
+    for value in values:
+        if torch.is_tensor(value):
+            if tensor_device is None:
+                tensor_device = value.device
+            if tensor_dtype is None:
+                tensor_dtype = value.dtype
+
+    if isinstance(device, str) and device.lower() == "auto":
+        device = tensor_device or resolve_device("auto")
+    elif device is None:
+        device = tensor_device or torch.device("cpu")
+    else:
+        device = resolve_device(device)
+
     if dtype is None:
-        dtype = torch.float32
+        dtype = tensor_dtype or torch.float32
     return device, dtype
 
 

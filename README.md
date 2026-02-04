@@ -12,6 +12,12 @@ uv run python examples/dynamic_mic.py --plot
 uv run python examples/dynamic_src.py --plot
 ```
 
+## Device Selection
+- `device="cpu"`: CPU execution
+- `device="cuda"`: NVIDIA GPU (CUDA) if available, otherwise fallback to CPU
+- `device="mps"`: Apple Silicon GPU via Metal (MPS) if available, otherwise fallback to CPU
+- `device="auto"`: prefer CUDA → MPS → CPU
+
 ## References
 - [gpuRIR](https://github.com/DavidDiazGuerra/gpuRIR)
 - [pyroomacoustics](https://github.com/LCAV/pyroomacoustics)
