@@ -13,7 +13,11 @@ from .utils import as_tensor, ensure_dim
 
 @dataclass(frozen=True)
 class Room:
-    """Room geometry and acoustic parameters."""
+    """Room geometry and acoustic parameters.
+
+    Example:
+        >>> room = Room.shoebox(size=[6.0, 4.0, 3.0], fs=16000, beta=[0.9] * 6)
+    """
 
     size: Tensor
     fs: float
@@ -43,7 +47,11 @@ class Room:
         device: Optional[torch.device | str] = None,
         dtype: Optional[torch.dtype] = None,
     ) -> "Room":
-        """Create a rectangular (shoebox) room."""
+        """Create a rectangular (shoebox) room.
+
+        Example:
+            >>> room = Room.shoebox(size=[6.0, 4.0, 3.0], fs=16000, beta=[0.9] * 6)
+        """
         size_t = as_tensor(size, device=device, dtype=dtype)
         size_t = ensure_dim(size_t)
         beta_t = None
@@ -54,7 +62,11 @@ class Room:
 
 @dataclass(frozen=True)
 class Source:
-    """Source container with positions and optional orientation."""
+    """Source container with positions and optional orientation.
+
+    Example:
+        >>> sources = Source.positions([[1.0, 2.0, 1.5]])
+    """
 
     positions: Tensor
     orientation: Optional[Tensor] = None
@@ -79,7 +91,11 @@ class Source:
         device: Optional[torch.device | str] = None,
         dtype: Optional[torch.dtype] = None,
     ) -> "Source":
-        """Construct a Source from positions."""
+        """Construct a Source from positions.
+
+        Example:
+            >>> sources = Source.positions([[1.0, 2.0, 1.5]])
+        """
         return cls.from_positions(
             positions, orientation=orientation, device=device, dtype=dtype
         )
@@ -103,7 +119,11 @@ class Source:
 
 @dataclass(frozen=True)
 class MicrophoneArray:
-    """Microphone array container."""
+    """Microphone array container.
+
+    Example:
+        >>> mics = MicrophoneArray.positions([[2.0, 2.0, 1.5]])
+    """
 
     positions: Tensor
     orientation: Optional[Tensor] = None
@@ -128,7 +148,11 @@ class MicrophoneArray:
         device: Optional[torch.device | str] = None,
         dtype: Optional[torch.dtype] = None,
     ) -> "MicrophoneArray":
-        """Construct a MicrophoneArray from positions."""
+        """Construct a MicrophoneArray from positions.
+
+        Example:
+            >>> mics = MicrophoneArray.positions([[2.0, 2.0, 1.5]])
+        """
         return cls.from_positions(
             positions, orientation=orientation, device=device, dtype=dtype
         )

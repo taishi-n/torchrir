@@ -11,7 +11,12 @@ from .base import BaseDataset, SentenceLike
 
 
 def choose_speakers(dataset: BaseDataset, num_sources: int, rng: random.Random) -> List[str]:
-    """Select unique speakers for the requested number of sources."""
+    """Select unique speakers for the requested number of sources.
+
+    Example:
+        >>> rng = random.Random(0)
+        >>> speakers = choose_speakers(dataset, num_sources=2, rng=rng)
+    """
     speakers = dataset.list_speakers()
     if not speakers:
         raise RuntimeError("no speakers available")
@@ -27,7 +32,20 @@ def load_dataset_sources(
     duration_s: float,
     rng: random.Random,
 ) -> Tuple[torch.Tensor, int, List[Tuple[str, List[str]]]]:
-    """Load and concatenate utterances for each speaker into fixed-length signals."""
+    """Load and concatenate utterances for each speaker into fixed-length signals.
+
+    Example:
+        >>> from pathlib import Path
+        >>> from torchrir import CmuArcticDataset
+        >>> rng = random.Random(0)
+        >>> root = Path("datasets/cmu_arctic")
+        >>> signals, fs, info = load_dataset_sources(
+        ...     dataset_factory=lambda spk: CmuArcticDataset(root, speaker=spk, download=True),
+        ...     num_sources=2,
+        ...     duration_s=10.0,
+        ...     rng=rng,
+        ... )
+    """
     dataset0 = dataset_factory(None)
     speakers = choose_speakers(dataset0, num_sources, rng)
     signals: List[torch.Tensor] = []

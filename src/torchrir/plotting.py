@@ -20,7 +20,15 @@ def plot_scene_static(
     title: Optional[str] = None,
     show: bool = False,
 ):
-    """Plot a static room with source and mic positions."""
+    """Plot a static room with source and mic positions.
+
+    Example:
+        >>> ax = plot_scene_static(
+        ...     room=[6.0, 4.0, 3.0],
+        ...     sources=[[1.0, 2.0, 1.5]],
+        ...     mics=[[2.0, 2.0, 1.5]],
+        ... )
+    """
     plt, ax = _setup_axes(ax, room)
 
     size = _room_size(room, ax)
@@ -55,6 +63,13 @@ def plot_scene_dynamic(
     """Plot source and mic trajectories within a room.
 
     If trajectories are static, only positions are plotted.
+
+    Example:
+        >>> ax = plot_scene_dynamic(
+        ...     room=[6.0, 4.0, 3.0],
+        ...     src_traj=src_traj,
+        ...     mic_traj=mic_traj,
+        ... )
     """
     plt, ax = _setup_axes(ax, room)
 

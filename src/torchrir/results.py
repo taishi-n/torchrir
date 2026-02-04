@@ -13,7 +13,13 @@ from .scene import Scene
 
 @dataclass(frozen=True)
 class RIRResult:
-    """Container for RIRs with metadata."""
+    """Container for RIRs with metadata.
+
+    Example:
+        >>> from torchrir import ISMSimulator
+        >>> result = ISMSimulator().simulate(scene, config)
+        >>> rirs = result.rirs
+    """
 
     rirs: Tensor
     scene: Scene

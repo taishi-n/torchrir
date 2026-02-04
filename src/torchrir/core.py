@@ -223,6 +223,7 @@ def simulate_dynamic_rir(
 
     Example:
         >>> room = Room.shoebox(size=[6.0, 4.0, 3.0], fs=16000, beta=[0.9] * 6)
+        >>> from torchrir import linear_trajectory
         >>> src_traj = torch.stack(
         ...     [linear_trajectory(torch.tensor([1.0, 2.0, 1.5]),
         ...                        torch.tensor([4.0, 2.0, 1.5]), 8)],

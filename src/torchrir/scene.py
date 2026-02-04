@@ -13,7 +13,12 @@ from .room import MicrophoneArray, Room, Source
 
 @dataclass(frozen=True)
 class Scene:
-    """Container for room, sources, microphones, and optional trajectories."""
+    """Container for room, sources, microphones, and optional trajectories.
+
+    Example:
+        >>> scene = Scene(room=room, sources=sources, mics=mics, src_traj=src_traj, mic_traj=mic_traj)
+        >>> scene.validate()
+    """
 
     room: Room
     sources: Source

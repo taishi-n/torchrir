@@ -49,6 +49,13 @@ class CmuArcticSentence:
 
 
 class CmuArcticDataset:
+    """CMU ARCTIC dataset loader.
+
+    Example:
+        >>> dataset = CmuArcticDataset(Path("datasets/cmu_arctic"), speaker="bdl", download=True)
+        >>> audio, fs = dataset.load_wav("arctic_a0001")
+    """
+
     def __init__(self, root: Path, speaker: str = "bdl", download: bool = False) -> None:
         """Initialize a CMU ARCTIC dataset handle.
 
@@ -182,7 +189,11 @@ def _parse_text_line(line: str) -> Tuple[str, str]:
 
 
 def load_wav_mono(path: Path) -> Tuple[torch.Tensor, int]:
-    """Load a wav file and return mono audio and sample rate."""
+    """Load a wav file and return mono audio and sample rate.
+
+    Example:
+        >>> audio, fs = load_wav_mono(Path("datasets/cmu_arctic/ARCTIC/.../wav/arctic_a0001.wav"))
+    """
     import soundfile as sf
 
     audio, sample_rate = sf.read(str(path), dtype="float32", always_2d=True)
@@ -195,7 +206,11 @@ def load_wav_mono(path: Path) -> Tuple[torch.Tensor, int]:
 
 
 def save_wav(path: Path, audio: torch.Tensor, sample_rate: int) -> None:
-    """Save a mono or multi-channel wav to disk."""
+    """Save a mono or multi-channel wav to disk.
+
+    Example:
+        >>> save_wav(Path("outputs/example.wav"), audio, sample_rate)
+    """
     import soundfile as sf
 
     audio = audio.detach().cpu().clamp(-1.0, 1.0).to(torch.float32)

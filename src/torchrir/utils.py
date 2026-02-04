@@ -41,6 +41,9 @@ def resolve_device(
     """Resolve a device string (including 'auto') into a torch.device.
 
     Falls back to CPU when the requested backend is unavailable.
+
+    Example:
+        >>> device = resolve_device("auto")
     """
     if device is None:
         return torch.device("cpu")
@@ -76,7 +79,12 @@ def resolve_device(
 
 @dataclass(frozen=True)
 class DeviceSpec:
-    """Resolve device + dtype defaults consistently."""
+    """Resolve device + dtype defaults consistently.
+
+    Example:
+        >>> spec = DeviceSpec(device="auto", dtype=torch.float32)
+        >>> device, dtype = spec.resolve(tensor)
+    """
 
     device: Optional[torch.device | str] = None
     dtype: Optional[torch.dtype] = None
@@ -140,7 +148,11 @@ def estimate_beta_from_t60(
     device: Optional[torch.device | str] = None,
     dtype: Optional[torch.dtype] = None,
 ) -> Tensor:
-    """Estimate reflection coefficients from T60 using Sabine's formula."""
+    """Estimate reflection coefficients from T60 using Sabine's formula.
+
+    Example:
+        >>> beta = estimate_beta_from_t60(torch.tensor([6.0, 4.0, 3.0]), t60=0.4)
+    """
     if t60 <= 0:
         raise ValueError("t60 must be positive")
     size = as_tensor(size, device=device, dtype=dtype)
@@ -172,7 +184,11 @@ def estimate_t60_from_beta(
     device: Optional[torch.device | str] = None,
     dtype: Optional[torch.dtype] = None,
 ) -> float:
-    """Estimate T60 from reflection coefficients using Sabine's formula."""
+    """Estimate T60 from reflection coefficients using Sabine's formula.
+
+    Example:
+        >>> t60 = estimate_t60_from_beta(torch.tensor([6.0, 4.0, 3.0]), beta=torch.full((6,), 0.9))
+    """
     size = as_tensor(size, device=device, dtype=dtype)
     size = ensure_dim(size)
     beta = as_tensor(beta, device=size.device, dtype=size.dtype)
@@ -244,7 +260,11 @@ def orientation_to_unit(orientation: Tensor, dim: int) -> Tensor:
 
 
 def att2t_sabine_estimation(att_db: float, t60: float) -> float:
-    """Convert attenuation (dB) to time based on T60."""
+    """Convert attenuation (dB) to time based on T60.
+
+    Example:
+        >>> t = att2t_sabine_estimation(att_db=60.0, t60=0.4)
+    """
     if t60 <= 0:
         raise ValueError("t60 must be positive")
     if att_db <= 0:
@@ -253,17 +273,29 @@ def att2t_sabine_estimation(att_db: float, t60: float) -> float:
 
 
 def att2t_SabineEstimation(att_db: float, t60: float) -> float:
-    """Legacy alias for att2t_sabine_estimation."""
+    """Legacy alias for att2t_sabine_estimation.
+
+    Example:
+        >>> t = att2t_SabineEstimation(att_db=60.0, t60=0.4)
+    """
     return att2t_sabine_estimation(att_db, t60)
 
 
 def beta_SabineEstimation(room_size: Tensor, t60: float) -> Tensor:
-    """Legacy alias for estimate_beta_from_t60."""
+    """Legacy alias for estimate_beta_from_t60.
+
+    Example:
+        >>> beta = beta_SabineEstimation(torch.tensor([6.0, 4.0, 3.0]), t60=0.4)
+    """
     return estimate_beta_from_t60(room_size, t60)
 
 
 def t2n(tmax: float, room_size: Tensor, c: float = _DEF_SPEED_OF_SOUND) -> Tensor:
-    """Estimate image counts per dimension needed to cover tmax."""
+    """Estimate image counts per dimension needed to cover tmax.
+
+    Example:
+        >>> nb_img = t2n(0.3, torch.tensor([6.0, 4.0, 3.0]))
+    """
     if tmax <= 0:
         raise ValueError("tmax must be positive")
     size = as_tensor(room_size)

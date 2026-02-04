@@ -24,7 +24,11 @@ class RIRSimulator(Protocol):
 
 @dataclass(frozen=True)
 class ISMSimulator:
-    """ISM-based simulator using the current core implementation."""
+    """ISM-based simulator using the current core implementation.
+
+    Example:
+        >>> result = ISMSimulator().simulate(scene, config)
+    """
 
     def simulate(self, scene: Scene, config: SimulationConfig | None = None) -> RIRResult:
         scene.validate()

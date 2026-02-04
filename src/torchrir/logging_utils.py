@@ -9,7 +9,12 @@ from typing import Optional
 
 @dataclass(frozen=True)
 class LoggingConfig:
-    """Configuration for torchrir logging."""
+    """Configuration for torchrir logging.
+
+    Example:
+        >>> config = LoggingConfig(level="INFO")
+        >>> logger = setup_logging(config)
+    """
 
     level: str | int = "INFO"
     format: str = "%(levelname)s:%(name)s:%(message)s"
@@ -33,7 +38,12 @@ class LoggingConfig:
 
 
 def setup_logging(config: LoggingConfig, *, name: str = "torchrir") -> logging.Logger:
-    """Configure and return the base torchrir logger."""
+    """Configure and return the base torchrir logger.
+
+    Example:
+        >>> logger = setup_logging(LoggingConfig(level="DEBUG"))
+        >>> logger.info("ready")
+    """
     logger = logging.getLogger(name)
     level = config.resolve_level()
     logger.setLevel(level)
@@ -47,7 +57,11 @@ def setup_logging(config: LoggingConfig, *, name: str = "torchrir") -> logging.L
 
 
 def get_logger(name: Optional[str] = None) -> logging.Logger:
-    """Return a torchrir logger, namespaced under the torchrir root."""
+    """Return a torchrir logger, namespaced under the torchrir root.
+
+    Example:
+        >>> logger = get_logger("examples.static")
+    """
     if not name:
         return logging.getLogger("torchrir")
     if name.startswith("torchrir"):
