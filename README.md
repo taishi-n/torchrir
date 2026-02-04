@@ -3,6 +3,9 @@
 PyTorch-based room impulse response (RIR) simulation toolkit focused on a clean, modern API with GPU support.
 This project has been substantially assisted by AI using Codex.
 
+## License
+Apache-2.0. See `LICENSE` and `NOTICE`.
+
 ## Example Usage
 ```bash
 # CMU ARCTIC + static RIR (fixed sources/mics)
