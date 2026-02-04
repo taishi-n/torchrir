@@ -1,7 +1,7 @@
 import pytest
 import torch
 
-from torchrir import MicrophoneArray, RIRResult, Room, Scene, SimulationConfig, Source
+from torchrir import ISMSimulator, MicrophoneArray, RIRResult, Room, Scene, SimulationConfig, Source
 
 
 def test_scene_validate_static():
@@ -63,3 +63,13 @@ def test_rir_result_container():
     rirs = torch.zeros((1, 1, 256))
     result = RIRResult(rirs=rirs, scene=scene, config=config, seed=123)
     assert result.rirs.shape == (1, 1, 256)
+
+
+def test_ism_simulator_static():
+    room = Room.shoebox(size=[4.0, 3.0, 2.5], fs=16000, beta=[0.9] * 6)
+    sources = Source.positions([[1.0, 1.0, 1.0]])
+    mics = MicrophoneArray.positions([[2.0, 1.5, 1.0]])
+    scene = Scene(room=room, sources=sources, mics=mics)
+    config = SimulationConfig(max_order=1, tmax=0.05)
+    result = ISMSimulator().simulate(scene, config)
+    assert result.rirs.ndim == 3

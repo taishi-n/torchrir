@@ -9,6 +9,7 @@ from .plotting_utils import plot_scene_and_save
 from .room import MicrophoneArray, Room, Source
 from .scene import Scene
 from .results import RIRResult
+from .simulators import FDTDSimulator, ISMSimulator, RIRSimulator, RayTracingSimulator
 from .signal import convolve_dynamic_rir, convolve_rir, dynamic_convolve, fft_convolve
 from .datasets import (
     BaseDataset,
@@ -40,6 +41,10 @@ __all__ = [
     "Room",
     "Source",
     "RIRResult",
+    "RIRSimulator",
+    "ISMSimulator",
+    "RayTracingSimulator",
+    "FDTDSimulator",
     "convolve_dynamic_rir",
     "convolve_rir",
     "dynamic_convolve",

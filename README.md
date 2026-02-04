@@ -75,6 +75,14 @@ from torchrir import RIRResult
 result = RIRResult(rirs=rirs, scene=scene, config=config)
 ```
 
+### Simulation strategies
+```python
+from torchrir import ISMSimulator
+
+sim = ISMSimulator()
+result = sim.simulate(scene, config)
+```
+
 ## Device Selection
 - `device="cpu"`: CPU execution
 - `device="cuda"`: NVIDIA GPU (CUDA) if available, otherwise fallback to CPU

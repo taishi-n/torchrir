@@ -33,9 +33,9 @@ This TODO list is ordered by priority (higher priority items appear first).
 - [x] Make `Room`, `Source`, `MicrophoneArray` immutable and add `.replace()` helpers.
 
 ## Strategy-based Simulation
-- [ ] Define a `RIRSimulator` interface with `simulate(scene, config) -> RIRResult`.
-- [ ] Implement `ISMSimulator` using current core logic.
-- [ ] Add placeholder `RayTracingSimulator` and `FDTDSimulator` shells to clarify extension points.
+- [x] Define a `RIRSimulator` interface with `simulate(scene, config) -> RIRResult`.
+- [x] Implement `ISMSimulator` using current core logic.
+- [x] Add placeholder `RayTracingSimulator` and `FDTDSimulator` shells to clarify extension points.
 - [ ] Ensure `simulate_rir`/`simulate_dynamic_rir` remain as thin wrappers for backward compatibility.
 
 ## CLI / Recipes
