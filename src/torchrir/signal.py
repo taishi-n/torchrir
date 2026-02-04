@@ -82,19 +82,11 @@ def convolve_dynamic_rir(
     if hop is not None and timestamps is not None:
         raise ValueError("use either hop or timestamps, not both")
 
-    signal = _ensure_signal(signal)
-    rirs = _ensure_dynamic_rirs(rirs, signal)
-    t_steps, n_src, n_mic, rir_len = rirs.shape
-
-    if signal.shape[0] not in (1, n_src):
-        raise ValueError("signal source count does not match rirs")
-    if signal.shape[0] == 1 and n_src > 1:
-        signal = signal.expand(n_src, -1)
+    from .dynamic import DynamicConvolver
 
     if hop is not None:
-        return _convolve_dynamic_rir_hop(signal, rirs, hop)
-
-    return _convolve_dynamic_rir_trajectory(signal, rirs, timestamps=timestamps, fs=fs)
+        return DynamicConvolver(mode="hop", hop=hop).convolve(signal, rirs)
+    return DynamicConvolver(mode="trajectory", timestamps=timestamps, fs=fs).convolve(signal, rirs)
 
 
 def dynamic_convolve(

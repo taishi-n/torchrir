@@ -11,10 +11,10 @@ import torch
 
 try:
     from torchrir import (
+        DynamicConvolver,
         MicrophoneArray,
         Room,
         Source,
-        convolve_dynamic_rir,
         resolve_device,
         simulate_dynamic_rir,
         simulate_rir,
@@ -23,10 +23,10 @@ except ModuleNotFoundError:  # allow running without installation
     ROOT = Path(__file__).resolve().parents[1]
     sys.path.insert(0, str(ROOT / "src"))
     from torchrir import (
+        DynamicConvolver,
         MicrophoneArray,
         Room,
         Source,
-        convolve_dynamic_rir,
         resolve_device,
         simulate_dynamic_rir,
         simulate_rir,
@@ -86,7 +86,7 @@ def _bench_dynamic(device: torch.device, repeats: int) -> float:
         tmax=0.8,
         device=device,
     )
-    convolve_dynamic_rir(signal, rirs)
+    DynamicConvolver(mode="trajectory").convolve(signal, rirs)
     if device.type == "cuda":
         torch.cuda.synchronize()
     if device.type == "mps":
@@ -102,7 +102,7 @@ def _bench_dynamic(device: torch.device, repeats: int) -> float:
             tmax=0.8,
             device=device,
         )
-        convolve_dynamic_rir(signal, rirs)
+        DynamicConvolver(mode="trajectory").convolve(signal, rirs)
     if device.type == "cuda":
         torch.cuda.synchronize()
     if device.type == "mps":

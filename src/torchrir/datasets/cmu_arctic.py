@@ -121,6 +121,10 @@ class CmuArcticDataset:
         wav_ids = {p.stem for p in self.wav_dir.glob("*.wav")}
         return [s for s in self.sentences() if s.utterance_id in wav_ids]
 
+    def list_speakers(self) -> List[str]:
+        """Return available speaker IDs."""
+        return list_cmu_arctic_speakers()
+
     def wav_path(self, utterance_id: str) -> Path:
         """Return the wav path for an utterance ID."""
         return self.wav_dir / f"{utterance_id}.wav"

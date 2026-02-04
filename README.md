@@ -12,6 +12,16 @@ uv run python examples/dynamic_mic.py --plot
 uv run python examples/dynamic_src.py --plot
 ```
 
+```python
+from torchrir import DynamicConvolver
+
+# Trajectory-mode dynamic convolution
+y = DynamicConvolver(mode="trajectory").convolve(signal, rirs)
+
+# Hop-mode dynamic convolution
+y = DynamicConvolver(mode="hop", hop=1024).convolve(signal, rirs)
+```
+
 ## Device Selection
 - `device="cpu"`: CPU execution
 - `device="cuda"`: NVIDIA GPU (CUDA) if available, otherwise fallback to CPU

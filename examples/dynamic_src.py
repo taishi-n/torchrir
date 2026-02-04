@@ -11,10 +11,10 @@ import torch
 
 try:
     from torchrir import (
+        DynamicConvolver,
         MicrophoneArray,
         Room,
         Source,
-        convolve_dynamic_rir,
         plot_scene_and_save,
         resolve_device,
         save_wav,
@@ -24,10 +24,10 @@ except ModuleNotFoundError:  # allow running without installation
     ROOT = Path(__file__).resolve().parents[1]
     sys.path.insert(0, str(ROOT / "src"))
     from torchrir import (
+        DynamicConvolver,
         MicrophoneArray,
         Room,
         Source,
-        convolve_dynamic_rir,
         plot_scene_and_save,
         resolve_device,
         save_wav,
@@ -122,7 +122,7 @@ def main() -> None:
         device=device,
     )
 
-    y_dynamic = convolve_dynamic_rir(signals, rirs)
+    y_dynamic = DynamicConvolver(mode="trajectory").convolve(signals, rirs)
 
     args.out_dir.mkdir(parents=True, exist_ok=True)
     out_path = args.out_dir / "dynamic_src_binaural.wav"
