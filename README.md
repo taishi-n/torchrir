@@ -65,6 +65,9 @@ scene = Scene(room=room, sources=sources, mics=mics, src_traj=src_traj, mic_traj
 scene.validate()
 ```
 
+### Immutable geometry helpers
+`Room`, `Source`, and `MicrophoneArray` are immutable; use `.replace()` to update fields.
+
 ### Result container
 ```python
 from torchrir import RIRResult

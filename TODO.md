@@ -30,7 +30,7 @@ This TODO list is ordered by priority (higher priority items appear first).
 - [x] Add `Scene` dataclass to encapsulate room, sources, mics, and optional trajectories.
 - [x] Add `SimulationConfig` dataclass for algorithm settings (fs, max_order, tmax, directivity, device, seed).
 - [x] Add `RIRResult` dataclass to return RIR plus metadata (scene/config/timestamps/seed).
-- [ ] Make `Room`, `Source`, `MicrophoneArray` immutable and add `.replace()` helpers.
+- [x] Make `Room`, `Source`, `MicrophoneArray` immutable and add `.replace()` helpers.
 
 ## Strategy-based Simulation
 - [ ] Define a `RIRSimulator` interface with `simulate(scene, config) -> RIRResult`.

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 """Room, source, and microphone geometry models."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Optional, Sequence
 
 import torch
@@ -28,6 +28,10 @@ class Room:
         if self.beta is not None and self.t60 is not None:
             raise ValueError("beta and t60 are mutually exclusive")
 
+    def replace(self, **kwargs) -> "Room":
+        """Return a new Room with updated fields."""
+        return replace(self, **kwargs)
+
     @staticmethod
     def shoebox(
         size: Sequence[float] | Tensor,
@@ -48,11 +52,23 @@ class Room:
         return Room(size=size_t, fs=fs, c=c, beta=beta_t, t60=t60)
 
 
+@dataclass(frozen=True)
 class Source:
-    def __init__(self, positions: Tensor, orientation: Optional[Tensor] = None) -> None:
-        """Create a source container with positions and optional orientation."""
-        self.positions = positions
-        self.orientation = orientation
+    """Source container with positions and optional orientation."""
+
+    positions: Tensor
+    orientation: Optional[Tensor] = None
+
+    def __post_init__(self) -> None:
+        pos = as_tensor(self.positions)
+        object.__setattr__(self, "positions", pos)
+        if self.orientation is not None:
+            ori = as_tensor(self.orientation)
+            object.__setattr__(self, "orientation", ori)
+
+    def replace(self, **kwargs) -> "Source":
+        """Return a new Source with updated fields."""
+        return replace(self, **kwargs)
 
     @classmethod
     def positions(
@@ -85,11 +101,23 @@ class Source:
         return cls(pos, ori)
 
 
+@dataclass(frozen=True)
 class MicrophoneArray:
-    def __init__(self, positions: Tensor, orientation: Optional[Tensor] = None) -> None:
-        """Create a microphone array container."""
-        self.positions = positions
-        self.orientation = orientation
+    """Microphone array container."""
+
+    positions: Tensor
+    orientation: Optional[Tensor] = None
+
+    def __post_init__(self) -> None:
+        pos = as_tensor(self.positions)
+        object.__setattr__(self, "positions", pos)
+        if self.orientation is not None:
+            ori = as_tensor(self.orientation)
+            object.__setattr__(self, "orientation", ori)
+
+    def replace(self, **kwargs) -> "MicrophoneArray":
+        """Return a new MicrophoneArray with updated fields."""
+        return replace(self, **kwargs)
 
     @classmethod
     def positions(
