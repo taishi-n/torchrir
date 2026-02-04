@@ -25,6 +25,7 @@ from .utils import (
     beta_SabineEstimation,
     estimate_beta_from_t60,
     estimate_t60_from_beta,
+    resolve_device,
     t2n,
 )
 
@@ -47,6 +48,7 @@ __all__ = [
     "fft_convolve",
     "get_config",
     "list_cmu_arctic_speakers",
+    "resolve_device",
     "load_wav_mono",
     "plot_scene_dynamic",
     "plot_scene_and_save",

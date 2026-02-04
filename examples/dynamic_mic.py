@@ -16,6 +16,7 @@ try:
         Source,
         convolve_dynamic_rir,
         plot_scene_and_save,
+        resolve_device,
         save_wav,
         simulate_dynamic_rir,
     )
@@ -28,6 +29,7 @@ except ModuleNotFoundError:  # allow running without installation
         Source,
         convolve_dynamic_rir,
         plot_scene_and_save,
+        resolve_device,
         save_wav,
         simulate_dynamic_rir,
     )
@@ -64,7 +66,7 @@ def main() -> None:
     args = parser.parse_args()
 
     rng = random.Random(args.seed)
-    device = torch.device(args.device)
+    device = resolve_device(args.device)
     room_size = torch.tensor(args.room, dtype=torch.float32)
     signals, fs, info = load_cmu_arctic_sources(
         root=args.dataset_dir,

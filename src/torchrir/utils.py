@@ -20,8 +20,8 @@ def as_tensor(
     dtype: Optional[torch.dtype] = None,
 ) -> Tensor:
     """Convert a value to a tensor while preserving device/dtype when possible."""
-    if isinstance(device, str) and device.lower() == "auto":
-        device = None
+    if isinstance(device, str):
+        device = resolve_device(device)
     if torch.is_tensor(value):
         out = value
         if device is not None:

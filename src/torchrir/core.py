@@ -19,6 +19,7 @@ from .utils import (
     infer_device_dtype,
     normalize_orientation,
     orientation_to_unit,
+    resolve_device,
 )
 
 
@@ -66,6 +67,9 @@ def simulate_rir(
         raise ValueError("nsample must be positive")
     if max_order < 0:
         raise ValueError("max_order must be non-negative")
+
+    if isinstance(device, str):
+        device = resolve_device(device)
 
     src_pos, src_ori = _prepare_entities(
         sources, orientation, which="source", device=device, dtype=dtype
@@ -174,6 +178,9 @@ def simulate_dynamic_rir(
     Returns:
         Tensor of shape (T, n_src, n_mic, nsample).
     """
+    if isinstance(device, str):
+        device = resolve_device(device)
+
     src_traj = as_tensor(src_traj, device=device, dtype=dtype)
     mic_traj = as_tensor(mic_traj, device=device, dtype=dtype)
 
