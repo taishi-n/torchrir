@@ -3,12 +3,21 @@ from __future__ import annotations
 """Simulation configuration for torchrir."""
 
 from dataclasses import dataclass, replace
+from typing import Optional
+
+import torch
 
 
 @dataclass(frozen=True)
 class SimulationConfig:
     """Configuration values for RIR simulation and convolution."""
 
+    fs: Optional[float] = None
+    max_order: Optional[int] = None
+    tmax: Optional[float] = None
+    directivity: Optional[str | tuple[str, str]] = None
+    device: Optional[torch.device | str] = None
+    seed: Optional[int] = None
     use_lut: bool = True
     mixed_precision: bool = False
     frac_delay_length: int = 81
@@ -19,6 +28,14 @@ class SimulationConfig:
 
     def validate(self) -> None:
         """Validate configuration values."""
+        if self.fs is not None and self.fs <= 0:
+            raise ValueError("fs must be positive")
+        if self.max_order is not None and self.max_order < 0:
+            raise ValueError("max_order must be non-negative")
+        if self.tmax is not None and self.tmax <= 0:
+            raise ValueError("tmax must be positive")
+        if self.seed is not None and self.seed < 0:
+            raise ValueError("seed must be non-negative")
         if self.frac_delay_length <= 0 or self.frac_delay_length % 2 == 0:
             raise ValueError("frac_delay_length must be a positive odd integer")
         if self.sinc_lut_granularity <= 0:

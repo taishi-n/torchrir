@@ -113,7 +113,7 @@ device, dtype = DeviceSpec(device="auto").resolve()
 - Orientation specified by vector or angles.
 
 #### Configuration
-- `SimulationConfig` controls algorithm settings (e.g., fractional delay length, LUT, chunk sizes, compile path).
+- `SimulationConfig` controls algorithm settings (e.g., max_order, tmax, directivity, device, seed, fractional delay length, LUT, chunk sizes, compile path).
 - Passed explicitly via `simulate_rir(..., config=...)` or `simulate_dynamic_rir(..., config=...)`.
 
 ### Outputs

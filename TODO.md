@@ -28,7 +28,7 @@ This TODO list is ordered by priority (higher priority items appear first).
 
 ## Domain Model (stabilize inputs/outputs)
 - [x] Add `Scene` dataclass to encapsulate room, sources, mics, and optional trajectories.
-- [ ] Add `SimulationConfig` dataclass for algorithm settings (fs, max_order, tmax, directivity, device, seed).
+- [x] Add `SimulationConfig` dataclass for algorithm settings (fs, max_order, tmax, directivity, device, seed).
 - [ ] Add `RIRResult` dataclass to return RIR plus metadata (scene/config/timestamps/seed).
 - [ ] Make `Room`, `Source`, `MicrophoneArray` immutable and add `.replace()` helpers.
 

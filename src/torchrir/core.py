@@ -28,12 +28,12 @@ def simulate_rir(
     room: Room,
     sources: Source | Tensor,
     mics: MicrophoneArray | Tensor,
-    max_order: int,
+    max_order: int | None,
     nb_img: Optional[Tensor | Tuple[int, ...]] = None,
     nsample: Optional[int] = None,
     tmax: Optional[float] = None,
     tdiff: Optional[float] = None,
-    directivity: str | tuple[str, str] = "omni",
+    directivity: str | tuple[str, str] | None = "omni",
     orientation: Optional[Tensor | tuple[Tensor, Tensor]] = None,
     config: Optional[SimulationConfig] = None,
     device: Optional[torch.device | str] = None,
@@ -45,12 +45,12 @@ def simulate_rir(
         room: Room configuration (geometry, fs, reflection coefficients).
         sources: Source positions or a Source object.
         mics: Microphone positions or a MicrophoneArray object.
-        max_order: Maximum reflection order.
+        max_order: Maximum reflection order (uses config if None).
         nb_img: Optional per-dimension image counts (overrides max_order).
         nsample: Output length in samples.
         tmax: Output length in seconds (used if nsample is None).
         tdiff: Optional time to start diffuse tail modeling.
-        directivity: Directivity pattern(s) for source and mic.
+        directivity: Directivity pattern(s) for source and mic (uses config if None).
         orientation: Orientation vectors or angles.
         config: Optional simulation configuration overrides.
         device: Output device.
@@ -59,6 +59,23 @@ def simulate_rir(
     Returns:
         Tensor of shape (n_src, n_mic, nsample).
     """
+    cfg = config or default_config()
+    cfg.validate()
+
+    if device is None and cfg.device is not None:
+        device = cfg.device
+
+    if max_order is None:
+        if cfg.max_order is None:
+            raise ValueError("max_order must be provided if not set in config")
+        max_order = cfg.max_order
+
+    if tmax is None and nsample is None and cfg.tmax is not None:
+        tmax = cfg.tmax
+
+    if directivity is None:
+        directivity = cfg.directivity or "omni"
+
     if not isinstance(room, Room):
         raise TypeError("room must be a Room instance")
     if nsample is None and tmax is None:
@@ -120,8 +137,6 @@ def simulate_rir(
     n_src = src_pos.shape[0]
     n_mic = mic_pos.shape[0]
     rir = torch.zeros((n_src, n_mic, nsample), device=device, dtype=dtype)
-    cfg = config or default_config()
-    cfg.validate()
     fdl = cfg.frac_delay_length
     fdl2 = (fdl - 1) // 2
     img_chunk = cfg.image_chunk_size
@@ -158,7 +173,7 @@ def simulate_rir(
         _accumulate_rir_batch(rir, sample_chunk, attenuation_chunk, cfg)
 
     if tdiff is not None and tmax is not None and tdiff < tmax:
-        rir = _apply_diffuse_tail(rir, room, beta, tdiff, tmax)
+        rir = _apply_diffuse_tail(rir, room, beta, tdiff, tmax, seed=cfg.seed)
     return rir
 
 
@@ -167,10 +182,10 @@ def simulate_dynamic_rir(
     room: Room,
     src_traj: Tensor,
     mic_traj: Tensor,
-    max_order: int,
+    max_order: int | None,
     nsample: Optional[int] = None,
     tmax: Optional[float] = None,
-    directivity: str | tuple[str, str] = "omni",
+    directivity: str | tuple[str, str] | None = "omni",
     orientation: Optional[Tensor | tuple[Tensor, Tensor]] = None,
     config: Optional[SimulationConfig] = None,
     device: Optional[torch.device | str] = None,
@@ -182,10 +197,10 @@ def simulate_dynamic_rir(
         room: Room configuration.
         src_traj: Source trajectory (T, n_src, dim).
         mic_traj: Microphone trajectory (T, n_mic, dim).
-        max_order: Maximum reflection order.
+        max_order: Maximum reflection order (uses config if None).
         nsample: Output length in samples.
         tmax: Output length in seconds (used if nsample is None).
-        directivity: Directivity pattern(s) for source and mic.
+        directivity: Directivity pattern(s) for source and mic (uses config if None).
         orientation: Orientation vectors or angles.
         config: Optional simulation configuration overrides.
         device: Output device.
@@ -194,6 +209,23 @@ def simulate_dynamic_rir(
     Returns:
         Tensor of shape (T, n_src, n_mic, nsample).
     """
+    cfg = config or default_config()
+    cfg.validate()
+
+    if device is None and cfg.device is not None:
+        device = cfg.device
+
+    if max_order is None:
+        if cfg.max_order is None:
+            raise ValueError("max_order must be provided if not set in config")
+        max_order = cfg.max_order
+
+    if tmax is None and nsample is None and cfg.tmax is not None:
+        tmax = cfg.tmax
+
+    if directivity is None:
+        directivity = cfg.directivity or "omni"
+
     if isinstance(device, str):
         device = resolve_device(device)
 
@@ -673,7 +705,15 @@ def _get_sinc_lut(fdl: int, lut_gran: int, *, device: torch.device, dtype: torch
     return cached
 
 
-def _apply_diffuse_tail(rir: Tensor, room: Room, beta: Tensor, tdiff: float, tmax: float) -> Tensor:
+def _apply_diffuse_tail(
+    rir: Tensor,
+    room: Room,
+    beta: Tensor,
+    tdiff: float,
+    tmax: float,
+    *,
+    seed: Optional[int] = None,
+) -> Tensor:
     """Apply a diffuse reverberation tail after tdiff.
 
     Returns:
@@ -694,7 +734,7 @@ def _apply_diffuse_tail(rir: Tensor, room: Room, beta: Tensor, tdiff: float, tma
         decay = torch.exp(-t / tau)
 
     gen = torch.Generator(device=rir.device)
-    gen.manual_seed(0)
+    gen.manual_seed(0 if seed is None else seed)
     noise = torch.randn(rir[..., tdiff_idx:].shape, device=rir.device, dtype=rir.dtype, generator=gen)
     scale = torch.linalg.norm(rir[..., tdiff_idx - 1 : tdiff_idx], dim=-1, keepdim=True) + 1e-8
     rir[..., tdiff_idx:] = noise * decay * scale
