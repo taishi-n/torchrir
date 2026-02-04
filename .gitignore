@@ -13,6 +13,7 @@ venv/
 
 # OS / editor
 .DS_Store
+**/.DS_Store
 .idea/
 .vscode/
 
@@ -23,3 +24,8 @@ examples/outputs/
 **/outputs/
 *.zip
 *.npy
+
+# Docs build artifacts (Sphinx)
+docs/_build/
+docs/_autosummary/
+docs/_generated/
