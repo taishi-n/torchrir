@@ -17,6 +17,7 @@ try:
         MicrophoneArray,
         Room,
         Source,
+        animate_scene_gif,
         get_logger,
         plot_scene_and_save,
         resolve_device,
@@ -34,6 +35,7 @@ except ModuleNotFoundError:  # allow running without installation
         MicrophoneArray,
         Room,
         Source,
+        animate_scene_gif,
         get_logger,
         plot_scene_and_save,
         resolve_device,
@@ -71,6 +73,8 @@ def main() -> None:
     parser.add_argument("--out-dir", type=Path, default=Path("outputs"))
     parser.add_argument("--plot", action="store_true", help="plot room and trajectories")
     parser.add_argument("--show", action="store_true", help="show plots interactively")
+    parser.add_argument("--gif", action="store_true", help="save trajectory animation GIF")
+    parser.add_argument("--gif-fps", type=float, default=0.0)
     parser.add_argument("--log-level", type=str, default="INFO")
     args = parser.parse_args()
 
@@ -126,6 +130,39 @@ def main() -> None:
             )
         except Exception as exc:  # pragma: no cover - optional dependency
             logger.warning("Plot skipped: %s", exc)
+    if args.gif:
+        try:
+            gif_path = args.out_dir / "dynamic_mic.gif"
+            animate_scene_gif(
+                out_path=gif_path,
+                room=room.size,
+                sources=sources,
+                mics=mics,
+                src_traj=src_traj,
+                mic_traj=mic_traj,
+                fps=args.gif_fps if args.gif_fps > 0 else None,
+                signal_len=signals.shape[1],
+                fs=fs,
+            )
+            logger.info("saved: %s", gif_path)
+            if room.size.numel() == 3:
+                gif_path_3d = args.out_dir / "dynamic_mic_3d.gif"
+                animate_scene_gif(
+                    out_path=gif_path_3d,
+                    room=room.size,
+                    sources=sources,
+                    mics=mics,
+                    src_traj=src_traj,
+                    mic_traj=mic_traj,
+                    fps=args.gif_fps if args.gif_fps > 0 else None,
+                    signal_len=signals.shape[1],
+                    fs=fs,
+                    plot_2d=False,
+                    plot_3d=True,
+                )
+                logger.info("saved: %s", gif_path_3d)
+        except Exception as exc:  # pragma: no cover - optional dependency
+            logger.warning("GIF skipped: %s", exc)
 
     rirs = simulate_dynamic_rir(
         room=room,

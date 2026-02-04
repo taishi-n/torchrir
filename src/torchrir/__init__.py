@@ -4,6 +4,7 @@ from .config import SimulationConfig, default_config
 from .core import simulate_dynamic_rir, simulate_rir
 from .dynamic import DynamicConvolver
 from .logging_utils import LoggingConfig, get_logger, setup_logging
+from .animation import animate_scene_gif
 from .plotting import plot_scene_dynamic, plot_scene_static
 from .plotting_utils import plot_scene_and_save
 from .room import MicrophoneArray, Room, Source
@@ -61,6 +62,7 @@ __all__ = [
     "get_logger",
     "list_cmu_arctic_speakers",
     "LoggingConfig",
+    "animate_scene_gif",
     "resolve_device",
     "SentenceLike",
     "load_dataset_sources",

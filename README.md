@@ -29,16 +29,22 @@ uv run python examples/static.py --plot
 # Dynamic RIR demos
 uv run python examples/dynamic_mic.py --plot
 uv run python examples/dynamic_src.py --plot
+uv run python examples/dynamic_mic.py --gif
+uv run python examples/dynamic_src.py --gif
 
 # Unified CLI
 uv run python examples/cli.py --mode static --plot
 uv run python examples/cli.py --mode dynamic_mic --plot
 uv run python examples/cli.py --mode dynamic_src --plot
+uv run python examples/cli.py --mode dynamic_mic --gif
+uv run python examples/dynamic_mic.py --gif --gif-fps 12
 
 # Config + deterministic
 uv run python examples/cli.py --mode static --deterministic --seed 123 --config-out outputs/cli.json
 uv run python examples/cli.py --config-in outputs/cli.json
 ```
+GIF FPS is auto-derived from signal duration and RIR steps unless overridden with `--gif-fps`.
+For 3D rooms, an additional `*_3d.gif` is saved.
 YAML configs are supported when `PyYAML` is installed.
 ```bash
 # YAML config
@@ -87,6 +93,7 @@ Dynamic convolution is exposed via `DynamicConvolver` only (no legacy function w
 - Deterministic mode is best-effort; some backends may still be non-deterministic.
 - YAML configs require `PyYAML`; otherwise a `ModuleNotFoundError` is raised.
 - CMU ARCTIC downloads require network access.
+- GIF animation output requires Pillow (via matplotlib animation writer).
 
 ### Dataset-agnostic utilities
 ```python

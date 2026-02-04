@@ -1540,6 +1540,7 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "matplotlib" },
+    { name = "pillow" },
     { name = "pyroomacoustics" },
     { name = "pytest" },
     { name = "soundfile" },
@@ -1554,6 +1555,7 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "matplotlib", specifier = ">=3.10.8" },
+    { name = "pillow", specifier = ">=11.2.1" },
     { name = "pyroomacoustics", specifier = ">=0.9.0" },
     { name = "pytest", specifier = ">=9.0.2" },
     { name = "soundfile", specifier = ">=0.13.1" },

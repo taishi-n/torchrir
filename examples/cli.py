@@ -19,6 +19,7 @@ try:
         MicrophoneArray,
         Room,
         Source,
+        animate_scene_gif,
         get_logger,
         plot_scene_and_save,
         resolve_device,
@@ -37,6 +38,7 @@ except ModuleNotFoundError:  # allow running without installation
         MicrophoneArray,
         Room,
         Source,
+        animate_scene_gif,
         get_logger,
         plot_scene_and_save,
         resolve_device,
@@ -135,6 +137,58 @@ def _plot_scene(args, room, sources, mics, src_traj=None, mic_traj=None, prefix=
         logger.warning("Plot skipped: %s", exc)
 
 
+def _plot_gif(
+    args,
+    room,
+    sources,
+    mics,
+    *,
+    src_traj=None,
+    mic_traj=None,
+    prefix="scene",
+    signal_len: int | None = None,
+    fs: float | None = None,
+):
+    if not args.gif:
+        return
+    if src_traj is None and mic_traj is None:
+        return
+    try:
+        gif_path = args.out_dir / f"{prefix}.gif"
+        animate_scene_gif(
+            out_path=gif_path,
+            room=room.size,
+            sources=sources,
+            mics=mics,
+            src_traj=src_traj,
+            mic_traj=mic_traj,
+            fps=args.gif_fps if args.gif_fps > 0 else None,
+            signal_len=signal_len,
+            fs=fs,
+        )
+        logger = get_logger("examples.cli")
+        logger.info("saved: %s", gif_path)
+        if room.size.numel() == 3:
+            gif_path_3d = args.out_dir / f"{prefix}_3d.gif"
+            animate_scene_gif(
+                out_path=gif_path_3d,
+                room=room.size,
+                sources=sources,
+                mics=mics,
+                src_traj=src_traj,
+                mic_traj=mic_traj,
+                fps=args.gif_fps if args.gif_fps > 0 else None,
+                signal_len=signal_len,
+                fs=fs,
+                plot_2d=False,
+                plot_3d=True,
+            )
+            logger.info("saved: %s", gif_path_3d)
+    except Exception as exc:  # pragma: no cover - optional dependency
+        logger = get_logger("examples.cli")
+        logger.warning("GIF skipped: %s", exc)
+
+
 def _apply_determinism(seed: int, enable: bool, logger) -> None:
     torch.manual_seed(seed)
     if not enable:
@@ -165,6 +219,8 @@ def _serialize_args(args) -> Dict[str, Any]:
         "out_dir": str(args.out_dir),
         "plot": args.plot,
         "show": args.show,
+        "gif": args.gif,
+        "gif_fps": args.gif_fps,
         "log_level": args.log_level,
     }
 
@@ -187,6 +243,8 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--out-dir", type=Path, default=Path("outputs"))
     parser.add_argument("--plot", action="store_true", help="plot room and trajectories")
     parser.add_argument("--show", action="store_true", help="show plots interactively")
+    parser.add_argument("--gif", action="store_true", help="save trajectory animation GIF")
+    parser.add_argument("--gif-fps", type=float, default=0.0)
     parser.add_argument("--log-level", type=str, default="INFO")
     parser.add_argument("--config-in", type=Path, help="load config from JSON/YAML")
     parser.add_argument("--config-out", type=Path, help="write config to JSON/YAML")
@@ -207,6 +265,17 @@ def _run_static(args, rng: random.Random, logger):
     mics = MicrophoneArray.positions(mic_pos.tolist())
 
     _plot_scene(args, room, sources, mics, prefix="static")
+    _plot_gif(
+        args,
+        room,
+        sources,
+        mics,
+        src_traj=None,
+        mic_traj=None,
+        prefix="static",
+        signal_len=signals.shape[1],
+        fs=fs,
+    )
 
     rirs = simulate_rir(
         room=room,
@@ -252,6 +321,17 @@ def _run_dynamic_src(args, rng: random.Random, logger):
     mics = MicrophoneArray.positions(mic_pos.tolist())
 
     _plot_scene(args, room, sources, mics, src_traj=src_traj, mic_traj=mic_traj, prefix="dynamic_src")
+    _plot_gif(
+        args,
+        room,
+        sources,
+        mics,
+        src_traj=src_traj,
+        mic_traj=mic_traj,
+        prefix="dynamic_src",
+        signal_len=signals.shape[1],
+        fs=fs,
+    )
 
     rirs = simulate_dynamic_rir(
         room=room,
@@ -292,6 +372,17 @@ def _run_dynamic_mic(args, rng: random.Random, logger):
     mics = MicrophoneArray.positions(mic_traj[0].tolist())
 
     _plot_scene(args, room, sources, mics, src_traj=src_traj, mic_traj=mic_traj, prefix="dynamic_mic")
+    _plot_gif(
+        args,
+        room,
+        sources,
+        mics,
+        src_traj=src_traj,
+        mic_traj=mic_traj,
+        prefix="dynamic_mic",
+        signal_len=signals.shape[1],
+        fs=fs,
+    )
 
     rirs = simulate_dynamic_rir(
         room=room,
