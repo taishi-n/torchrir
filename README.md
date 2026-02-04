@@ -6,6 +6,11 @@ This project has been substantially assisted by AI using Codex.
 ## License
 Apache-2.0. See `LICENSE` and `NOTICE`.
 
+## Installation
+```bash
+pip install torchrir
+```
+
 ## Example Usage
 ```bash
 # CMU ARCTIC + static RIR (fixed sources/mics)
@@ -31,6 +36,23 @@ uv run python examples/cli.py --mode static --config-out outputs/cli.yaml
 uv run python examples/cli.py --config-in outputs/cli.yaml
 ```
 `examples/cli_example.yaml` provides a ready-to-use template.
+
+```python
+from torchrir import DynamicConvolver, MicrophoneArray, Room, Source, simulate_rir
+
+room = Room.shoebox(size=[6.0, 4.0, 3.0], fs=16000, beta=[0.9] * 6)
+sources = Source.positions([[1.0, 2.0, 1.5]])
+mics = MicrophoneArray.positions([[2.0, 2.0, 1.5]])
+
+rir = simulate_rir(
+    room=room,
+    sources=sources,
+    mics=mics,
+    max_order=6,
+    tmax=0.3,
+    device="auto",
+)
+```
 
 ```python
 from torchrir import DynamicConvolver
