@@ -12,6 +12,7 @@ import torch
 try:
     from torchrir import (
         DynamicConvolver,
+        CmuArcticDataset,
         MicrophoneArray,
         Room,
         Source,
@@ -25,6 +26,7 @@ except ModuleNotFoundError:  # allow running without installation
     sys.path.insert(0, str(ROOT / "src"))
     from torchrir import (
         DynamicConvolver,
+        CmuArcticDataset,
         MicrophoneArray,
         Room,
         Source,
@@ -37,11 +39,11 @@ except ModuleNotFoundError:  # allow running without installation
 EXAMPLES_DIR = Path(__file__).resolve().parent
 if str(EXAMPLES_DIR) not in sys.path:
     sys.path.insert(0, str(EXAMPLES_DIR))
-from cmu_arctic_scene_utils import (
+from torchrir import (
     binaural_mic_positions,
     clamp_positions,
     linear_trajectory,
-    load_cmu_arctic_sources,
+    load_dataset_sources,
     sample_positions,
 )
 
@@ -68,12 +70,15 @@ def main() -> None:
     rng = random.Random(args.seed)
     device = resolve_device(args.device)
     room_size = torch.tensor(args.room, dtype=torch.float32)
-    signals, fs, info = load_cmu_arctic_sources(
-        root=args.dataset_dir,
+    def dataset_factory(speaker: str | None):
+        spk = speaker or "bdl"
+        return CmuArcticDataset(args.dataset_dir, speaker=spk, download=args.download)
+
+    signals, fs, info = load_dataset_sources(
+        dataset_factory=dataset_factory,
         num_sources=args.num_sources,
         duration_s=args.duration,
         rng=rng,
-        download=args.download,
     )
     signals = signals.to(device)
     room = Room.shoebox(size=args.room, fs=fs, beta=[0.9] * (6 if len(args.room) == 3 else 4))

@@ -22,6 +22,31 @@ y = DynamicConvolver(mode="trajectory").convolve(signal, rirs)
 y = DynamicConvolver(mode="hop", hop=1024).convolve(signal, rirs)
 ```
 
+### Dataset-agnostic utilities
+```python
+from torchrir import (
+    CmuArcticDataset,
+    binaural_mic_positions,
+    clamp_positions,
+    load_dataset_sources,
+    sample_positions,
+)
+
+def dataset_factory(speaker: str | None):
+    spk = speaker or "bdl"
+    return CmuArcticDataset("datasets/cmu_arctic", speaker=spk, download=True)
+
+signals, fs, info = load_dataset_sources(
+    dataset_factory=dataset_factory,
+    num_sources=2,
+    duration_s=10.0,
+    rng=random.Random(0),
+)
+```
+
+### Dataset template (for future extension)
+`TemplateDataset` provides a minimal stub to implement new datasets later.
+
 ## Device Selection
 - `device="cpu"`: CPU execution
 - `device="cuda"`: NVIDIA GPU (CUDA) if available, otherwise fallback to CPU
