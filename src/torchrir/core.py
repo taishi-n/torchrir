@@ -121,28 +121,38 @@ def simulate_rir(
     cfg = get_config()
     fdl = cfg["frac_delay_length"]
     fdl2 = (fdl - 1) // 2
+    img_chunk = cfg.get("image_chunk_size", n_vec.shape[0])
+    if img_chunk <= 0:
+        img_chunk = n_vec.shape[0]
 
-    for s_idx in range(n_src):
-        src_dir = None
-        if src_pattern != "omni":
-            if src_ori is None:
-                raise ValueError("source orientation required for non-omni directivity")
-            src_dir = _select_orientation(src_ori, s_idx, n_src, dim)
+    src_dirs = None
+    if src_pattern != "omni":
+        if src_ori is None:
+            raise ValueError("source orientation required for non-omni directivity")
+        src_dirs = orientation_to_unit(src_ori, dim)
+        if src_dirs.ndim == 1:
+            src_dirs = src_dirs.unsqueeze(0).repeat(n_src, 1)
+        if src_dirs.ndim != 2 or src_dirs.shape[0] != n_src:
+            raise ValueError("source orientation must match number of sources")
 
-        sample, attenuation = _compute_image_contributions(
-            src_pos[s_idx],
+    for start in range(0, n_vec.shape[0], img_chunk):
+        end = min(start + img_chunk, n_vec.shape[0])
+        n_vec_chunk = n_vec[start:end]
+        refl_chunk = refl[start:end]
+        sample_chunk, attenuation_chunk = _compute_image_contributions_batch(
+            src_pos,
             mic_pos,
             room_size,
-            n_vec,
-            refl,
+            n_vec_chunk,
+            refl_chunk,
             room,
             fdl2,
             src_pattern=src_pattern,
             mic_pattern=mic_pattern,
-            src_dir=src_dir,
+            src_dirs=src_dirs,
             mic_dir=mic_dir,
         )
-        _accumulate_rir(rir[s_idx], sample, attenuation)
+        _accumulate_rir_batch(rir, sample_chunk, attenuation_chunk)
 
     if tdiff is not None and tmax is not None and tdiff < tmax:
         rir = _apply_diffuse_tail(rir, room, beta, tdiff, tmax)
@@ -314,6 +324,14 @@ def _image_positions(src: Tensor, room_size: Tensor, n_vec: Tensor) -> Tensor:
     return 2.0 * room_size * n + sign * src
 
 
+def _image_positions_batch(src_pos: Tensor, room_size: Tensor, n_vec: Tensor) -> Tensor:
+    """Compute image source positions for multiple sources."""
+    sign = torch.where((n_vec % 2) == 0, 1.0, -1.0).to(dtype=src_pos.dtype)
+    n = torch.floor_divide(n_vec + 1, 2).to(dtype=src_pos.dtype)
+    base = 2.0 * room_size * n
+    return base[None, :, :] + sign[None, :, :] * src_pos[:, None, :]
+
+
 def _reflection_coefficients(n_vec: Tensor, beta: Tensor) -> Tensor:
     """Compute reflection coefficients for each image source.
 
@@ -376,6 +394,47 @@ def _compute_image_contributions(
     return sample, attenuation
 
 
+def _compute_image_contributions_batch(
+    src_pos: Tensor,
+    mic_pos: Tensor,
+    room_size: Tensor,
+    n_vec: Tensor,
+    refl: Tensor,
+    room: Room,
+    fdl2: int,
+    *,
+    src_pattern: str,
+    mic_pattern: str,
+    src_dirs: Optional[Tensor],
+    mic_dir: Optional[Tensor],
+) -> Tuple[Tensor, Tensor]:
+    """Compute samples/attenuation for all sources/mics/images in batch."""
+    img = _image_positions_batch(src_pos, room_size, n_vec)
+    vec = mic_pos[None, :, None, :] - img[:, None, :, :]
+    dist = torch.linalg.norm(vec, dim=-1)
+    dist = torch.clamp(dist, min=1e-6)
+    time = dist / room.c
+    time = time + (fdl2 / room.fs)
+    sample = time * room.fs
+
+    gain = refl.view(1, 1, -1)
+    if src_pattern != "omni":
+        if src_dirs is None:
+            raise ValueError("source orientation required for non-omni directivity")
+        src_dirs = src_dirs[:, None, None, :]
+        cos_theta = _cos_between(vec, src_dirs)
+        gain = gain * directivity_gain(src_pattern, cos_theta)
+    if mic_pattern != "omni":
+        if mic_dir is None:
+            raise ValueError("mic orientation required for non-omni directivity")
+        mic_dir = mic_dir[None, :, None, :] if mic_dir.ndim == 2 else mic_dir.view(1, 1, 1, -1)
+        cos_theta = _cos_between(-vec, mic_dir)
+        gain = gain * directivity_gain(mic_pattern, cos_theta)
+
+    attenuation = gain / dist
+    return sample, attenuation
+
+
 def _select_orientation(orientation: Tensor, idx: int, count: int, dim: int) -> Tensor:
     """Pick the correct orientation vector for a given entity index."""
     if orientation.ndim == 0:
@@ -404,51 +463,190 @@ def _accumulate_rir(rir: Tensor, sample: Tensor, amplitude: Tensor) -> None:
     fdl = cfg["frac_delay_length"]
     lut_gran = cfg["sinc_lut_granularity"]
     use_lut = cfg["use_lut"]
+    if use_lut and rir.device.type == "mps":
+        use_lut = False
     fdl2 = (fdl - 1) // 2
 
-    n = torch.arange(fdl, device=rir.device, dtype=sample.dtype)
-    offsets = n - fdl2
-    window = torch.hann_window(fdl, periodic=False, device=rir.device, dtype=sample.dtype)
+    dtype = amplitude.dtype
+    n = _get_fdl_grid(fdl, device=rir.device, dtype=dtype)
+    offsets = _get_fdl_offsets(fdl, device=rir.device)
+    window = _get_fdl_window(fdl, device=rir.device, dtype=dtype)
+
+    if use_lut:
+        sinc_lut = _get_sinc_lut(fdl, lut_gran, device=rir.device, dtype=dtype)
+
+    mic_offsets = (torch.arange(n_mic, device=rir.device, dtype=torch.int64) * nsample).view(
+        n_mic, 1, 1
+    )
+    rir_flat = rir.view(-1)
+
+    chunk_size = cfg.get("accumulate_chunk_size", 4096)
+    n_img = idx0.shape[1]
+    for start in range(0, n_img, chunk_size):
+        end = min(start + chunk_size, n_img)
+        idx = idx0[:, start:end]
+        amp = amplitude[:, start:end]
+        frac_m = frac[:, start:end]
+
+        if use_lut:
+            x_off_frac = (1.0 - frac_m) * lut_gran
+            lut_gran_off = torch.floor(x_off_frac).to(torch.int64)
+            x_off = x_off_frac - lut_gran_off.to(dtype)
+            lut_pos = lut_gran_off[..., None] + (n[None, None, :].to(torch.int64) * lut_gran)
+
+            s0 = torch.take(sinc_lut, lut_pos)
+            s1 = torch.take(sinc_lut, lut_pos + 1)
+            interp = s0 + x_off[..., None] * (s1 - s0)
+            filt = interp * window[None, None, :]
+        else:
+            t = n[None, None, :] - fdl2 - frac_m[..., None]
+            filt = torch.sinc(t) * window[None, None, :]
+
+        contrib = amp[..., None] * filt
+        target = idx[..., None] + offsets[None, None, :]
+        valid = (target >= 0) & (target < nsample)
+        if not valid.any():
+            continue
+
+        target = target + mic_offsets
+        target_flat = target[valid].to(torch.int64)
+        values_flat = contrib[valid]
+        rir_flat.scatter_add_(0, target_flat, values_flat)
+
+
+def _accumulate_rir_batch(rir: Tensor, sample: Tensor, amplitude: Tensor) -> None:
+    """Accumulate fractional-delay contributions for all sources/mics."""
+    fn = _maybe_compile_accumulate(_accumulate_rir_batch_impl, rir.device, amplitude.dtype)
+    return fn(rir, sample, amplitude)
+
+
+def _accumulate_rir_batch_impl(rir: Tensor, sample: Tensor, amplitude: Tensor) -> None:
+    """Implementation for batch accumulation (optionally compiled)."""
+    idx0 = torch.floor(sample).to(torch.int64)
+    frac = sample - idx0.to(sample.dtype)
+
+    n_src, n_mic, nsample = rir.shape
+    n_sm = n_src * n_mic
+    idx0 = idx0.view(n_sm, -1)
+    frac = frac.view(n_sm, -1)
+    amplitude = amplitude.view(n_sm, -1)
+
+    cfg = get_config()
+    fdl = cfg["frac_delay_length"]
+    lut_gran = cfg["sinc_lut_granularity"]
+    use_lut = cfg["use_lut"]
+    if use_lut and rir.device.type == "mps":
+        use_lut = False
+    fdl2 = (fdl - 1) // 2
+
+    n = _get_fdl_grid(fdl, device=rir.device, dtype=sample.dtype)
+    offsets = _get_fdl_offsets(fdl, device=rir.device)
+    window = _get_fdl_window(fdl, device=rir.device, dtype=sample.dtype)
 
     if use_lut:
         sinc_lut = _get_sinc_lut(fdl, lut_gran, device=rir.device, dtype=sample.dtype)
 
-    for m in range(n_mic):
-        idx = idx0[m]
-        amp = amplitude[m]
-        frac_m = frac[m]
+    sm_offsets = (torch.arange(n_sm, device=rir.device, dtype=torch.int64) * nsample).view(
+        n_sm, 1, 1
+    )
+    rir_flat = rir.view(-1)
+
+    chunk_size = cfg.get("accumulate_chunk_size", 4096)
+    n_img = idx0.shape[1]
+    for start in range(0, n_img, chunk_size):
+        end = min(start + chunk_size, n_img)
+        idx = idx0[:, start:end]
+        amp = amplitude[:, start:end]
+        frac_m = frac[:, start:end]
 
         if use_lut:
             x_off_frac = (1.0 - frac_m) * lut_gran
             lut_gran_off = torch.floor(x_off_frac).to(torch.int64)
             x_off = x_off_frac - lut_gran_off.to(sample.dtype)
-            lut_pos = lut_gran_off[:, None] + (n[None, :].to(torch.int64) * lut_gran)
+            lut_pos = lut_gran_off[..., None] + (n[None, None, :].to(torch.int64) * lut_gran)
 
             s0 = torch.take(sinc_lut, lut_pos)
             s1 = torch.take(sinc_lut, lut_pos + 1)
-            interp = s0 + x_off[:, None] * (s1 - s0)
-            filt = interp * window[None, :]
+            interp = s0 + x_off[..., None] * (s1 - s0)
+            filt = interp * window[None, None, :]
         else:
-            t = n[None, :] - fdl2 - frac_m[:, None]
-            filt = torch.sinc(t) * window[None, :]
+            t = n[None, None, :] - fdl2 - frac_m[..., None]
+            filt = torch.sinc(t) * window[None, None, :]
 
-        contrib = amp[:, None] * filt
-        target = idx[:, None] + offsets[None, :]
+        contrib = amp[..., None] * filt
+        target = idx[..., None] + offsets[None, None, :]
         valid = (target >= 0) & (target < nsample)
         if not valid.any():
             continue
 
-        target = target[valid].to(torch.int64)
-        values = contrib[valid]
-        rir[m].scatter_add_(0, target, values)
+        target = target + sm_offsets
+        target_flat = target[valid].to(torch.int64)
+        values_flat = contrib[valid]
+        rir_flat.scatter_add_(0, target_flat, values_flat)
+
+
+_SINC_LUT_CACHE: dict[tuple[int, int, str, torch.dtype], Tensor] = {}
+_FDL_GRID_CACHE: dict[tuple[int, str, torch.dtype], Tensor] = {}
+_FDL_OFFSETS_CACHE: dict[tuple[int, str], Tensor] = {}
+_FDL_WINDOW_CACHE: dict[tuple[int, str, torch.dtype], Tensor] = {}
+_ACCUM_BATCH_COMPILED: dict[tuple[str, torch.dtype], callable] = {}
+
+
+def _maybe_compile_accumulate(fn, device: torch.device, dtype: torch.dtype):
+    """Optionally wrap accumulation with torch.compile on GPU devices."""
+    if device.type not in ("cuda", "mps"):
+        return fn
+    cfg = get_config()
+    if not cfg.get("use_compile", False):
+        return fn
+    key = (str(device), dtype)
+    compiled = _ACCUM_BATCH_COMPILED.get(key)
+    if compiled is None:
+        compiled = torch.compile(fn, dynamic=True)
+        _ACCUM_BATCH_COMPILED[key] = compiled
+    return compiled
+
+
+def _get_fdl_grid(fdl: int, *, device: torch.device, dtype: torch.dtype) -> Tensor:
+    key = (fdl, str(device), dtype)
+    cached = _FDL_GRID_CACHE.get(key)
+    if cached is None:
+        cached = torch.arange(fdl, device=device, dtype=dtype)
+        _FDL_GRID_CACHE[key] = cached
+    return cached
+
+
+def _get_fdl_offsets(fdl: int, *, device: torch.device) -> Tensor:
+    key = (fdl, str(device))
+    cached = _FDL_OFFSETS_CACHE.get(key)
+    if cached is None:
+        fdl2 = (fdl - 1) // 2
+        cached = torch.arange(fdl, device=device, dtype=torch.int64) - fdl2
+        _FDL_OFFSETS_CACHE[key] = cached
+    return cached
+
+
+def _get_fdl_window(fdl: int, *, device: torch.device, dtype: torch.dtype) -> Tensor:
+    key = (fdl, str(device), dtype)
+    cached = _FDL_WINDOW_CACHE.get(key)
+    if cached is None:
+        cached = torch.hann_window(fdl, periodic=False, device=device, dtype=dtype)
+        _FDL_WINDOW_CACHE[key] = cached
+    return cached
 
 
 def _get_sinc_lut(fdl: int, lut_gran: int, *, device: torch.device, dtype: torch.dtype) -> Tensor:
     """Create a sinc lookup table for fractional delays."""
+    key = (fdl, lut_gran, str(device), dtype)
+    cached = _SINC_LUT_CACHE.get(key)
+    if cached is not None:
+        return cached
     fdl2 = (fdl - 1) // 2
     lut_size = (fdl + 1) * lut_gran + 1
     n = torch.linspace(-fdl2 - 1, fdl2 + 1, lut_size, device=device, dtype=dtype)
-    return torch.sinc(n)
+    cached = torch.sinc(n)
+    _SINC_LUT_CACHE[key] = cached
+    return cached
 
 
 def _apply_diffuse_tail(rir: Tensor, room: Room, beta: Tensor, tdiff: float, tmax: float) -> Tensor:
