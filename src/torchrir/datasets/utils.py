@@ -3,6 +3,7 @@ from __future__ import annotations
 """Dataset-agnostic utilities."""
 
 import random
+from pathlib import Path
 from typing import Callable, List, Optional, Sequence, Tuple
 
 import torch
@@ -94,3 +95,20 @@ def load_dataset_sources(
     if fs is None:
         raise RuntimeError("no audio loaded from dataset sources")
     return stacked, int(fs), info
+
+
+def load_wav_mono(path: Path) -> Tuple[torch.Tensor, int]:
+    """Load a wav/flac file and return mono audio and sample rate.
+
+    Example:
+        >>> audio, fs = load_wav_mono(Path("datasets/cmu_arctic/ARCTIC/.../wav/arctic_a0001.wav"))
+    """
+    import soundfile as sf
+
+    audio, sample_rate = sf.read(str(path), dtype="float32", always_2d=True)
+    audio_t = torch.from_numpy(audio)
+    if audio_t.shape[1] > 1:
+        audio_t = audio_t.mean(dim=1)
+    else:
+        audio_t = audio_t.squeeze(1)
+    return audio_t, sample_rate

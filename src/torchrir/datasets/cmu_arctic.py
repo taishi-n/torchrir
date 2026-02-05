@@ -2,6 +2,7 @@ from __future__ import annotations
 
 """CMU ARCTIC dataset helpers."""
 
+import logging
 import tarfile
 import urllib.request
 from dataclasses import dataclass
@@ -9,7 +10,9 @@ from pathlib import Path
 from typing import List, Tuple
 
 import torch
-import logging
+
+from .base import BaseDataset
+from .utils import load_wav_mono
 
 BASE_URL = "http://www.festvox.org/cmu_arctic/packed"
 VALID_SPEAKERS = {
@@ -49,7 +52,7 @@ class CmuArcticSentence:
     text: str
 
 
-class CmuArcticDataset:
+class CmuArcticDataset(BaseDataset):
     """CMU ARCTIC dataset loader.
 
     Example:
@@ -189,23 +192,6 @@ def _parse_text_line(line: str) -> Tuple[str, str]:
     utterance = left.replace("(", "").strip().split()[0]
     text = right.rsplit('"', 1)[0]
     return utterance, text
-
-
-def load_wav_mono(path: Path) -> Tuple[torch.Tensor, int]:
-    """Load a wav file and return mono audio and sample rate.
-
-    Example:
-        >>> audio, fs = load_wav_mono(Path("datasets/cmu_arctic/ARCTIC/.../wav/arctic_a0001.wav"))
-    """
-    import soundfile as sf
-
-    audio, sample_rate = sf.read(str(path), dtype="float32", always_2d=True)
-    audio_t = torch.from_numpy(audio)
-    if audio_t.shape[1] > 1:
-        audio_t = audio_t.mean(dim=1)
-    else:
-        audio_t = audio_t.squeeze(1)
-    return audio_t, sample_rate
 
 
 def save_wav(path: Path, audio: torch.Tensor, sample_rate: int) -> None:
