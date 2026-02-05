@@ -1,12 +1,17 @@
 # TorchRIR
 
+[![GitHub stars](https://img.shields.io/github/stars/taishi-n/torchrir?style=social)](https://github.com/taishi-n/torchrir)
+
 ## Summary
 TorchRIR is a PyTorch-based toolkit for room impulse response (RIR) simulation
 with CPU/CUDA/MPS support, static and dynamic scenes, and dataset utilities.
-TorchRIR is under active development and may contain bugs or breaking changes.
-Please validate results for your use case.
 If you find bugs or have feature requests, please open an issue.
 Contributions are welcome.
+
+```{warning}
+TorchRIR is under active development and may contain bugs or breaking changes.
+Please validate results for your use case.
+```
 
 ## Installation
 ```bash
@@ -34,6 +39,8 @@ pip install torchrir
 ### License
 TorchRIR is released under the Apache 2.0 license. See `LICENSE`.
 
+See the detailed overview: {doc}`overview`.
+
 ## Main features
 ### Static room acoustic simulation
 - Compute static RIRs with `simulate_rir`.
@@ -47,18 +54,23 @@ TorchRIR is released under the Apache 2.0 license. See `LICENSE`.
 - Use `load_dataset_sources` to build fixed-length sources.
 - Use dataset examples to generate per-scene WAV + metadata.
 
-## API documentation
-See the API reference: `api`.
+See runnable examples and command-line usage: {doc}`examples`.
 
-## Index
+## Documentation pages
+- {doc}`overview`
+- {doc}`examples`
+- {doc}`changelog`
+- {doc}`api` (API documentation)
 - {ref}`genindex`
 
 ```{toctree}
 :maxdepth: 2
 :caption: Contents
+:hidden:
 
-api
 overview
 examples
 changelog
+API documentation <api>
+Index <genindex>
 ```

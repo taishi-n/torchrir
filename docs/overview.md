@@ -1,25 +1,30 @@
 # Overview
 
 ## Capabilities
-- ISM-based static and dynamic RIR simulation (2D/3D shoebox rooms).
-- Directivity patterns: `omni`, `cardioid`, `hypercardioid`, `subcardioid`, `bidir` with orientation handling.
-- Acoustic parameters: `beta` or `t60` (Sabine), optional diffuse tail via `tdiff`.
+- ISM-based static and dynamic RIR simulation for 2D/3D shoebox rooms.
+- Directivity patterns (`omni`, `cardioid`, `hypercardioid`, `subcardioid`, `bidir`)
+  with per-source/mic orientation handling.
+- Acoustic parameters via `beta` or `t60` (Sabine), optional diffuse tail via `tdiff`.
 - Dynamic convolution via `DynamicConvolver` (`trajectory` or `hop` modes).
-- GPU acceleration for ISM accumulation (CUDA/MPS; MPS disables LUT).
-- Dataset utilities with CMU ARCTIC support and example pipelines.
-- Plotting utilities for static and dynamic scenes.
-- Metadata export helpers for time axis, DOA, and array attributes (JSON-ready).
-- Unified CLI with JSON/YAML config and deterministic flag support.
+- CPU/CUDA/MPS execution with optional `torch.compile` acceleration for ISM accumulation
+  (when enabled; MPS disables LUT).
+- Standard array geometries (linear, circular, polyhedron, binaural, Eigenmike)
+  and trajectory sampling utilities.
+- Dataset utilities (CMU ARCTIC, LibriSpeech, template stubs) plus DataLoader collate helpers.
+- Plotting utilities for static/dynamic scenes and GIF animation.
+- Metadata export helpers for time axis, DOA, array attributes, and trajectories (JSON-ready).
+- Unified CLI example with JSON/YAML config and deterministic flag support.
 
 ## Module layout
-- `torchrir.sim`: simulation backends (ISM implementation in `torchrir.sim.ism`)
-- `torchrir.signal`: convolution utilities and dynamic convolver
-- `torchrir.geometry`: array geometries, sampling, trajectories
-- `torchrir.viz`: plotting and animation helpers
-- `torchrir.models`: room/scene/result data models
-- `torchrir.io`: audio I/O and metadata serialization
-- `torchrir.util`: shared math/tensor/device helpers
-- `torchrir.infra`: logging utilities
+- {py:mod}`torchrir.sim`: Simulation engines and configuration for RIR generation.
+- {py:mod}`torchrir.signal`: Signal processing utilities for static and dynamic RIR convolution.
+- {py:mod}`torchrir.geometry`: Geometry helpers for arrays, trajectories, and sampling.
+- {py:mod}`torchrir.viz`: Visualization helpers for scenes and trajectories.
+- {py:mod}`torchrir.models`: Core data models for rooms, sources, microphones, scenes, and results.
+- {py:mod}`torchrir.io`: I/O helpers for audio files and metadata serialization.
+- {py:mod}`torchrir.util`: General-purpose math, device, and tensor utilities for torchrir.
+- {py:mod}`torchrir.infra`: Infrastructure utilities (logging configuration and helpers).
+- {py:mod}`torchrir.datasets`: Dataset helpers, collate utilities, and template stubs.
 
 ## Device selection
 - `device="cpu"`: CPU execution
@@ -47,60 +52,6 @@ device, dtype = DeviceSpec(device="auto").resolve()
 - CMU ARCTIC downloads require network access.
 - GIF animation output requires Pillow (via matplotlib animation writer).
 
-## Dataset utilities
-```python
-from torchrir import CmuArcticDataset, collate_dataset_items, load_dataset_sources
-from torchrir.geometry import clamp_positions, sample_positions
-import random
-from torch.utils.data import DataLoader
-
-def dataset_factory(speaker: str | None):
-    spk = speaker or "bdl"
-    return CmuArcticDataset("datasets/cmu_arctic", speaker=spk, download=True)
-
-signals, fs, info = load_dataset_sources(
-    dataset_factory=dataset_factory,
-    num_sources=2,
-    duration_s=10.0,
-    rng=random.Random(0),
-)
-
-dataset = CmuArcticDataset("datasets/cmu_arctic", speaker="bdl", download=True)
-loader = DataLoader(dataset, batch_size=4, collate_fn=collate_dataset_items)
-```
-
-`TemplateDataset` provides a minimal stub for future dataset integrations.
-
-### LibriSpeech example
-```python
-from pathlib import Path
-from torchrir import LibriSpeechDataset
-
-dataset = LibriSpeechDataset(
-    Path("datasets/librispeech"),
-    subset="train-clean-100",
-    download=True,
-)
-audio, fs = dataset.load_wav("103-1240-0000")
-```
-
-## Logging
-```python
-from torchrir import LoggingConfig, get_logger, setup_logging
-
-setup_logging(LoggingConfig(level="INFO"))
-logger = get_logger("examples")
-logger.info("running torchrir example")
-```
-
-## Scene and results
-```python
-from torchrir import Scene, RIRResult
-
-scene = Scene(room=room, sources=sources, mics=mics, src_traj=src_traj, mic_traj=mic_traj)
-scene.validate()
-result = RIRResult(rirs=rirs, scene=scene, config=config)
-```
 
 ## Specification (current)
 ### Purpose
