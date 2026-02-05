@@ -47,7 +47,11 @@ class LibriSpeechDataset(BaseDataset):
     """
 
     def __init__(
-        self, root: Path, subset: str = "train-clean-100", download: bool = False
+        self,
+        root: Path,
+        subset: str = "train-clean-100",
+        speaker: str | None = None,
+        download: bool = False,
     ) -> None:
         """Initialize a LibriSpeech dataset handle.
 
@@ -60,9 +64,11 @@ class LibriSpeechDataset(BaseDataset):
             raise ValueError(f"unsupported subset: {subset}")
         self.root = Path(root)
         self.subset = subset
+        self.speaker = speaker
         self._archive_name = f"{subset}.tar.gz"
         self._base_dir = self.root / "LibriSpeech"
         self._subset_dir = self._base_dir / subset
+        self._speaker_dir = self._subset_dir / speaker if speaker else None
 
         if download:
             self._download_and_extract()
@@ -72,9 +78,15 @@ class LibriSpeechDataset(BaseDataset):
                 "dataset not found; run with download=True or place the archive under "
                 f"{self.root}"
             )
+        if self._speaker_dir is not None and not self._speaker_dir.exists():
+            raise FileNotFoundError(
+                f"speaker directory not found: {self._speaker_dir}"
+            )
 
     def list_speakers(self) -> List[str]:
         """Return available speaker IDs."""
+        if self.speaker is not None:
+            return [self.speaker]
         if not self._subset_dir.exists():
             return []
         return sorted([p.name for p in self._subset_dir.iterdir() if p.is_dir()])
@@ -82,7 +94,10 @@ class LibriSpeechDataset(BaseDataset):
     def available_sentences(self) -> List[LibriSpeechSentence]:
         """Return sentences that have a corresponding audio file."""
         sentences: List[LibriSpeechSentence] = []
-        for trans_path in self._subset_dir.rglob("*.trans.txt"):
+        search_root = (
+            self._speaker_dir if self._speaker_dir is not None else self._subset_dir
+        )
+        for trans_path in search_root.rglob("*.trans.txt"):
             chapter_dir = trans_path.parent
             speaker_id = chapter_dir.parent.name
             chapter_id = chapter_dir.name
