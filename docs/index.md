@@ -51,7 +51,7 @@ See the detailed overview: {doc}`overview`.
 - Convolve with `DynamicConvolver(mode="trajectory")`.
 
 ### Building dataset
-- Use `load_dataset_sources` to build fixed-length sources.
+- Use `torchrir.datasets.load_dataset_sources` to build fixed-length sources.
 - Use dataset examples to generate per-scene WAV + metadata.
 
 See runnable examples and command-line usage: {doc}`examples`.
