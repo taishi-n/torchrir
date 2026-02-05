@@ -22,7 +22,8 @@
 - {py:mod}`torchrir.viz`: Visualization helpers for scenes and trajectories.
 - {py:mod}`torchrir.models`: Core data models for rooms, sources, microphones, scenes, and results.
 - {py:mod}`torchrir.io`: I/O helpers for audio files and metadata serialization
-  (wav-only `load`/`save`/`info`, non-wav via `torchrir.io.audio.*`).
+  (wav-only `load`/`save`/`info` with backend selection; non-wav via
+  `torchrir.io.audio.*`).
 - {py:mod}`torchrir.util`: General-purpose math, device, and tensor utilities for torchrir.
 - {py:mod}`torchrir.logging`: Logging configuration and helpers.
 - {py:mod}`torchrir.config`: Simulation configuration objects.

@@ -40,7 +40,7 @@ pip install torchrir
 - `torchrir.geometry`: array geometries, sampling, trajectories
 - `torchrir.viz`: plotting and animation helpers
 - `torchrir.models`: room/scene/result data models
-- `torchrir.io`: audio I/O and metadata serialization
+- `torchrir.io`: audio I/O and metadata serialization (wav-only load/save/info with backend selection)
 - `torchrir.util`: shared math/tensor/device helpers
 - `torchrir.logging`: logging utilities
 - `torchrir.config`: simulation configuration objects
