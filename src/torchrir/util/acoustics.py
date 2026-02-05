@@ -22,6 +22,10 @@ def estimate_beta_from_t60(
 ) -> Tensor:
     """Estimate reflection coefficients from T60 using Sabine's formula.
 
+    Note:
+        This function corresponds to gpuRIR's ``beta_SabineEstimation``. TorchRIR
+        uses snake_case naming for consistency.
+
     Example:
         >>> beta = estimate_beta_from_t60(torch.tensor([6.0, 4.0, 3.0]), t60=0.4)
     """
@@ -101,6 +105,10 @@ def estimate_t60_from_beta(
 def att2t_sabine_estimation(att_db: float, t60: float) -> float:
     """Convert attenuation (dB) to time based on T60.
 
+    Note:
+        This function corresponds to gpuRIR's ``att2t_SabineEstimation``. TorchRIR
+        uses snake_case naming for consistency.
+
     Example:
         >>> t = att2t_sabine_estimation(att_db=60.0, t60=0.4)
     """
@@ -111,29 +119,16 @@ def att2t_sabine_estimation(att_db: float, t60: float) -> float:
     return (att_db / 60.0) * t60
 
 
-def att2t_SabineEstimation(att_db: float, t60: float) -> float:
-    """Legacy alias for att2t_sabine_estimation.
-
-    Example:
-        >>> t = att2t_SabineEstimation(att_db=60.0, t60=0.4)
-    """
-    return att2t_sabine_estimation(att_db, t60)
-
-
-def beta_SabineEstimation(room_size: Tensor, t60: float) -> Tensor:
-    """Legacy alias for estimate_beta_from_t60.
-
-    Example:
-        >>> beta = beta_SabineEstimation(torch.tensor([6.0, 4.0, 3.0]), t60=0.4)
-    """
-    return estimate_beta_from_t60(room_size, t60)
-
-
-def t2n(tmax: float, room_size: Tensor, c: float = _DEF_SPEED_OF_SOUND) -> Tensor:
+def estimate_image_counts(
+    tmax: float, room_size: Tensor, c: float = _DEF_SPEED_OF_SOUND
+) -> Tensor:
     """Estimate image counts per dimension needed to cover tmax.
 
+    Note:
+        This function corresponds to gpuRIR's ``t2n`` helper, renamed for clarity.
+
     Example:
-        >>> nb_img = t2n(0.3, torch.tensor([6.0, 4.0, 3.0]))
+        >>> nb_img = estimate_image_counts(0.3, torch.tensor([6.0, 4.0, 3.0]))
     """
     if tmax <= 0:
         raise ValueError("tmax must be positive")

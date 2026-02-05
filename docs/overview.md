@@ -24,7 +24,8 @@
 - {py:mod}`torchrir.io`: I/O helpers for audio files and metadata serialization.
 - {py:mod}`torchrir.util`: General-purpose math, device, and tensor utilities for torchrir.
 - {py:mod}`torchrir.infra`: Infrastructure utilities (logging configuration and helpers).
-- {py:mod}`torchrir.datasets`: Dataset helpers, collate utilities, and template stubs.
+- {py:mod}`torchrir.datasets`: Dataset helpers and collate utilities.
+- {py:mod}`torchrir.experimental`: Work-in-progress APIs (ray tracing, FDTD, template datasets).
 
 ## Device selection
 - `device="cpu"`: CPU execution
@@ -39,8 +40,10 @@ device, dtype = DeviceSpec(device="auto").resolve()
 ```
 
 ## Limitations and potential errors
-- Ray tracing and FDTD simulators are placeholders and raise `NotImplementedError`.
-- `TemplateDataset` methods are not implemented and will raise `NotImplementedError`.
+- Experimental ray tracing and FDTD simulators (`torchrir.experimental`) are placeholders and
+  raise `NotImplementedError`.
+- Experimental dataset stubs (`torchrir.experimental`) are not implemented and raise
+  `NotImplementedError`.
 - `simulate_rir`/`simulate_dynamic_rir` require `max_order` (or `SimulationConfig.max_order`) and either `nsample` or `tmax`.
 - Non-`omni` directivity requires orientation; mismatched shapes raise `ValueError`.
 - `beta` must have 4 (2D) or 6 (3D) elements; invalid sizes raise `ValueError`.

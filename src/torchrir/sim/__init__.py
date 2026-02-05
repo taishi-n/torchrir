@@ -7,13 +7,11 @@ and simulator interfaces for ISM plus placeholder ray-tracing/FDTD backends.
 from .config import SimulationConfig, default_config
 from .ism import simulate_dynamic_rir, simulate_rir
 from .directivity import directivity_gain, split_directivity
-from .simulators import FDTDSimulator, ISMSimulator, RIRSimulator, RayTracingSimulator
+from .simulators import ISMSimulator, RIRSimulator
 
 __all__ = [
-    "FDTDSimulator",
     "ISMSimulator",
     "RIRSimulator",
-    "RayTracingSimulator",
     "SimulationConfig",
     "default_config",
     "directivity_gain",

@@ -34,7 +34,7 @@ pip install torchrir
 ### Supported datasets
 - CMU ARCTIC
 - LibriSpeech
-- TemplateDataset (stub for future integrations)
+- Experimental template stub: {py:mod}`torchrir.experimental`
 
 ### License
 TorchRIR is released under the Apache 2.0 license. See `LICENSE`.

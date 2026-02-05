@@ -1,6 +1,13 @@
 API
 ===
 
+Stable vs Experimental
+----------------------
+
+This API reference lists both stable and experimental modules.
+Experimental APIs live under ``torchrir.experimental`` and may change without
+notice. Prefer top-level ``torchrir`` and documented submodules for stable use.
+
 .. automodule:: torchrir
    :members:
    :undoc-members:
@@ -45,6 +52,11 @@ Module packages
    :show-inheritance:
 
 .. automodule:: torchrir.infra
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: torchrir.experimental
    :members:
    :undoc-members:
    :show-inheritance:

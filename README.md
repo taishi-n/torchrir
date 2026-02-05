@@ -59,9 +59,9 @@ rir = simulate_rir(room=room, sources=sources, mics=mics, max_order=6, tmax=0.3)
 For detailed documentation, see the docs under `docs/` and Read the Docs.
 
 ## Future Work
-- Ray tracing backend: implement `RayTracingSimulator` with frequency-dependent absorption/scattering.
+- Ray tracing backend: implement `torchrir.experimental.RayTracingSimulator` with frequency-dependent absorption/scattering.
 - CUDA-native acceleration: introduce dedicated CUDA kernels for large-scale RIR generation.
-- Dataset expansion: add additional dataset integrations beyond CMU ARCTIC (see `TemplateDataset`), including torchaudio datasets (e.g., LibriSpeech, VCTK, LibriTTS, SpeechCommands, CommonVoice, GTZAN, MUSDB-HQ).
+- Dataset expansion: add additional dataset integrations beyond CMU ARCTIC (see `torchrir.experimental.TemplateDataset`), including torchaudio datasets (e.g., LibriSpeech, VCTK, LibriTTS, SpeechCommands, CommonVoice, GTZAN, MUSDB-HQ).
 - Add regression tests comparing generated RIRs against gpuRIR outputs.
 
 ## Related Libraries
