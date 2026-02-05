@@ -43,7 +43,7 @@ class LibriSpeechDataset(BaseDataset):
 
     Example:
         >>> dataset = LibriSpeechDataset(Path("datasets/librispeech"), subset="train-clean-100", download=True)
-        >>> audio, fs = dataset.load_wav("103-1240-0000")
+        >>> audio, fs = dataset.load_audio("103-1240-0000")
     """
 
     def __init__(
@@ -117,8 +117,8 @@ class LibriSpeechDataset(BaseDataset):
                         )
         return sentences
 
-    def load_wav(self, utterance_id: str) -> Tuple[torch.Tensor, int]:
-        """Load a mono wav for the given utterance ID."""
+    def load_audio(self, utterance_id: str) -> Tuple[torch.Tensor, int]:
+        """Load mono audio for the given utterance ID."""
         speaker_id, chapter_id, _ = utterance_id.split("-", 2)
         path = self._subset_dir / speaker_id / chapter_id / f"{utterance_id}.flac"
         return load_audio(path)

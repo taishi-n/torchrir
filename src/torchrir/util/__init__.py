@@ -1,9 +1,9 @@
 """General-purpose math, device, and tensor utilities for torchrir."""
 
 from .acoustics import (
-    att2t_sabine_estimation,
+    attenuation_db_to_time_sabine,
     estimate_beta_from_t60,
-    estimate_image_counts,
+    estimate_image_counts_from_tmax,
     estimate_t60_from_beta,
 )
 from .cli import add_output_args
@@ -15,10 +15,10 @@ __all__ = [
     "DeviceSpec",
     "add_output_args",
     "as_tensor",
-    "att2t_sabine_estimation",
+    "attenuation_db_to_time_sabine",
     "ensure_dim",
     "estimate_beta_from_t60",
-    "estimate_image_counts",
+    "estimate_image_counts_from_tmax",
     "estimate_t60_from_beta",
     "extend_size",
     "infer_device_dtype",

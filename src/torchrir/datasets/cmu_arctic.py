@@ -39,7 +39,7 @@ VALID_SPEAKERS = {
 logger = logging.getLogger(__name__)
 
 
-def list_cmu_arctic_speakers() -> List[str]:
+def cmu_arctic_speakers() -> List[str]:
     """Return supported CMU ARCTIC speaker IDs."""
     return sorted(VALID_SPEAKERS)
 
@@ -57,7 +57,7 @@ class CmuArcticDataset(BaseDataset):
 
     Example:
         >>> dataset = CmuArcticDataset(Path("datasets/cmu_arctic"), speaker="bdl", download=True)
-        >>> audio, fs = dataset.load_wav("arctic_a0001")
+        >>> audio, fs = dataset.load_audio("arctic_a0001")
     """
 
     def __init__(
@@ -88,8 +88,8 @@ class CmuArcticDataset(BaseDataset):
             )
 
     @property
-    def wav_dir(self) -> Path:
-        """Return the directory containing wav files."""
+    def audio_dir(self) -> Path:
+        """Return the directory containing audio files."""
         return self._dataset_dir / "wav"
 
     @property
@@ -133,20 +133,20 @@ class CmuArcticDataset(BaseDataset):
 
     def available_sentences(self) -> List[CmuArcticSentence]:
         """Return sentences that have a corresponding wav file."""
-        wav_ids = {p.stem for p in self.wav_dir.glob("*.wav")}
+        wav_ids = {p.stem for p in self.audio_dir.glob("*.wav")}
         return [s for s in self.sentences() if s.utterance_id in wav_ids]
 
     def list_speakers(self) -> List[str]:
         """Return available speaker IDs."""
-        return list_cmu_arctic_speakers()
+        return cmu_arctic_speakers()
 
-    def wav_path(self, utterance_id: str) -> Path:
-        """Return the wav path for an utterance ID."""
-        return self.wav_dir / f"{utterance_id}.wav"
+    def audio_path(self, utterance_id: str) -> Path:
+        """Return the audio path for an utterance ID."""
+        return self.audio_dir / f"{utterance_id}.wav"
 
-    def load_wav(self, utterance_id: str) -> Tuple[torch.Tensor, int]:
-        """Load a mono wav for the given utterance ID."""
-        path = self.wav_path(utterance_id)
+    def load_audio(self, utterance_id: str) -> Tuple[torch.Tensor, int]:
+        """Load mono audio for the given utterance ID."""
+        path = self.audio_path(utterance_id)
         return load(path)
 
 

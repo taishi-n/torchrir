@@ -22,7 +22,7 @@ from ..io.audio import load, save
 from .collate import CollateBatch, collate_dataset_items
 from .librispeech import LibriSpeechDataset, LibriSpeechSentence
 
-from .cmu_arctic import CmuArcticDataset, CmuArcticSentence, list_cmu_arctic_speakers
+from .cmu_arctic import CmuArcticDataset, CmuArcticSentence, cmu_arctic_speakers
 
 __all__ = [
     "BaseDataset",
@@ -32,7 +32,7 @@ __all__ = [
     "DatasetItem",
     "CollateBatch",
     "collate_dataset_items",
-    "list_cmu_arctic_speakers",
+    "cmu_arctic_speakers",
     "SentenceLike",
     "load_dataset_sources",
     "load",

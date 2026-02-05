@@ -74,7 +74,7 @@ def load_dataset_sources(
                 idx = 0
             sentence = sentences[idx]
             idx += 1
-            audio, sample_rate = dataset.load_wav(sentence.utterance_id)
+            audio, sample_rate = dataset.load_audio(sentence.utterance_id)
             if fs is None:
                 fs = sample_rate
                 target_samples = int(duration_s * fs)

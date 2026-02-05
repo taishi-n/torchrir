@@ -10,7 +10,7 @@ from torch import Tensor
 
 from .audio import AudioInfo, _load_audio, _save_audio, info_audio
 from .metadata import build_metadata, save_metadata_json
-from .outputs import save_audio, save_metadata
+from .outputs import save_scene_audio, save_scene_metadata
 
 
 @dataclass(frozen=True)
@@ -176,8 +176,8 @@ __all__ = [
     "info",
     "list_audio_backends",
     "load",
-    "save_audio",
-    "save_metadata",
+    "save_scene_audio",
+    "save_scene_metadata",
     "save_metadata_json",
     "save",
     "set_audio_backend",

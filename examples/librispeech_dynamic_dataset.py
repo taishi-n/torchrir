@@ -44,7 +44,7 @@ if str(EXAMPLES_DIR) not in sys.path:
 
 from torchrir.datasets import LibriSpeechDataset, load_dataset_sources
 from torchrir.geometry import arrays, sampling, trajectories
-from torchrir.io import save_audio, save_metadata
+from torchrir.io import save_scene_audio, save_scene_metadata
 from torchrir.signal import DynamicConvolver
 from torchrir.sim import simulate_dynamic_rir
 from torchrir.util import add_output_args, resolve_device
@@ -266,14 +266,14 @@ def main() -> None:
         y = DynamicConvolver(mode="trajectory").convolve(signals, rirs)
 
         # Save mixture audio and JSON metadata per scene.
-        save_audio(
+        save_scene_audio(
             out_dir=args.out_dir,
             audio=y,
             fs=fs,
             audio_name=f"scene_{idx:03d}.wav",
             logger=logger,
         )
-        metadata = save_metadata(
+        metadata = save_scene_metadata(
             out_dir=args.out_dir,
             metadata_name=f"scene_{idx:03d}_metadata.json",
             room=room,

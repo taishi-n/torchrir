@@ -35,7 +35,7 @@ if str(EXAMPLES_DIR) not in sys.path:
 
 from torchrir.datasets import CmuArcticDataset, load_dataset_sources
 from torchrir.geometry import arrays, sampling, trajectories
-from torchrir.io import save_audio, save_metadata
+from torchrir.io import save_scene_audio, save_scene_metadata
 from torchrir.signal import DynamicConvolver
 from torchrir.sim import simulate_dynamic_rir, simulate_rir
 from torchrir.util import add_output_args, resolve_device
@@ -315,14 +315,14 @@ def _run_static(args, rng: random.Random, logger):
     y = convolve_rir(signals, rirs)
 
     # Persist outputs.
-    save_audio(
+    save_scene_audio(
         out_dir=args.out_dir,
         audio=y,
         fs=fs,
         audio_name="static_binaural.wav",
         logger=logger,
     )
-    metadata = save_metadata(
+    metadata = save_scene_metadata(
         out_dir=args.out_dir,
         metadata_name="static_binaural_metadata.json",
         room=room,
@@ -412,14 +412,14 @@ def _run_dynamic_src(args, rng: random.Random, logger):
     y = DynamicConvolver(mode="trajectory").convolve(signals, rirs)
 
     # Persist outputs.
-    save_audio(
+    save_scene_audio(
         out_dir=args.out_dir,
         audio=y,
         fs=fs,
         audio_name="dynamic_src_binaural.wav",
         logger=logger,
     )
-    metadata = save_metadata(
+    metadata = save_scene_metadata(
         out_dir=args.out_dir,
         metadata_name="dynamic_src_binaural_metadata.json",
         room=room,
@@ -506,14 +506,14 @@ def _run_dynamic_mic(args, rng: random.Random, logger):
     y = DynamicConvolver(mode="trajectory").convolve(signals, rirs)
 
     # Persist outputs.
-    save_audio(
+    save_scene_audio(
         out_dir=args.out_dir,
         audio=y,
         fs=fs,
         audio_name="dynamic_mic_binaural.wav",
         logger=logger,
     )
-    metadata = save_metadata(
+    metadata = save_scene_metadata(
         out_dir=args.out_dir,
         metadata_name="dynamic_mic_binaural_metadata.json",
         room=room,

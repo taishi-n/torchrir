@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from ..models import MicrophoneArray, Room, Source
 
 
-def save_audio(
+def save_scene_audio(
     *,
     out_dir: Path,
     audio: Tensor,
@@ -23,7 +23,7 @@ def save_audio(
     audio_name: str,
     logger: Optional[logging.Logger] = None,
 ) -> Path:
-    """Save audio to the output directory."""
+    """Save scene audio to the output directory."""
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / audio_name
     save(out_path, audio, fs)
@@ -32,7 +32,7 @@ def save_audio(
     return out_path
 
 
-def save_metadata(
+def save_scene_metadata(
     *,
     out_dir: Path,
     metadata_name: str,
@@ -48,7 +48,7 @@ def save_metadata(
     extra: Optional[dict[str, Any]] = None,
     logger: Optional[logging.Logger] = None,
 ) -> dict[str, Any]:
-    """Build and save metadata JSON to the output directory."""
+    """Build and save scene metadata JSON to the output directory."""
     out_dir.mkdir(parents=True, exist_ok=True)
     metadata = build_metadata(
         room=room,

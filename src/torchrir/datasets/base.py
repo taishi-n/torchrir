@@ -40,7 +40,7 @@ class BaseDataset(Dataset[DatasetItem]):
         """Return sentence entries that have audio available."""
         raise NotImplementedError
 
-    def load_wav(self, utterance_id: str) -> Tuple[torch.Tensor, int]:
+    def load_audio(self, utterance_id: str) -> Tuple[torch.Tensor, int]:
         """Load audio for an utterance and return (audio, sample_rate)."""
         raise NotImplementedError
 
@@ -52,7 +52,7 @@ class BaseDataset(Dataset[DatasetItem]):
             raise TypeError(f"Index must be int, got {type(idx)!r}")
         sentences = self._get_sentences()
         sentence = sentences[idx]
-        audio, sample_rate = self.load_wav(sentence.utterance_id)
+        audio, sample_rate = self.load_audio(sentence.utterance_id)
         speaker = getattr(self, "speaker", None)
         text = getattr(sentence, "text", None)
         return DatasetItem(

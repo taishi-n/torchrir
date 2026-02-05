@@ -102,7 +102,7 @@ def estimate_t60_from_beta(
     return 0.161 * volume / absorption
 
 
-def att2t_sabine_estimation(att_db: float, t60: float) -> float:
+def attenuation_db_to_time_sabine(att_db: float, t60: float) -> float:
     """Convert attenuation (dB) to time based on T60.
 
     Note:
@@ -110,7 +110,7 @@ def att2t_sabine_estimation(att_db: float, t60: float) -> float:
         uses snake_case naming for consistency.
 
     Example:
-        >>> t = att2t_sabine_estimation(att_db=60.0, t60=0.4)
+        >>> t = attenuation_db_to_time_sabine(att_db=60.0, t60=0.4)
     """
     if t60 <= 0:
         raise ValueError("t60 must be positive")
@@ -119,7 +119,7 @@ def att2t_sabine_estimation(att_db: float, t60: float) -> float:
     return (att_db / 60.0) * t60
 
 
-def estimate_image_counts(
+def estimate_image_counts_from_tmax(
     tmax: float, room_size: Tensor, c: float = _DEF_SPEED_OF_SOUND
 ) -> Tensor:
     """Estimate image counts per dimension needed to cover tmax.
@@ -128,7 +128,7 @@ def estimate_image_counts(
         This function corresponds to gpuRIR's ``t2n`` helper, renamed for clarity.
 
     Example:
-        >>> nb_img = estimate_image_counts(0.3, torch.tensor([6.0, 4.0, 3.0]))
+        >>> nb_img = estimate_image_counts_from_tmax(0.3, torch.tensor([6.0, 4.0, 3.0]))
     """
     if tmax <= 0:
         raise ValueError("tmax must be positive")

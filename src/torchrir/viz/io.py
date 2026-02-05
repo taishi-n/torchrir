@@ -19,7 +19,7 @@ from .utils import (
 )
 
 
-def plot_scene_and_save(
+def render_scene_plots(
     *,
     out_dir: Path,
     room: Sequence[float] | torch.Tensor,
@@ -106,7 +106,7 @@ def save_scene_plots(
 ) -> None:
     """Plot and save scene images."""
     try:
-        static_paths, dynamic_paths = plot_scene_and_save(
+        static_paths, dynamic_paths = render_scene_plots(
             out_dir=out_dir,
             room=room,
             sources=sources,
