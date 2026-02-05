@@ -20,6 +20,8 @@ For each scene index `k`:
 
 - `scene_k.wav` — binaural mixture
 - `scene_k_metadata.json` — room size, trajectories, DOA, array attributes, etc.
+- `scene_k_static_2d.png` / `scene_k_dynamic_2d.png` — layout plots
+  (3D variants are saved when the room is 3D)
 
 ### Run
 
@@ -48,4 +50,3 @@ The example is implemented in `examples/cmu_arctic_dynamic_dataset.py` and uses:
 - `simulate_dynamic_rir` to generate the dynamic RIR sequence.
 - `DynamicConvolver(mode="trajectory")` to produce the final mixture.
 - `build_metadata` + `save_metadata_json` to store scene metadata.
-

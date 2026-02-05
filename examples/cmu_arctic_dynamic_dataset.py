@@ -16,6 +16,7 @@ Key characteristics:
 Outputs (per scene index k):
     - scene_k.wav
     - scene_k_metadata.json
+    - scene_k_static_2d.png / scene_k_dynamic_2d.png (and 3D variants when enabled)
 
 Run:
     uv run python examples/cmu_arctic_dynamic_dataset.py --num-scenes 4 --num-sources 2 --duration 6
@@ -79,7 +80,9 @@ if str(EXAMPLES_DIR) not in sys.path:
 from torchrir import binaural_mic_positions, sample_positions
 
 
-def _dataset_factory(root: Path, download: bool, speaker: str | None) -> CmuArcticDataset:
+def _dataset_factory(
+    root: Path, download: bool, speaker: str | None
+) -> CmuArcticDataset:
     spk = speaker or "bdl"
     return CmuArcticDataset(root, speaker=spk, download=download)
 
@@ -161,7 +164,9 @@ def main() -> None:
     # Fixed room and fixed binaural microphone layout across all scenes.
     device = resolve_device(args.device)
     room_size = torch.tensor(args.room, dtype=torch.float32)
-    room = Room.shoebox(size=args.room, fs=16000, beta=[0.9] * (6 if len(args.room) == 3 else 4))
+    room = Room.shoebox(
+        size=args.room, fs=16000, beta=[0.9] * (6 if len(args.room) == 3 else 4)
+    )
 
     rng = random.Random(args.seed)
     mic_center = sample_positions(num=1, room_size=room_size, rng=rng).squeeze(0)
@@ -174,7 +179,9 @@ def main() -> None:
         # Use a per-scene RNG so each scene has independent random motion + sources.
         scene_rng = random.Random(args.seed + idx)
         signals, fs, info = load_dataset_sources(
-            dataset_factory=lambda speaker: _dataset_factory(args.dataset_dir, args.download, speaker),
+            dataset_factory=lambda speaker: _dataset_factory(
+                args.dataset_dir, args.download, speaker
+            ),
             num_sources=args.num_sources,
             duration_s=args.duration,
             rng=scene_rng,
