@@ -76,7 +76,7 @@ EXAMPLES_DIR = Path(__file__).resolve().parent
 if str(EXAMPLES_DIR) not in sys.path:
     sys.path.insert(0, str(EXAMPLES_DIR))
 
-from torchrir import binaural_mic_positions, sample_positions
+from torchrir import sample_positions
 
 
 def _dataset_factory(
@@ -174,7 +174,7 @@ def main() -> None:
 
     rng = random.Random(args.seed)
     mic_center = sample_positions(num=1, room_size=room_size, rng=rng).squeeze(0)
-    mic_pos = clamp_positions(binaural_mic_positions(mic_center), room_size)
+    mic_pos = clamp_positions(MicrophoneArray.binaural(mic_center).positions, room_size)
     mics = MicrophoneArray.from_positions(mic_pos.tolist())
 
     args.out_dir.mkdir(parents=True, exist_ok=True)

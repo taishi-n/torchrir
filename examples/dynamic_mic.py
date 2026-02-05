@@ -51,13 +51,7 @@ except ModuleNotFoundError:  # allow running without installation
 EXAMPLES_DIR = Path(__file__).resolve().parent
 if str(EXAMPLES_DIR) not in sys.path:
     sys.path.insert(0, str(EXAMPLES_DIR))
-from torchrir import (
-    binaural_mic_positions,
-    clamp_positions,
-    linear_trajectory,
-    load_dataset_sources,
-    sample_positions,
-)
+from torchrir import clamp_positions, linear_trajectory, load_dataset_sources, sample_positions
 
 
 def main() -> None:
@@ -116,7 +110,7 @@ def main() -> None:
     steps = max(2, args.steps)
     mic_center_traj = linear_trajectory(mic_center_start, mic_center_end, steps)
     mic_traj = torch.stack(
-        [binaural_mic_positions(center) for center in mic_center_traj],
+        [MicrophoneArray.binaural(center).positions for center in mic_center_traj],
         dim=0,
     )
     mic_traj = clamp_positions(mic_traj, room_size)

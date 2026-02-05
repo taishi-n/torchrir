@@ -46,20 +46,6 @@ def linear_trajectory(
     )
 
 
-def binaural_mic_positions(center: torch.Tensor, offset: float = 0.08) -> torch.Tensor:
-    """Create a two-mic binaural layout around a center point.
-
-    Example:
-        >>> mics = binaural_mic_positions(torch.tensor([2.0, 2.0, 1.5]))
-    """
-    dim = center.numel()
-    offset_vec = torch.zeros((dim,), dtype=torch.float32)
-    offset_vec[0] = offset
-    left = center - offset_vec
-    right = center + offset_vec
-    return torch.stack([left, right], dim=0)
-
-
 def clamp_positions(
     positions: torch.Tensor, room_size: torch.Tensor, margin: float = 0.1
 ) -> torch.Tensor:

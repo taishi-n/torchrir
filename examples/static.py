@@ -49,12 +49,7 @@ except ModuleNotFoundError:  # allow running without installation
 EXAMPLES_DIR = Path(__file__).resolve().parent
 if str(EXAMPLES_DIR) not in sys.path:
     sys.path.insert(0, str(EXAMPLES_DIR))
-from torchrir import (
-    binaural_mic_positions,
-    clamp_positions,
-    load_dataset_sources,
-    sample_positions,
-)
+from torchrir import clamp_positions, load_dataset_sources, sample_positions
 
 
 def main() -> None:
@@ -104,7 +99,7 @@ def main() -> None:
 
     sources_pos = sample_positions(num=args.num_sources, room_size=room_size, rng=rng)
     mic_center = sample_positions(num=1, room_size=room_size, rng=rng).squeeze(0)
-    mic_pos = binaural_mic_positions(mic_center)
+    mic_pos = MicrophoneArray.binaural(mic_center).positions
     mic_pos = clamp_positions(mic_pos, room_size)
 
     sources = Source.from_positions(sources_pos.tolist())

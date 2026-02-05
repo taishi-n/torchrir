@@ -56,13 +56,7 @@ EXAMPLES_DIR = Path(__file__).resolve().parent
 if str(EXAMPLES_DIR) not in sys.path:
     sys.path.insert(0, str(EXAMPLES_DIR))
 
-from torchrir import (
-    binaural_mic_positions,
-    clamp_positions,
-    linear_trajectory,
-    load_dataset_sources,
-    sample_positions,
-)
+from torchrir import clamp_positions, linear_trajectory, load_dataset_sources, sample_positions
 
 
 def _dataset_factory(root: Path, download: bool, speaker: str | None):
@@ -277,7 +271,7 @@ def _run_static(args, rng: random.Random, logger):
 
     sources_pos = sample_positions(num=args.num_sources, room_size=room_size, rng=rng)
     mic_center = sample_positions(num=1, room_size=room_size, rng=rng).squeeze(0)
-    mic_pos = clamp_positions(binaural_mic_positions(mic_center), room_size)
+    mic_pos = clamp_positions(MicrophoneArray.binaural(mic_center).positions, room_size)
 
     sources = Source.from_positions(sources_pos.tolist())
     mics = MicrophoneArray.from_positions(mic_pos.tolist())
@@ -352,7 +346,7 @@ def _run_dynamic_src(args, rng: random.Random, logger):
     src_traj = clamp_positions(src_traj, room_size).to(device)
 
     mic_center = sample_positions(num=1, room_size=room_size, rng=rng).squeeze(0)
-    mic_pos = clamp_positions(binaural_mic_positions(mic_center), room_size)
+    mic_pos = clamp_positions(MicrophoneArray.binaural(mic_center).positions, room_size)
     mic_traj = mic_pos.unsqueeze(0).repeat(steps, 1, 1).to(device)
 
     sources = Source.from_positions(src_start.tolist())
@@ -426,7 +420,7 @@ def _run_dynamic_mic(args, rng: random.Random, logger):
     mic_center_end = sample_positions(num=1, room_size=room_size, rng=rng).squeeze(0)
     mic_center_traj = linear_trajectory(mic_center_start, mic_center_end, steps)
     mic_traj = torch.stack(
-        [binaural_mic_positions(center) for center in mic_center_traj], dim=0
+        [MicrophoneArray.binaural(center).positions for center in mic_center_traj], dim=0
     )
     mic_traj = clamp_positions(mic_traj, room_size).to(device)
 

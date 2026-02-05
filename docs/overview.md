@@ -41,7 +41,6 @@ device, dtype = DeviceSpec(device="auto").resolve()
 ```python
 from torchrir import (
     CmuArcticDataset,
-    binaural_mic_positions,
     clamp_positions,
     load_dataset_sources,
     collate_dataset_items,
