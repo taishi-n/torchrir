@@ -3,57 +3,31 @@
 PyTorch-based room impulse response (RIR) simulation toolkit focused on a clean, modern API with GPU support.
 This project has been substantially assisted by AI using Codex.
 
-## License
-Apache-2.0. See `LICENSE` and `NOTICE`.
-
 ## Installation
 ```bash
 pip install torchrir
 ```
 
-## Current Capabilities
-- ISM-based static and dynamic RIR simulation (2D/3D shoebox rooms).
-- Directivity patterns: `omni`, `cardioid`, `hypercardioid`, `subcardioid`, `bidir` with orientation handling.
-- Acoustic parameters: `beta` or `t60` (Sabine), optional diffuse tail via `tdiff`.
-- Dynamic convolution via `DynamicConvolver` (`trajectory` or `hop` modes).
-- GPU acceleration for ISM accumulation (CUDA/MPS; MPS disables LUT).
-- Dataset utilities with CMU ARCTIC support and example pipelines.
-- Plotting utilities for static and dynamic scenes.
-- Metadata export helpers for time axis, DOA, and array attributes (JSON-ready).
-- Unified CLI with JSON/YAML config and deterministic flag support.
+## Examples
+- `examples/static.py`: fixed sources/mics with binaural output.  
+  `uv run python examples/static.py --plot`
+- `examples/dynamic_src.py`: moving sources, fixed mics.  
+  `uv run python examples/dynamic_src.py --plot`
+- `examples/dynamic_mic.py`: fixed sources, moving mics.  
+  `uv run python examples/dynamic_mic.py --plot`
+- `examples/cli.py`: unified CLI for static/dynamic scenes, JSON/YAML configs.  
+  `uv run python examples/cli.py --mode static --plot`
+- `examples/cmu_arctic_dynamic_dataset.py`: small dynamic dataset generator (fixed room/mics, randomized source motion).  
+  `uv run python examples/cmu_arctic_dynamic_dataset.py --num-scenes 4 --num-sources 2`
+- `examples/benchmark_device.py`: CPU/GPU benchmark for RIR simulation.  
+  `uv run python examples/benchmark_device.py --dynamic`
 
-## Example Usage
-```bash
-# CMU ARCTIC + static RIR (fixed sources/mics)
-uv run python examples/static.py --plot
-
-# Dynamic RIR demos
-uv run python examples/dynamic_mic.py --plot
-uv run python examples/dynamic_src.py --plot
-uv run python examples/dynamic_mic.py --gif
-uv run python examples/dynamic_src.py --gif
-
-# Unified CLI
-uv run python examples/cli.py --mode static --plot
-uv run python examples/cli.py --mode dynamic_mic --plot
-uv run python examples/cli.py --mode dynamic_src --plot
-uv run python examples/cli.py --mode dynamic_mic --gif
-uv run python examples/dynamic_mic.py --gif --gif-fps 12
-
-# Config + deterministic
-uv run python examples/cli.py --mode static --deterministic --seed 123 --config-out outputs/cli.json
-uv run python examples/cli.py --config-in outputs/cli.json
-```
-GIF FPS is auto-derived from signal duration and RIR steps unless overridden with `--gif-fps`.
-For 3D rooms, an additional `*_3d.gif` is saved.
-YAML configs are supported when `PyYAML` is installed.
-```bash
-# YAML config
-uv run python examples/cli.py --mode static --config-out outputs/cli.yaml
-uv run python examples/cli.py --config-in outputs/cli.yaml
-```
-`examples/cli_example.yaml` provides a ready-to-use template.
-Examples also save `*_metadata.json` alongside audio outputs.
+## Core API Overview
+- Geometry: `Room`, `Source`, `MicrophoneArray`
+- Static RIR: `simulate_rir`
+- Dynamic RIR: `simulate_dynamic_rir`
+- Dynamic convolution: `DynamicConvolver`
+- Metadata export: `build_metadata`, `save_metadata_json`
 
 ```python
 from torchrir import DynamicConvolver, MicrophoneArray, Room, Source, simulate_rir
@@ -62,185 +36,12 @@ room = Room.shoebox(size=[6.0, 4.0, 3.0], fs=16000, beta=[0.9] * 6)
 sources = Source.from_positions([[1.0, 2.0, 1.5]])
 mics = MicrophoneArray.from_positions([[2.0, 2.0, 1.5]])
 
-rir = simulate_rir(
-    room=room,
-    sources=sources,
-    mics=mics,
-    max_order=6,
-    tmax=0.3,
-    device="auto",
-)
+rir = simulate_rir(room=room, sources=sources, mics=mics, max_order=6, tmax=0.3)
+# For dynamic scenes, compute rirs with simulate_dynamic_rir and convolve:
+# y = DynamicConvolver(mode="trajectory").convolve(signal, rirs)
 ```
 
-```python
-from torchrir import DynamicConvolver
-
-# Trajectory-mode dynamic convolution
-y = DynamicConvolver(mode="trajectory").convolve(signal, rirs)
-
-# Hop-mode dynamic convolution
-y = DynamicConvolver(mode="hop", hop=1024).convolve(signal, rirs)
-```
-Dynamic convolution is exposed via `DynamicConvolver` only (no legacy function wrappers).
-
-## Limitations and Potential Errors
-- Ray tracing and FDTD simulators are placeholders and raise `NotImplementedError`.
-- `TemplateDataset` methods are not implemented and will raise `NotImplementedError`.
-- `simulate_rir`/`simulate_dynamic_rir` require `max_order` (or `SimulationConfig.max_order`) and either `nsample` or `tmax`.
-- Non-`omni` directivity requires orientation; mismatched shapes raise `ValueError`.
-- `beta` must have 4 (2D) or 6 (3D) elements; invalid sizes raise `ValueError`.
-- `simulate_dynamic_rir` requires `src_traj` and `mic_traj` to have matching time steps.
-- Dynamic simulation currently loops per time step; very long trajectories can be slow.
-- MPS disables the sinc LUT path (falls back to direct sinc), which can be slower and slightly different numerically.
-- Deterministic mode is best-effort; some backends may still be non-deterministic.
-- YAML configs require `PyYAML`; otherwise a `ModuleNotFoundError` is raised.
-- CMU ARCTIC downloads require network access.
-- GIF animation output requires Pillow (via matplotlib animation writer).
-
-### Dataset-agnostic utilities
-```python
-from torchrir import (
-    CmuArcticDataset,
-    binaural_mic_positions,
-    clamp_positions,
-    load_dataset_sources,
-    sample_positions,
-)
-
-def dataset_factory(speaker: str | None):
-    spk = speaker or "bdl"
-    return CmuArcticDataset("datasets/cmu_arctic", speaker=spk, download=True)
-
-signals, fs, info = load_dataset_sources(
-    dataset_factory=dataset_factory,
-    num_sources=2,
-    duration_s=10.0,
-    rng=random.Random(0),
-)
-```
-
-### Dataset template (for future extension)
-`TemplateDataset` provides a minimal stub to implement new datasets later.
-
-### Logging
-```python
-from torchrir import LoggingConfig, get_logger, setup_logging
-
-setup_logging(LoggingConfig(level="INFO"))
-logger = get_logger("examples")
-logger.info("running torchrir example")
-```
-
-### Scene container
-```python
-from torchrir import Scene
-
-scene = Scene(room=room, sources=sources, mics=mics, src_traj=src_traj, mic_traj=mic_traj)
-scene.validate()
-```
-
-### Immutable geometry helpers
-`Room`, `Source`, and `MicrophoneArray` are immutable; use `.replace()` to update fields.
-
-### Result container
-```python
-from torchrir import RIRResult
-
-result = RIRResult(rirs=rirs, scene=scene, config=config)
-```
-
-### Simulation strategies
-```python
-from torchrir import ISMSimulator
-
-sim = ISMSimulator()
-result = sim.simulate(scene, config)
-```
-
-## Device Selection
-- `device="cpu"`: CPU execution
-- `device="cuda"`: NVIDIA GPU (CUDA) if available, otherwise fallback to CPU
-- `device="mps"`: Apple Silicon GPU via Metal (MPS) if available, otherwise fallback to CPU
-- `device="auto"`: prefer CUDA → MPS → CPU
-
-```python
-from torchrir import DeviceSpec
-
-device, dtype = DeviceSpec(device="auto").resolve()
-```
-
-## Specification (Current)
-### Purpose
-- Provide room impulse response (RIR) simulation on PyTorch with CPU/CUDA/MPS support.
-- Support static and dynamic scenes with a maintainable, modern API.
-
-### Room Model
-- Shoebox (rectangular) room model.
-- 2D or 3D.
-- Image Source Method (ISM) implementation.
-
-### Inputs
-#### Scene Geometry
-- Room size: `[Lx, Ly, Lz]` (2D uses `[Lx, Ly]`).
-- Source positions: `(n_src, dim)`.
-- Microphone positions: `(n_mic, dim)`.
-- Reflection order: `max_order`.
-
-#### Acoustic Parameters
-- Sample rate: `fs`.
-- Speed of sound: `c` (default 343.0 m/s).
-- Wall reflection coefficients: `beta` (4 faces for 2D, 6 for 3D) or `t60` (Sabine).
-
-#### Output Length
-- Specify `nsample` (samples) or `tmax` (seconds).
-
-#### Directivity
-- Patterns: `omni`, `cardioid`, `hypercardioid`, `subcardioid`, `bidir`.
-- Orientation specified by vector or angles.
-
-#### Configuration
-- `SimulationConfig` controls algorithm settings (e.g., max_order, tmax, directivity, device, seed, fractional delay length, LUT, chunk sizes, compile path).
-- Passed explicitly via `simulate_rir(..., config=...)` or `simulate_dynamic_rir(..., config=...)`.
-
-### Outputs
-- Static RIR shape: `(n_src, n_mic, nsample)`.
-- Dynamic RIR shape: `(T, n_src, n_mic, nsample)`.
-- Preserves dtype/device.
-
-### Core APIs
-#### Static RIR
-```python
-room = Room.shoebox(size=[6.0, 4.0, 3.0], fs=16000, beta=[0.9] * 6)
-sources = Source.from_positions([[1.0, 2.0, 1.5], [4.5, 1.0, 1.2]])
-mics = MicrophoneArray.from_positions([[2.0, 2.0, 1.5], [3.0, 2.0, 1.5]])
-
-rir = simulate_rir(
-    room=room,
-    sources=sources,
-    mics=mics,
-    max_order=8,
-    tmax=0.4,
-    directivity="omni",
-    device="auto",
-)
-```
-
-#### Dynamic RIRs + Convolution
-```python
-rirs = simulate_dynamic_rir(
-    room=room,
-    src_traj=src_traj,   # (T, n_src, dim)
-    mic_traj=mic_traj,   # (T, n_mic, dim)
-    max_order=8,
-    tmax=0.4,
-    device="auto",
-)
-
-y = DynamicConvolver(mode="trajectory").convolve(signal, rirs)
-```
-
-### Device Control
-- `device="cpu"`, `"cuda"`, `"mps"`, or `"auto"`; resolves with fallback to CPU.
+For detailed documentation, see the docs under `docs/` and Read the Docs.
 
 ## Future Work
 - Ray tracing backend: implement `RayTracingSimulator` with frequency-dependent absorption/scattering.
