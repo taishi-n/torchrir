@@ -15,7 +15,7 @@ _DEF_SPEED_OF_SOUND = 343.0
 
 
 def as_tensor(
-    value: Tensor | Iterable[float] | float | int,
+    value: Tensor | Iterable[float] | Iterable[Iterable[float]] | float | int,
     *,
     device: Optional[torch.device | str] = None,
     dtype: Optional[torch.dtype] = None,

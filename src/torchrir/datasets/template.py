@@ -34,7 +34,9 @@ class TemplateDataset(BaseDataset):
         protocol intact.
     """
 
-    def __init__(self, root: Path, speaker: str = "default", download: bool = False) -> None:
+    def __init__(
+        self, root: Path, speaker: str = "default", download: bool = False
+    ) -> None:
         self.root = Path(root)
         self.speaker = speaker
         if download:

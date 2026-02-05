@@ -44,7 +44,9 @@ class DynamicConvolver:
             if self.hop is None:
                 raise ValueError("hop must be provided for hop mode")
             return _convolve_dynamic_hop(signal, rirs, self.hop)
-        return _convolve_dynamic_trajectory(signal, rirs, timestamps=self.timestamps, fs=self.fs)
+        return _convolve_dynamic_trajectory(
+            signal, rirs, timestamps=self.timestamps, fs=self.fs
+        )
 
 
 def _convolve_dynamic_hop(signal: Tensor, rirs: Tensor, hop: int) -> Tensor:

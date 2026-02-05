@@ -10,7 +10,9 @@ import torch
 from .base import BaseDataset, SentenceLike
 
 
-def choose_speakers(dataset: BaseDataset, num_sources: int, rng: random.Random) -> List[str]:
+def choose_speakers(
+    dataset: BaseDataset, num_sources: int, rng: random.Random
+) -> List[str]:
     """Select unique speakers for the requested number of sources.
 
     Example:
@@ -89,4 +91,6 @@ def load_dataset_sources(
         info.append((speaker, utterance_ids))
 
     stacked = torch.stack(signals, dim=0)
+    if fs is None:
+        raise RuntimeError("no audio loaded from dataset sources")
     return stacked, int(fs), info

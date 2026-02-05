@@ -92,7 +92,9 @@ def plot_scene_dynamic(
     return ax
 
 
-def _setup_axes(ax: Any | None, room: Room | Sequence[float] | Tensor) -> tuple[Any, Any]:
+def _setup_axes(
+    ax: Any | None, room: Room | Sequence[float] | Tensor
+) -> tuple[Any, Any]:
     """Create 2D/3D axes based on room dimension."""
     import matplotlib.pyplot as plt
 
@@ -131,8 +133,9 @@ def _draw_room_2d(ax: Any, size: Tensor) -> None:
     """Draw a 2D rectangular room."""
     import matplotlib.patches as patches
 
-    rect = patches.Rectangle((0.0, 0.0), size[0].item(), size[1].item(),
-                             fill=False, edgecolor="black")
+    rect = patches.Rectangle(
+        (0.0, 0.0), size[0].item(), size[1].item(), fill=False, edgecolor="black"
+    )
     ax.add_patch(rect)
     ax.set_xlim(0, size[0].item())
     ax.set_ylim(0, size[1].item())
@@ -186,7 +189,9 @@ def _draw_room_3d(ax: Any, size: Tensor) -> None:
     ax.set_zlabel("z")
 
 
-def _extract_positions(entity: Source | MicrophoneArray | Tensor | Sequence, ax: Any | None) -> Tensor:
+def _extract_positions(
+    entity: Source | MicrophoneArray | Tensor | Sequence, ax: Any | None
+) -> Tensor:
     """Extract positions from Source/MicrophoneArray or raw tensor."""
     if isinstance(entity, (Source, MicrophoneArray)):
         pos = entity.positions
@@ -211,7 +216,9 @@ def _scatter_positions(
         return
     dim = positions.shape[1]
     if dim == 2:
-        ax.scatter(positions[:, 0], positions[:, 1], label=label, marker=marker, color=color)
+        ax.scatter(
+            positions[:, 0], positions[:, 1], label=label, marker=marker, color=color
+        )
     else:
         ax.scatter(
             positions[:, 0],
@@ -300,4 +307,4 @@ def _is_moving(traj: Tensor, positions: Tensor, *, tol: float = 1e-6) -> bool:
     if traj.numel() == 0:
         return False
     pos0 = positions.unsqueeze(0).expand_as(traj)
-    return torch.any(torch.linalg.norm(traj - pos0, dim=-1) > tol).item()
+    return bool(torch.any(torch.linalg.norm(traj - pos0, dim=-1) > tol).item())

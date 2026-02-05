@@ -59,8 +59,8 @@ Examples also save `*_metadata.json` alongside audio outputs.
 from torchrir import DynamicConvolver, MicrophoneArray, Room, Source, simulate_rir
 
 room = Room.shoebox(size=[6.0, 4.0, 3.0], fs=16000, beta=[0.9] * 6)
-sources = Source.positions([[1.0, 2.0, 1.5]])
-mics = MicrophoneArray.positions([[2.0, 2.0, 1.5]])
+sources = Source.from_positions([[1.0, 2.0, 1.5]])
+mics = MicrophoneArray.from_positions([[2.0, 2.0, 1.5]])
 
 rir = simulate_rir(
     room=room,
@@ -211,8 +211,8 @@ device, dtype = DeviceSpec(device="auto").resolve()
 #### Static RIR
 ```python
 room = Room.shoebox(size=[6.0, 4.0, 3.0], fs=16000, beta=[0.9] * 6)
-sources = Source.positions([[1.0, 2.0, 1.5], [4.5, 1.0, 1.2]])
-mics = MicrophoneArray.positions([[2.0, 2.0, 1.5], [3.0, 2.0, 1.5]])
+sources = Source.from_positions([[1.0, 2.0, 1.5], [4.5, 1.0, 1.2]])
+mics = MicrophoneArray.from_positions([[2.0, 2.0, 1.5], [3.0, 2.0, 1.5]])
 
 rir = simulate_rir(
     room=room,

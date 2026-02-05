@@ -171,7 +171,7 @@ def main() -> None:
     rng = random.Random(args.seed)
     mic_center = sample_positions(num=1, room_size=room_size, rng=rng).squeeze(0)
     mic_pos = clamp_positions(binaural_mic_positions(mic_center), room_size)
-    mics = MicrophoneArray.positions(mic_pos.tolist())
+    mics = MicrophoneArray.from_positions(mic_pos.tolist())
 
     args.out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -200,7 +200,7 @@ def main() -> None:
         mic_traj = mic_pos.unsqueeze(0).repeat(steps, 1, 1).to(device)
 
         # Use the initial positions for scene bookkeeping (trajectory is used for RIRs).
-        sources = Source.positions(src_traj[0].tolist())
+        sources = Source.from_positions(src_traj[0].tolist())
 
         if args.plot:
             try:

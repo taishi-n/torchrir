@@ -65,7 +65,7 @@ class Source:
     """Source container with positions and optional orientation.
 
     Example:
-        >>> sources = Source.positions([[1.0, 2.0, 1.5]])
+        >>> sources = Source.from_positions([[1.0, 2.0, 1.5]])
     """
 
     positions: Tensor
@@ -81,24 +81,6 @@ class Source:
     def replace(self, **kwargs) -> "Source":
         """Return a new Source with updated fields."""
         return replace(self, **kwargs)
-
-    @classmethod
-    def positions(
-        cls,
-        positions: Sequence[Sequence[float]] | Tensor,
-        *,
-        orientation: Optional[Sequence[float] | Tensor] = None,
-        device: Optional[torch.device | str] = None,
-        dtype: Optional[torch.dtype] = None,
-    ) -> "Source":
-        """Construct a Source from positions.
-
-        Example:
-            >>> sources = Source.positions([[1.0, 2.0, 1.5]])
-        """
-        return cls.from_positions(
-            positions, orientation=orientation, device=device, dtype=dtype
-        )
 
     @classmethod
     def from_positions(
@@ -122,7 +104,7 @@ class MicrophoneArray:
     """Microphone array container.
 
     Example:
-        >>> mics = MicrophoneArray.positions([[2.0, 2.0, 1.5]])
+        >>> mics = MicrophoneArray.from_positions([[2.0, 2.0, 1.5]])
     """
 
     positions: Tensor
@@ -138,24 +120,6 @@ class MicrophoneArray:
     def replace(self, **kwargs) -> "MicrophoneArray":
         """Return a new MicrophoneArray with updated fields."""
         return replace(self, **kwargs)
-
-    @classmethod
-    def positions(
-        cls,
-        positions: Sequence[Sequence[float]] | Tensor,
-        *,
-        orientation: Optional[Sequence[float] | Tensor] = None,
-        device: Optional[torch.device | str] = None,
-        dtype: Optional[torch.dtype] = None,
-    ) -> "MicrophoneArray":
-        """Construct a MicrophoneArray from positions.
-
-        Example:
-            >>> mics = MicrophoneArray.positions([[2.0, 2.0, 1.5]])
-        """
-        return cls.from_positions(
-            positions, orientation=orientation, device=device, dtype=dtype
-        )
 
     @classmethod
     def from_positions(

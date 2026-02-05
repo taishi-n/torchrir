@@ -13,8 +13,8 @@ from torchrir import (
 
 def test_simulate_rir_shape_and_peak():
     room = Room.shoebox(size=[5.0, 4.0, 3.0], fs=16000, beta=[0.9] * 6)
-    sources = Source.positions([[1.0, 1.0, 1.0]])
-    mics = MicrophoneArray.positions([[2.0, 1.0, 1.0]])
+    sources = Source.from_positions([[1.0, 1.0, 1.0]])
+    mics = MicrophoneArray.from_positions([[2.0, 1.0, 1.0]])
 
     nsample = 2048
     rir = simulate_rir(
@@ -37,8 +37,8 @@ def test_simulate_rir_shape_and_peak():
 
 def test_simulate_rir_directivity_requires_orientation():
     room = Room.shoebox(size=[5.0, 4.0, 3.0], fs=16000, beta=[0.9] * 6)
-    sources = Source.positions([[1.0, 1.0, 1.0]])
-    mics = MicrophoneArray.positions([[2.0, 1.0, 1.0]])
+    sources = Source.from_positions([[1.0, 1.0, 1.0]])
+    mics = MicrophoneArray.from_positions([[2.0, 1.0, 1.0]])
 
     with pytest.raises(ValueError):
         simulate_rir(
@@ -53,8 +53,8 @@ def test_simulate_rir_directivity_requires_orientation():
 
 def test_simulate_rir_angle_orientation_2d():
     room = Room.shoebox(size=[5.0, 4.0], fs=16000, beta=[0.9] * 4)
-    sources = Source.positions([[1.0, 1.0]])
-    mics = MicrophoneArray.positions([[2.0, 1.0]])
+    sources = Source.from_positions([[1.0, 1.0]])
+    mics = MicrophoneArray.from_positions([[2.0, 1.0]])
     orientation = torch.tensor(0.0)
 
     rir = simulate_rir(

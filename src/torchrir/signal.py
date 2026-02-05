@@ -117,9 +117,9 @@ def _convolve_dynamic_rir_trajectory(
     else:
         step_fs = n_samples / t_steps
         ts_dtype = torch.float32 if signal.device.type == "mps" else torch.float64
-        w_ini = (torch.arange(t_steps, device=signal.device, dtype=ts_dtype) * step_fs).to(
-            torch.long
-        )
+        w_ini = (
+            torch.arange(t_steps, device=signal.device, dtype=ts_dtype) * step_fs
+        ).to(torch.long)
 
     w_ini = torch.cat(
         [w_ini, torch.tensor([n_samples], device=signal.device, dtype=torch.long)]
@@ -132,14 +132,18 @@ def _convolve_dynamic_rir_trajectory(
         )
 
     max_len = int(w_len.max().item())
-    segments = torch.zeros((t_steps, n_src, max_len), dtype=signal.dtype, device=signal.device)
+    segments = torch.zeros(
+        (t_steps, n_src, max_len), dtype=signal.dtype, device=signal.device
+    )
     for t in range(t_steps):
         start = int(w_ini[t].item())
         end = int(w_ini[t + 1].item())
         if end > start:
             segments[t, :, : end - start] = signal[:, start:end]
 
-    out = torch.zeros((n_mic, n_samples + rir_len - 1), dtype=signal.dtype, device=signal.device)
+    out = torch.zeros(
+        (n_mic, n_samples + rir_len - 1), dtype=signal.dtype, device=signal.device
+    )
 
     for t in range(t_steps):
         seg_len = int(w_len[t].item())
@@ -166,7 +170,9 @@ def _convolve_dynamic_rir_trajectory_batched(
     """GPU-friendly batched trajectory convolution using FFT."""
     n_samples = signal.shape[1]
     t_steps, n_src, n_mic, rir_len = rirs.shape
-    out = torch.zeros((n_mic, n_samples + rir_len - 1), dtype=signal.dtype, device=signal.device)
+    out = torch.zeros(
+        (n_mic, n_samples + rir_len - 1), dtype=signal.dtype, device=signal.device
+    )
 
     for t0 in range(0, t_steps, chunk_size):
         t1 = min(t0 + chunk_size, t_steps)
@@ -174,7 +180,9 @@ def _convolve_dynamic_rir_trajectory_batched(
         max_len = int(lengths.max().item())
         if max_len == 0:
             continue
-        segments = torch.zeros((t1 - t0, n_src, max_len), dtype=signal.dtype, device=signal.device)
+        segments = torch.zeros(
+            (t1 - t0, n_src, max_len), dtype=signal.dtype, device=signal.device
+        )
         for idx, t in enumerate(range(t0, t1)):
             start = int(w_ini[t].item())
             end = int(w_ini[t + 1].item())
@@ -190,7 +198,9 @@ def _convolve_dynamic_rir_trajectory_batched(
             dtype=signal.dtype,
             device=signal.device,
         )
-        conv = torch.fft.irfft(seg_f[:, :, None, :] * rir_f, n=fft_len, dim=-1, out=conv_out)
+        conv = torch.fft.irfft(
+            seg_f[:, :, None, :] * rir_f, n=fft_len, dim=-1, out=conv_out
+        )
         conv = conv[..., :conv_len]
         conv_sum = conv.sum(dim=1)
 
@@ -199,7 +209,9 @@ def _convolve_dynamic_rir_trajectory_batched(
             if seg_len == 0:
                 continue
             start = int(w_ini[t].item())
-            out[:, start : start + seg_len + rir_len - 1] += conv_sum[idx, :, : seg_len + rir_len - 1]
+            out[:, start : start + seg_len + rir_len - 1] += conv_sum[
+                idx, :, : seg_len + rir_len - 1
+            ]
 
     return out.squeeze(0) if n_mic == 1 else out
 
@@ -221,7 +233,9 @@ def _ensure_static_rirs(rirs: Tensor) -> Tensor:
         return rirs.view(1, rirs.shape[0], rirs.shape[1])
     if rirs.ndim == 3:
         return rirs
-    raise ValueError("rirs must have shape (rir_len,), (n_mic, rir_len), or (n_src, n_mic, rir_len)")
+    raise ValueError(
+        "rirs must have shape (rir_len,), (n_mic, rir_len), or (n_src, n_mic, rir_len)"
+    )
 
 
 def _ensure_dynamic_rirs(rirs: Tensor, signal: Tensor) -> Tensor:

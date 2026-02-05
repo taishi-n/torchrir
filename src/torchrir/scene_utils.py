@@ -32,7 +32,9 @@ def sample_positions(
     return torch.tensor(coords, dtype=torch.float32)
 
 
-def linear_trajectory(start: torch.Tensor, end: torch.Tensor, steps: int) -> torch.Tensor:
+def linear_trajectory(
+    start: torch.Tensor, end: torch.Tensor, steps: int
+) -> torch.Tensor:
     """Create a linear trajectory between start and end.
 
     Example:
@@ -58,7 +60,9 @@ def binaural_mic_positions(center: torch.Tensor, offset: float = 0.08) -> torch.
     return torch.stack([left, right], dim=0)
 
 
-def clamp_positions(positions: torch.Tensor, room_size: torch.Tensor, margin: float = 0.1) -> torch.Tensor:
+def clamp_positions(
+    positions: torch.Tensor, room_size: torch.Tensor, margin: float = 0.1
+) -> torch.Tensor:
     """Clamp positions to remain inside the room with a margin.
 
     Example:

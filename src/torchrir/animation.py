@@ -104,15 +104,15 @@ def animate_scene_gif(
     mic_lines = []
     for _ in range(view_src_traj.shape[1]):
         if view_dim == 2:
-            line, = ax.plot([], [], color="tab:green", alpha=0.6)
+            (line,) = ax.plot([], [], color="tab:green", alpha=0.6)
         else:
-            line, = ax.plot([], [], [], color="tab:green", alpha=0.6)
+            (line,) = ax.plot([], [], [], color="tab:green", alpha=0.6)
         src_lines.append(line)
     for _ in range(view_mic_traj.shape[1]):
         if view_dim == 2:
-            line, = ax.plot([], [], color="tab:orange", alpha=0.6)
+            (line,) = ax.plot([], [], color="tab:orange", alpha=0.6)
         else:
-            line, = ax.plot([], [], [], color="tab:orange", alpha=0.6)
+            (line,) = ax.plot([], [], [], color="tab:orange", alpha=0.6)
         mic_lines.append(line)
 
     ax.legend(loc="best")
@@ -137,15 +137,15 @@ def animate_scene_gif(
                 xy = mic_frame[:, m_idx, :]
                 line.set_data(xy[:, 0], xy[:, 1])
         else:
-            src_scatter._offsets3d = (
-                src_pos_frame[:, 0],
-                src_pos_frame[:, 1],
-                src_pos_frame[:, 2],
+            setattr(
+                src_scatter,
+                "_offsets3d",
+                (src_pos_frame[:, 0], src_pos_frame[:, 1], src_pos_frame[:, 2]),
             )
-            mic_scatter._offsets3d = (
-                mic_pos_frame[:, 0],
-                mic_pos_frame[:, 1],
-                mic_pos_frame[:, 2],
+            setattr(
+                mic_scatter,
+                "_offsets3d",
+                (mic_pos_frame[:, 0], mic_pos_frame[:, 1], mic_pos_frame[:, 2]),
             )
             for s_idx, line in enumerate(src_lines):
                 xyz = src_frame[:, s_idx, :]
@@ -166,7 +166,10 @@ def animate_scene_gif(
             fps = frames / duration_s
         else:
             fps = 6.0
-    anim = animation.FuncAnimation(fig, _frame, frames=frames, interval=1000 / fps, blit=False)
-    anim.save(out_path, writer="pillow", fps=fps)
+    anim = animation.FuncAnimation(
+        fig, _frame, frames=frames, interval=1000 / fps, blit=False
+    )
+    fps_int = None if fps is None else max(1, int(round(fps)))
+    anim.save(out_path, writer="pillow", fps=fps_int)
     plt.close(fig)
     return out_path

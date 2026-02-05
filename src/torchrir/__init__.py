@@ -26,7 +26,12 @@ from .datasets import (
     load_wav_mono,
     save_wav,
 )
-from .scene_utils import binaural_mic_positions, clamp_positions, linear_trajectory, sample_positions
+from .scene_utils import (
+    binaural_mic_positions,
+    clamp_positions,
+    linear_trajectory,
+    sample_positions,
+)
 from .utils import (
     att2t_SabineEstimation,
     att2t_sabine_estimation,

@@ -41,15 +41,17 @@ except ModuleNotFoundError:  # allow running without installation
 
 def _bench_once(device: torch.device, repeats: int) -> float:
     room = Room.shoebox(size=[8.0, 6.0, 3.5], fs=16000, beta=[0.92] * 6)
-    sources = Source.positions([[1.0, 1.5, 1.2], [4.0, 2.5, 1.4]])
+    sources = Source.from_positions([[1.0, 1.5, 1.2], [4.0, 2.5, 1.4]])
     mic_grid = []
     for x in (2.0, 3.0, 4.0, 5.0):
         for y in (1.5, 2.5, 3.5, 4.5):
             mic_grid.append([x, y, 1.2])
-    mics = MicrophoneArray.positions(mic_grid)
+    mics = MicrophoneArray.from_positions(mic_grid)
 
     # Warmup
-    simulate_rir(room=room, sources=sources, mics=mics, max_order=12, tmax=0.8, device=device)
+    simulate_rir(
+        room=room, sources=sources, mics=mics, max_order=12, tmax=0.8, device=device
+    )
     if device.type == "cuda":
         torch.cuda.synchronize()
     if device.type == "mps":
@@ -57,7 +59,9 @@ def _bench_once(device: torch.device, repeats: int) -> float:
 
     start = time.perf_counter()
     for _ in range(repeats):
-        simulate_rir(room=room, sources=sources, mics=mics, max_order=12, tmax=0.8, device=device)
+        simulate_rir(
+            room=room, sources=sources, mics=mics, max_order=12, tmax=0.8, device=device
+        )
     if device.type == "cuda":
         torch.cuda.synchronize()
     if device.type == "mps":
@@ -68,12 +72,12 @@ def _bench_once(device: torch.device, repeats: int) -> float:
 
 def _bench_dynamic(device: torch.device, repeats: int) -> float:
     room = Room.shoebox(size=[8.0, 6.0, 3.5], fs=16000, beta=[0.92] * 6)
-    sources = Source.positions([[1.0, 1.5, 1.2]])
+    sources = Source.from_positions([[1.0, 1.5, 1.2]])
     mic_grid = []
     for x in (2.0, 3.0, 4.0, 5.0):
         for y in (1.5, 2.5, 3.5, 4.5):
             mic_grid.append([x, y, 1.2])
-    mics = MicrophoneArray.positions(mic_grid)
+    mics = MicrophoneArray.from_positions(mic_grid)
     steps = 24
     src_traj = sources.positions.unsqueeze(0).repeat(steps, 1, 1)
     mic_start = torch.tensor([2.0, 1.0, 1.2])
@@ -118,10 +122,14 @@ def _bench_dynamic(device: torch.device, repeats: int) -> float:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="CPU vs GPU benchmark for RIR generation")
+    parser = argparse.ArgumentParser(
+        description="CPU vs GPU benchmark for RIR generation"
+    )
     parser.add_argument("--repeats", type=int, default=5)
     parser.add_argument("--gpu", type=str, default="auto", help="cuda/mps/auto")
-    parser.add_argument("--dynamic", action="store_true", help="benchmark dynamic trajectory path")
+    parser.add_argument(
+        "--dynamic", action="store_true", help="benchmark dynamic trajectory path"
+    )
     parser.add_argument("--log-level", type=str, default="INFO")
     args = parser.parse_args()
 

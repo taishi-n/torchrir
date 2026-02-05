@@ -114,7 +114,9 @@ def _normalize_config_values(config: Dict[str, Any]) -> Dict[str, Any]:
 
 def _load_sources(args, rng: random.Random, device: torch.device):
     signals, fs, info = load_dataset_sources(
-        dataset_factory=lambda speaker: _dataset_factory(args.dataset_dir, args.download, speaker),
+        dataset_factory=lambda speaker: _dataset_factory(
+            args.dataset_dir, args.download, speaker
+        ),
         num_sources=args.num_sources,
         duration_s=args.duration,
         rng=rng,
@@ -122,7 +124,9 @@ def _load_sources(args, rng: random.Random, device: torch.device):
     return signals.to(device), fs, info
 
 
-def _plot_scene(args, room, sources, mics, src_traj=None, mic_traj=None, prefix="scene"):
+def _plot_scene(
+    args, room, sources, mics, src_traj=None, mic_traj=None, prefix="scene"
+):
     if not args.plot:
         return
     try:
@@ -231,23 +235,31 @@ def _serialize_args(args) -> Dict[str, Any]:
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Unified CMU ARCTIC RIR examples")
-    parser.add_argument("--mode", choices=("static", "dynamic_src", "dynamic_mic"), default="static")
+    parser.add_argument(
+        "--mode", choices=("static", "dynamic_src", "dynamic_mic"), default="static"
+    )
     parser.add_argument("--dataset-dir", type=Path, default=Path("datasets/cmu_arctic"))
     parser.add_argument("--download", action="store_true", default=True)
     parser.add_argument("--no-download", action="store_false", dest="download")
     parser.add_argument("--num-sources", type=int, default=2)
     parser.add_argument("--duration", type=float, default=10.0)
     parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--deterministic", action="store_true", help="enable deterministic kernels")
+    parser.add_argument(
+        "--deterministic", action="store_true", help="enable deterministic kernels"
+    )
     parser.add_argument("--room", type=float, nargs="+", default=[6.0, 4.0, 3.0])
     parser.add_argument("--steps", type=int, default=16)
     parser.add_argument("--order", type=int, default=8)
     parser.add_argument("--tmax", type=float, default=0.4)
     parser.add_argument("--device", type=str, default="cpu")
     parser.add_argument("--out-dir", type=Path, default=Path("outputs"))
-    parser.add_argument("--plot", action="store_true", help="plot room and trajectories")
+    parser.add_argument(
+        "--plot", action="store_true", help="plot room and trajectories"
+    )
     parser.add_argument("--show", action="store_true", help="show plots interactively")
-    parser.add_argument("--gif", action="store_true", help="save trajectory animation GIF")
+    parser.add_argument(
+        "--gif", action="store_true", help="save trajectory animation GIF"
+    )
     parser.add_argument("--gif-fps", type=float, default=0.0)
     parser.add_argument("--log-level", type=str, default="INFO")
     parser.add_argument("--config-in", type=Path, help="load config from JSON/YAML")
@@ -258,15 +270,17 @@ def _build_parser() -> argparse.ArgumentParser:
 def _run_static(args, rng: random.Random, logger):
     device = resolve_device(args.device)
     signals, fs, info = _load_sources(args, rng, device)
-    room = Room.shoebox(size=args.room, fs=fs, beta=[0.9] * (6 if len(args.room) == 3 else 4))
+    room = Room.shoebox(
+        size=args.room, fs=fs, beta=[0.9] * (6 if len(args.room) == 3 else 4)
+    )
     room_size = torch.tensor(args.room, dtype=torch.float32)
 
     sources_pos = sample_positions(num=args.num_sources, room_size=room_size, rng=rng)
     mic_center = sample_positions(num=1, room_size=room_size, rng=rng).squeeze(0)
     mic_pos = clamp_positions(binaural_mic_positions(mic_center), room_size)
 
-    sources = Source.positions(sources_pos.tolist())
-    mics = MicrophoneArray.positions(mic_pos.tolist())
+    sources = Source.from_positions(sources_pos.tolist())
+    mics = MicrophoneArray.from_positions(mic_pos.tolist())
 
     _plot_scene(args, room, sources, mics, prefix="static")
     _plot_gif(
@@ -320,14 +334,19 @@ def _run_static(args, rng: random.Random, logger):
 def _run_dynamic_src(args, rng: random.Random, logger):
     device = resolve_device(args.device)
     signals, fs, info = _load_sources(args, rng, device)
-    room = Room.shoebox(size=args.room, fs=fs, beta=[0.9] * (6 if len(args.room) == 3 else 4))
+    room = Room.shoebox(
+        size=args.room, fs=fs, beta=[0.9] * (6 if len(args.room) == 3 else 4)
+    )
     room_size = torch.tensor(args.room, dtype=torch.float32)
 
     steps = max(2, args.steps)
     src_start = sample_positions(num=args.num_sources, room_size=room_size, rng=rng)
     src_end = sample_positions(num=args.num_sources, room_size=room_size, rng=rng)
     src_traj = torch.stack(
-        [linear_trajectory(src_start[i], src_end[i], steps) for i in range(args.num_sources)],
+        [
+            linear_trajectory(src_start[i], src_end[i], steps)
+            for i in range(args.num_sources)
+        ],
         dim=1,
     )
     src_traj = clamp_positions(src_traj, room_size).to(device)
@@ -336,10 +355,18 @@ def _run_dynamic_src(args, rng: random.Random, logger):
     mic_pos = clamp_positions(binaural_mic_positions(mic_center), room_size)
     mic_traj = mic_pos.unsqueeze(0).repeat(steps, 1, 1).to(device)
 
-    sources = Source.positions(src_start.tolist())
-    mics = MicrophoneArray.positions(mic_pos.tolist())
+    sources = Source.from_positions(src_start.tolist())
+    mics = MicrophoneArray.from_positions(mic_pos.tolist())
 
-    _plot_scene(args, room, sources, mics, src_traj=src_traj, mic_traj=mic_traj, prefix="dynamic_src")
+    _plot_scene(
+        args,
+        room,
+        sources,
+        mics,
+        src_traj=src_traj,
+        mic_traj=mic_traj,
+        prefix="dynamic_src",
+    )
     _plot_gif(
         args,
         room,
@@ -388,7 +415,9 @@ def _run_dynamic_src(args, rng: random.Random, logger):
 def _run_dynamic_mic(args, rng: random.Random, logger):
     device = resolve_device(args.device)
     signals, fs, info = _load_sources(args, rng, device)
-    room = Room.shoebox(size=args.room, fs=fs, beta=[0.9] * (6 if len(args.room) == 3 else 4))
+    room = Room.shoebox(
+        size=args.room, fs=fs, beta=[0.9] * (6 if len(args.room) == 3 else 4)
+    )
     room_size = torch.tensor(args.room, dtype=torch.float32)
 
     sources_pos = sample_positions(num=args.num_sources, room_size=room_size, rng=rng)
@@ -396,15 +425,25 @@ def _run_dynamic_mic(args, rng: random.Random, logger):
     mic_center_start = sample_positions(num=1, room_size=room_size, rng=rng).squeeze(0)
     mic_center_end = sample_positions(num=1, room_size=room_size, rng=rng).squeeze(0)
     mic_center_traj = linear_trajectory(mic_center_start, mic_center_end, steps)
-    mic_traj = torch.stack([binaural_mic_positions(center) for center in mic_center_traj], dim=0)
+    mic_traj = torch.stack(
+        [binaural_mic_positions(center) for center in mic_center_traj], dim=0
+    )
     mic_traj = clamp_positions(mic_traj, room_size).to(device)
 
     src_traj = sources_pos.unsqueeze(0).repeat(steps, 1, 1).to(device)
 
-    sources = Source.positions(sources_pos.tolist())
-    mics = MicrophoneArray.positions(mic_traj[0].tolist())
+    sources = Source.from_positions(sources_pos.tolist())
+    mics = MicrophoneArray.from_positions(mic_traj[0].tolist())
 
-    _plot_scene(args, room, sources, mics, src_traj=src_traj, mic_traj=mic_traj, prefix="dynamic_mic")
+    _plot_scene(
+        args,
+        room,
+        sources,
+        mics,
+        src_traj=src_traj,
+        mic_traj=mic_traj,
+        prefix="dynamic_mic",
+    )
     _plot_gif(
         args,
         room,

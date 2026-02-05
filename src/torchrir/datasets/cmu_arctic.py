@@ -44,6 +44,7 @@ def list_cmu_arctic_speakers() -> List[str]:
 @dataclass
 class CmuArcticSentence:
     """Sentence metadata from CMU ARCTIC."""
+
     utterance_id: str
     text: str
 
@@ -56,7 +57,9 @@ class CmuArcticDataset:
         >>> audio, fs = dataset.load_wav("arctic_a0001")
     """
 
-    def __init__(self, root: Path, speaker: str = "bdl", download: bool = False) -> None:
+    def __init__(
+        self, root: Path, speaker: str = "bdl", download: bool = False
+    ) -> None:
         """Initialize a CMU ARCTIC dataset handle.
 
         Args:

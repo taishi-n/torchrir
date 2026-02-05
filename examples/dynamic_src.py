@@ -62,7 +62,9 @@ from torchrir import (
 
 def main() -> None:
     """Run the dynamic-source CMU ARCTIC simulation."""
-    parser = argparse.ArgumentParser(description="Dynamic RIR: moving sources, fixed binaural mic")
+    parser = argparse.ArgumentParser(
+        description="Dynamic RIR: moving sources, fixed binaural mic"
+    )
     parser.add_argument("--dataset-dir", type=Path, default=Path("datasets/cmu_arctic"))
     parser.add_argument("--download", action="store_true", default=True)
     parser.add_argument("--no-download", action="store_false", dest="download")
@@ -75,9 +77,13 @@ def main() -> None:
     parser.add_argument("--tmax", type=float, default=0.4)
     parser.add_argument("--device", type=str, default="cpu")
     parser.add_argument("--out-dir", type=Path, default=Path("outputs"))
-    parser.add_argument("--plot", action="store_true", help="plot room and trajectories")
+    parser.add_argument(
+        "--plot", action="store_true", help="plot room and trajectories"
+    )
     parser.add_argument("--show", action="store_true", help="show plots interactively")
-    parser.add_argument("--gif", action="store_true", help="save trajectory animation GIF")
+    parser.add_argument(
+        "--gif", action="store_true", help="save trajectory animation GIF"
+    )
     parser.add_argument("--gif-fps", type=float, default=0.0)
     parser.add_argument("--log-level", type=str, default="INFO")
     args = parser.parse_args()
@@ -88,6 +94,7 @@ def main() -> None:
     rng = random.Random(args.seed)
     device = resolve_device(args.device)
     room_size = torch.tensor(args.room, dtype=torch.float32)
+
     def dataset_factory(speaker: str | None):
         spk = speaker or "bdl"
         return CmuArcticDataset(args.dataset_dir, speaker=spk, download=args.download)
@@ -99,13 +106,18 @@ def main() -> None:
         rng=rng,
     )
     signals = signals.to(device)
-    room = Room.shoebox(size=args.room, fs=fs, beta=[0.9] * (6 if len(args.room) == 3 else 4))
+    room = Room.shoebox(
+        size=args.room, fs=fs, beta=[0.9] * (6 if len(args.room) == 3 else 4)
+    )
 
     src_start = sample_positions(num=args.num_sources, room_size=room_size, rng=rng)
     src_end = sample_positions(num=args.num_sources, room_size=room_size, rng=rng)
     steps = max(2, args.steps)
     src_traj = torch.stack(
-        [linear_trajectory(src_start[i], src_end[i], steps) for i in range(args.num_sources)],
+        [
+            linear_trajectory(src_start[i], src_end[i], steps)
+            for i in range(args.num_sources)
+        ],
         dim=1,
     )
     src_traj = clamp_positions(src_traj, room_size)
@@ -115,8 +127,8 @@ def main() -> None:
     mic_pos = clamp_positions(mic_pos, room_size)
     mic_traj = mic_pos.unsqueeze(0).repeat(steps, 1, 1)
 
-    sources = Source.positions(src_start.tolist())
-    mics = MicrophoneArray.positions(mic_pos.tolist())
+    sources = Source.from_positions(src_start.tolist())
+    mics = MicrophoneArray.from_positions(mic_pos.tolist())
 
     src_traj = src_traj.to(device)
     mic_traj = mic_traj.to(device)

@@ -10,7 +10,9 @@ from torchrir import MicrophoneArray, Room, Source, fft_convolve, simulate_rir
 pra = pytest.importorskip("pyroomacoustics")
 
 
-def _align_by_xcorr(a: torch.Tensor, b: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+def _align_by_xcorr(
+    a: torch.Tensor, b: torch.Tensor
+) -> tuple[torch.Tensor, torch.Tensor]:
     a = a.detach().cpu()
     b = b.detach().cpu()
     corr = F.conv1d(a.view(1, 1, -1), b.view(1, 1, -1), padding=b.numel() - 1)
@@ -52,8 +54,8 @@ def test_rir_and_convolved_signal_close():
 
     # torchrir RIR
     room = Room.shoebox(size=room_dim, fs=fs, beta=[beta] * 6)
-    sources = Source.positions([src])
-    mics = MicrophoneArray.positions([mic])
+    sources = Source.from_positions([src])
+    mics = MicrophoneArray.from_positions([mic])
     torch_rir = simulate_rir(
         room=room,
         sources=sources,

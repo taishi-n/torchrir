@@ -127,7 +127,10 @@ def _positions_to_cpu(entity: torch.Tensor | object) -> torch.Tensor:
     return pos
 
 
-def _traj_steps(src_traj: Optional[torch.Tensor | Sequence], mic_traj: Optional[torch.Tensor | Sequence]) -> int:
+def _traj_steps(
+    src_traj: Optional[torch.Tensor | Sequence],
+    mic_traj: Optional[torch.Tensor | Sequence],
+) -> int:
     """Infer the number of trajectory steps."""
     if src_traj is not None:
         return int(_to_cpu(src_traj).shape[0])

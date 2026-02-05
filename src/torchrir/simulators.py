@@ -18,7 +18,9 @@ from .scene import Scene
 class RIRSimulator(Protocol):
     """Strategy interface for RIR simulation backends."""
 
-    def simulate(self, scene: Scene, config: SimulationConfig | None = None) -> RIRResult:
+    def simulate(
+        self, scene: Scene, config: SimulationConfig | None = None
+    ) -> RIRResult:
         """Run a simulation and return the result."""
 
 
@@ -30,7 +32,9 @@ class ISMSimulator:
         >>> result = ISMSimulator().simulate(scene, config)
     """
 
-    def simulate(self, scene: Scene, config: SimulationConfig | None = None) -> RIRResult:
+    def simulate(
+        self, scene: Scene, config: SimulationConfig | None = None
+    ) -> RIRResult:
         scene.validate()
         cfg = config or default_config()
         if scene.is_dynamic():
@@ -71,7 +75,9 @@ class RayTracingSimulator:
         reuse Scene/SimulationConfig for inputs and keep output shape parity.
     """
 
-    def simulate(self, scene: Scene, config: SimulationConfig | None = None) -> RIRResult:
+    def simulate(
+        self, scene: Scene, config: SimulationConfig | None = None
+    ) -> RIRResult:
         raise NotImplementedError("RayTracingSimulator is not implemented yet")
 
 
@@ -86,5 +92,7 @@ class FDTDSimulator:
         RIRResult with the same metadata contract as ISM.
     """
 
-    def simulate(self, scene: Scene, config: SimulationConfig | None = None) -> RIRResult:
+    def simulate(
+        self, scene: Scene, config: SimulationConfig | None = None
+    ) -> RIRResult:
         raise NotImplementedError("FDTDSimulator is not implemented yet")

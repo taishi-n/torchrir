@@ -6,8 +6,8 @@ from torchrir import MicrophoneArray, Room, SimulationConfig, Source, simulate_r
 
 def _compute(device: str, cfg: SimulationConfig) -> torch.Tensor:
     room = Room.shoebox(size=[4.0, 3.0, 2.5], fs=16000, beta=[0.9] * 6)
-    sources = Source.positions([[1.0, 1.2, 1.0]])
-    mics = MicrophoneArray.positions([[2.5, 2.0, 1.0]])
+    sources = Source.from_positions([[1.0, 1.2, 1.0]])
+    mics = MicrophoneArray.from_positions([[2.5, 2.0, 1.0]])
     rir = simulate_rir(
         room=room,
         sources=sources,
@@ -22,8 +22,8 @@ def _compute(device: str, cfg: SimulationConfig) -> torch.Tensor:
 
 def _compute_dynamic(device: str, cfg: SimulationConfig) -> torch.Tensor:
     room = Room.shoebox(size=[4.0, 3.0, 2.5], fs=16000, beta=[0.9] * 6)
-    sources = Source.positions([[1.0, 1.2, 1.0]])
-    mics = MicrophoneArray.positions([[2.5, 2.0, 1.0]])
+    sources = Source.from_positions([[1.0, 1.2, 1.0]])
+    mics = MicrophoneArray.from_positions([[2.5, 2.0, 1.0]])
     steps = 4
     src_traj = sources.positions.unsqueeze(0).repeat(steps, 1, 1)
     mic_start = torch.tensor([2.5, 2.0, 1.0])

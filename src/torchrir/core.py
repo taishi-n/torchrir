@@ -3,6 +3,7 @@ from __future__ import annotations
 """Core RIR simulation functions (static and dynamic)."""
 
 import math
+from collections.abc import Callable
 from typing import Optional, Tuple
 
 import torch
@@ -61,8 +62,8 @@ def simulate_rir(
 
     Example:
         >>> room = Room.shoebox(size=[6.0, 4.0, 3.0], fs=16000, beta=[0.9] * 6)
-        >>> sources = Source.positions([[1.0, 2.0, 1.5]])
-        >>> mics = MicrophoneArray.positions([[2.0, 2.0, 1.5]])
+        >>> sources = Source.from_positions([[1.0, 2.0, 1.5]])
+        >>> mics = MicrophoneArray.from_positions([[2.0, 2.0, 1.5]])
         >>> rir = simulate_rir(
         ...     room=room,
         ...     sources=sources,
@@ -90,9 +91,9 @@ def simulate_rir(
 
     if not isinstance(room, Room):
         raise TypeError("room must be a Room instance")
-    if nsample is None and tmax is None:
-        raise ValueError("nsample or tmax must be provided")
     if nsample is None:
+        if tmax is None:
+            raise ValueError("nsample or tmax must be provided")
         nsample = int(math.ceil(tmax * room.fs))
     if nsample <= 0:
         raise ValueError("nsample must be positive")
@@ -495,7 +496,11 @@ def _compute_image_contributions_batch(
     if mic_pattern != "omni":
         if mic_dir is None:
             raise ValueError("mic orientation required for non-omni directivity")
-        mic_dir = mic_dir[None, :, None, :] if mic_dir.ndim == 2 else mic_dir.view(1, 1, 1, -1)
+        mic_dir = (
+            mic_dir[None, :, None, :]
+            if mic_dir.ndim == 2
+            else mic_dir.view(1, 1, 1, -1)
+        )
         cos_theta = _cos_between(-vec, mic_dir)
         gain = gain * directivity_gain(mic_pattern, cos_theta)
 
@@ -542,9 +547,9 @@ def _accumulate_rir(
     if use_lut:
         sinc_lut = _get_sinc_lut(fdl, lut_gran, device=rir.device, dtype=dtype)
 
-    mic_offsets = (torch.arange(n_mic, device=rir.device, dtype=torch.int64) * nsample).view(
-        n_mic, 1, 1
-    )
+    mic_offsets = (
+        torch.arange(n_mic, device=rir.device, dtype=torch.int64) * nsample
+    ).view(n_mic, 1, 1)
     rir_flat = rir.view(-1)
 
     chunk_size = cfg.accumulate_chunk_size
@@ -559,7 +564,9 @@ def _accumulate_rir(
             x_off_frac = (1.0 - frac_m) * lut_gran
             lut_gran_off = torch.floor(x_off_frac).to(torch.int64)
             x_off = x_off_frac - lut_gran_off.to(dtype)
-            lut_pos = lut_gran_off[..., None] + (n[None, None, :].to(torch.int64) * lut_gran)
+            lut_pos = lut_gran_off[..., None] + (
+                n[None, None, :].to(torch.int64) * lut_gran
+            )
 
             s0 = torch.take(sinc_lut, lut_pos)
             s1 = torch.take(sinc_lut, lut_pos + 1)
@@ -618,9 +625,9 @@ def _accumulate_rir_batch_impl(
     if use_lut:
         sinc_lut = _get_sinc_lut(fdl, lut_gran, device=rir.device, dtype=sample.dtype)
 
-    sm_offsets = (torch.arange(n_sm, device=rir.device, dtype=torch.int64) * nsample).view(
-        n_sm, 1, 1
-    )
+    sm_offsets = (
+        torch.arange(n_sm, device=rir.device, dtype=torch.int64) * nsample
+    ).view(n_sm, 1, 1)
     rir_flat = rir.view(-1)
 
     n_img = idx0.shape[1]
@@ -634,7 +641,9 @@ def _accumulate_rir_batch_impl(
             x_off_frac = (1.0 - frac_m) * lut_gran
             lut_gran_off = torch.floor(x_off_frac).to(torch.int64)
             x_off = x_off_frac - lut_gran_off.to(sample.dtype)
-            lut_pos = lut_gran_off[..., None] + (n[None, None, :].to(torch.int64) * lut_gran)
+            lut_pos = lut_gran_off[..., None] + (
+                n[None, None, :].to(torch.int64) * lut_gran
+            )
 
             s0 = torch.take(sinc_lut, lut_pos)
             s1 = torch.take(sinc_lut, lut_pos + 1)
@@ -660,12 +669,13 @@ _SINC_LUT_CACHE: dict[tuple[int, int, str, torch.dtype], Tensor] = {}
 _FDL_GRID_CACHE: dict[tuple[int, str, torch.dtype], Tensor] = {}
 _FDL_OFFSETS_CACHE: dict[tuple[int, str], Tensor] = {}
 _FDL_WINDOW_CACHE: dict[tuple[int, str, torch.dtype], Tensor] = {}
-_ACCUM_BATCH_COMPILED: dict[tuple[str, torch.dtype, int, int, bool, int], callable] = {}
+_AccumFn = Callable[[Tensor, Tensor, Tensor], None]
+_ACCUM_BATCH_COMPILED: dict[tuple[str, torch.dtype, int, int, bool, int], _AccumFn] = {}
 
 
 def _get_accumulate_fn(
     cfg: SimulationConfig, device: torch.device, dtype: torch.dtype
-) -> callable:
+) -> _AccumFn:
     """Return an accumulation function with config-bound constants."""
     use_lut = cfg.use_lut and device.type != "mps"
     fdl = cfg.frac_delay_length
@@ -721,7 +731,9 @@ def _get_fdl_window(fdl: int, *, device: torch.device, dtype: torch.dtype) -> Te
     return cached
 
 
-def _get_sinc_lut(fdl: int, lut_gran: int, *, device: torch.device, dtype: torch.dtype) -> Tensor:
+def _get_sinc_lut(
+    fdl: int, lut_gran: int, *, device: torch.device, dtype: torch.dtype
+) -> Tensor:
     """Create a sinc lookup table for fractional delays."""
     key = (fdl, lut_gran, str(device), dtype)
     cached = _SINC_LUT_CACHE.get(key)
@@ -765,7 +777,12 @@ def _apply_diffuse_tail(
 
     gen = torch.Generator(device=rir.device)
     gen.manual_seed(0 if seed is None else seed)
-    noise = torch.randn(rir[..., tdiff_idx:].shape, device=rir.device, dtype=rir.dtype, generator=gen)
-    scale = torch.linalg.norm(rir[..., tdiff_idx - 1 : tdiff_idx], dim=-1, keepdim=True) + 1e-8
+    noise = torch.randn(
+        rir[..., tdiff_idx:].shape, device=rir.device, dtype=rir.dtype, generator=gen
+    )
+    scale = (
+        torch.linalg.norm(rir[..., tdiff_idx - 1 : tdiff_idx], dim=-1, keepdim=True)
+        + 1e-8
+    )
     rir[..., tdiff_idx:] = noise * decay * scale
     return rir

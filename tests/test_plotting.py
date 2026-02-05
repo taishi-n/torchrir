@@ -7,6 +7,7 @@ from torchrir import Room
 def _has_matplotlib():
     try:
         import matplotlib  # noqa: F401
+
         return True
     except Exception:
         return False
