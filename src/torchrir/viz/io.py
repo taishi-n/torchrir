@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Optional, Sequence
+import logging
 
 import torch
 
+from .animation import animate_scene_gif
 from .scene import plot_scene_dynamic, plot_scene_static
 from .utils import (
     _positions_to_cpu,
@@ -86,3 +88,86 @@ def plot_scene_and_save(
             dynamic_paths.append(dynamic_path)
 
     return static_paths, dynamic_paths
+
+
+def save_scene_plots(
+    *,
+    out_dir: Path,
+    room: torch.Tensor | Sequence[float],
+    sources: object,
+    mics: object,
+    src_traj: Optional[torch.Tensor | Sequence] = None,
+    mic_traj: Optional[torch.Tensor | Sequence] = None,
+    prefix: str,
+    show: bool,
+    logger: logging.Logger,
+    plot_2d: bool = True,
+    plot_3d: bool = True,
+) -> None:
+    """Plot and save scene images."""
+    try:
+        static_paths, dynamic_paths = plot_scene_and_save(
+            out_dir=out_dir,
+            room=room,
+            sources=sources,
+            mics=mics,
+            src_traj=src_traj,
+            mic_traj=mic_traj,
+            prefix=prefix,
+            show=show,
+            plot_2d=plot_2d,
+            plot_3d=plot_3d,
+        )
+        for path in static_paths + dynamic_paths:
+            logger.info("saved: %s", path)
+    except Exception as exc:  # pragma: no cover - optional dependency
+        logger.warning("Plot skipped: %s", exc)
+
+
+def save_scene_gifs(
+    *,
+    out_dir: Path,
+    room: torch.Tensor | Sequence[float],
+    sources: object,
+    mics: object,
+    src_traj: torch.Tensor,
+    mic_traj: torch.Tensor,
+    prefix: str,
+    signal_len: int,
+    fs: int,
+    gif_fps: int,
+    logger: logging.Logger,
+) -> None:
+    """Render trajectory GIFs."""
+    try:
+        gif_path = out_dir / f"{prefix}.gif"
+        animate_scene_gif(
+            out_path=gif_path,
+            room=room,
+            sources=sources,
+            mics=mics,
+            src_traj=src_traj,
+            mic_traj=mic_traj,
+            fps=gif_fps if gif_fps > 0 else None,
+            signal_len=signal_len,
+            fs=fs,
+        )
+        logger.info("saved: %s", gif_path)
+        if torch.as_tensor(room).numel() == 3:
+            gif_path_3d = out_dir / f"{prefix}_3d.gif"
+            animate_scene_gif(
+                out_path=gif_path_3d,
+                room=room,
+                sources=sources,
+                mics=mics,
+                src_traj=src_traj,
+                mic_traj=mic_traj,
+                fps=gif_fps if gif_fps > 0 else None,
+                signal_len=signal_len,
+                fs=fs,
+                plot_2d=False,
+                plot_3d=True,
+            )
+            logger.info("saved: %s", gif_path_3d)
+    except Exception as exc:  # pragma: no cover - optional dependency
+        logger.warning("GIF skipped: %s", exc)

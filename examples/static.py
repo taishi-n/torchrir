@@ -28,13 +28,8 @@ try:
         MicrophoneArray,
         Room,
         Source,
-        build_metadata,
         convolve_rir,
         get_logger,
-        plot_scene_and_save,
-        resolve_device,
-        save_metadata_json,
-        save_wav,
         setup_logging,
         simulate_rir,
     )
@@ -47,13 +42,8 @@ except ModuleNotFoundError:  # allow running without installation
         MicrophoneArray,
         Room,
         Source,
-        build_metadata,
         convolve_rir,
         get_logger,
-        plot_scene_and_save,
-        resolve_device,
-        save_metadata_json,
-        save_wav,
         setup_logging,
         simulate_rir,
     )
@@ -62,6 +52,9 @@ EXAMPLES_DIR = Path(__file__).resolve().parent
 if str(EXAMPLES_DIR) not in sys.path:
     sys.path.insert(0, str(EXAMPLES_DIR))
 from torchrir.geometry import arrays, sampling
+from torchrir.io import save_audio, save_metadata
+from torchrir.util import add_output_args, resolve_device
+from torchrir.viz import save_scene_plots
 from torchrir import load_dataset_sources
 
 
@@ -121,18 +114,12 @@ def main() -> None:
         default="cpu",
         help="Compute device (cpu/cuda/mps/auto).",
     )
-    parser.add_argument(
-        "--out-dir",
-        type=Path,
-        default=Path("outputs"),
-        help="Output directory for WAV/metadata/plots.",
+    add_output_args(
+        parser,
+        out_dir_default="outputs",
+        plot_default=False,
+        include_gif=False,
     )
-    parser.add_argument(
-        "--plot",
-        action="store_true",
-        help="Plot the static room layout and save PNGs.",
-    )
-    parser.add_argument("--show", action="store_true", help="show plots interactively")
     parser.add_argument("--log-level", type=str, default="INFO", help="Log level.")
     args = parser.parse_args()
 
@@ -176,17 +163,15 @@ def main() -> None:
 
     # Optional static plot.
     if args.plot:
-        try:
-            plot_scene_and_save(
-                out_dir=args.out_dir,
-                room=room.size,
-                sources=sources,
-                mics=mics,
-                prefix="static",
-                show=args.show,
-            )
-        except Exception as exc:  # pragma: no cover - optional dependency
-            logger.warning("Plot skipped: %s", exc)
+        save_scene_plots(
+            out_dir=args.out_dir,
+            room=room.size,
+            sources=sources,
+            mics=mics,
+            prefix="static",
+            show=args.show,
+            logger=logger,
+        )
 
     # ISM simulation + convolution.
     rirs = simulate_rir(
@@ -201,11 +186,16 @@ def main() -> None:
     y_static = convolve_rir(signals, rirs)
 
     # Save outputs (audio + metadata).
-    args.out_dir.mkdir(parents=True, exist_ok=True)
-    out_path = args.out_dir / "static_binaural.wav"
-    save_wav(out_path, y_static, fs)
-    meta_path = args.out_dir / "static_binaural_metadata.json"
-    metadata = build_metadata(
+    save_audio(
+        out_dir=args.out_dir,
+        audio=y_static,
+        fs=fs,
+        audio_name="static_binaural.wav",
+        logger=logger,
+    )
+    metadata = save_metadata(
+        out_dir=args.out_dir,
+        metadata_name="static_binaural_metadata.json",
         room=room,
         sources=sources,
         mics=mics,
@@ -215,14 +205,12 @@ def main() -> None:
         signal_len=signals.shape[1],
         source_info=info,
         extra={"mode": "static"},
+        logger=logger,
     )
-    save_metadata_json(meta_path, metadata)
 
     logger.info("sources: %s", info)
     logger.info("RIR shape: %s", tuple(rirs.shape))
     logger.info("output shape: %s", tuple(y_static.shape))
-    logger.info("saved: %s", out_path)
-    logger.info("saved: %s", meta_path)
 
 
 if __name__ == "__main__":

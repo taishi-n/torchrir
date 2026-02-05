@@ -13,6 +13,7 @@ produces a binaural output.
 - `--tmax`: RIR length in seconds.
 - `--room`: room size (Lx Ly Lz).
 - `--plot`: save layout plots.
+- `--out-dir`: output directory for WAV/metadata/plots.
 
 ### Example runs
 
@@ -38,13 +39,16 @@ Expected outputs:
 This example generates moving source trajectories and convolves with dynamic
 RIRs (trajectory mode).
 
+Plotting utilities are provided by `save_scene_plots` and `save_scene_gifs`.
+
 ### Key arguments
 
 - `--steps`: number of RIR time steps for the trajectory.
 - `--order`: ISM reflection order.
 - `--tmax`: RIR length in seconds.
 - `--gif`: save trajectory animation GIF.
-- `--gif-fps`: override GIF FPS (0 uses auto).
+- `--gif-fps`: override GIF FPS (<=0 uses auto).
+- `--out-dir`: output directory for WAV/metadata/plots/GIFs.
 
 ### Example runs
 
@@ -75,6 +79,7 @@ This example keeps sources fixed and moves the binaural mic along a linear path.
 - `--steps`: number of RIR time steps for the trajectory.
 - `--gif`: save trajectory animation GIF.
 - `--plot`: save layout plots.
+- `--out-dir`: output directory for WAV/metadata/plots/GIFs.
 
 ### Example runs
 
@@ -106,6 +111,7 @@ The unified CLI wraps the three scenarios above and supports JSON/YAML configs.
 - `--config-in`: load settings from JSON/YAML.
 - `--config-out`: write current settings to JSON/YAML.
 - `--deterministic`: enable deterministic kernels (best-effort).
+- `--out-dir`: output directory for WAV/metadata/plots/GIFs.
 
 ### Example runs
 
@@ -210,7 +216,7 @@ The example is implemented in `examples/cmu_arctic_dynamic_dataset.py` and uses:
 - `load_dataset_sources` to build fixed-length signals from multiple utterances.
 - `simulate_dynamic_rir` to generate the dynamic RIR sequence.
 - `DynamicConvolver(mode="trajectory")` to produce the final mixture.
-- `build_metadata` + `save_metadata_json` to store scene metadata.
+- `save_audio` + `save_metadata` to store scene metadata (kept as separate calls).
 
 ### Additional example
 

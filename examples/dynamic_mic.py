@@ -29,13 +29,7 @@ try:
         MicrophoneArray,
         Room,
         Source,
-        animate_scene_gif,
-        build_metadata,
         get_logger,
-        plot_scene_and_save,
-        resolve_device,
-        save_metadata_json,
-        save_wav,
         setup_logging,
         simulate_dynamic_rir,
     )
@@ -49,13 +43,7 @@ except ModuleNotFoundError:  # allow running without installation
         MicrophoneArray,
         Room,
         Source,
-        animate_scene_gif,
-        build_metadata,
         get_logger,
-        plot_scene_and_save,
-        resolve_device,
-        save_metadata_json,
-        save_wav,
         setup_logging,
         simulate_dynamic_rir,
     )
@@ -64,6 +52,9 @@ EXAMPLES_DIR = Path(__file__).resolve().parent
 if str(EXAMPLES_DIR) not in sys.path:
     sys.path.insert(0, str(EXAMPLES_DIR))
 from torchrir.geometry import arrays, sampling, trajectories
+from torchrir.io import save_audio, save_metadata
+from torchrir.util import add_output_args, resolve_device
+from torchrir.viz import save_scene_gifs, save_scene_plots
 from torchrir import load_dataset_sources
 
 
@@ -126,24 +117,11 @@ def main() -> None:
         default="cpu",
         help="Compute device (cpu/cuda/mps/auto).",
     )
-    parser.add_argument(
-        "--out-dir",
-        type=Path,
-        default=Path("outputs"),
-        help="Output directory for WAV/metadata/plots/GIFs.",
-    )
-    parser.add_argument(
-        "--plot", action="store_true", help="Plot room layout and trajectories."
-    )
-    parser.add_argument("--show", action="store_true", help="show plots interactively")
-    parser.add_argument(
-        "--gif", action="store_true", help="Save trajectory animation GIF."
-    )
-    parser.add_argument(
-        "--gif-fps",
-        type=float,
-        default=0.0,
-        help="Override GIF FPS (0 uses auto based on steps).",
+    add_output_args(
+        parser,
+        out_dir_default="outputs",
+        plot_default=False,
+        include_gif=True,
     )
     parser.add_argument("--log-level", type=str, default="INFO", help="Log level.")
     args = parser.parse_args()
@@ -204,52 +182,31 @@ def main() -> None:
 
     # Optional plots/GIFs.
     if args.plot:
-        try:
-            plot_scene_and_save(
-                out_dir=args.out_dir,
-                room=room.size,
-                sources=sources,
-                mics=mics,
-                src_traj=src_traj,
-                mic_traj=mic_traj,
-                prefix="dynamic_mic",
-                show=args.show,
-            )
-        except Exception as exc:  # pragma: no cover - optional dependency
-            logger.warning("Plot skipped: %s", exc)
+        save_scene_plots(
+            out_dir=args.out_dir,
+            room=room.size,
+            sources=sources,
+            mics=mics,
+            src_traj=src_traj,
+            mic_traj=mic_traj,
+            prefix="dynamic_mic",
+            show=args.show,
+            logger=logger,
+        )
     if args.gif:
-        try:
-            gif_path = args.out_dir / "dynamic_mic.gif"
-            animate_scene_gif(
-                out_path=gif_path,
-                room=room.size,
-                sources=sources,
-                mics=mics,
-                src_traj=src_traj,
-                mic_traj=mic_traj,
-                fps=args.gif_fps if args.gif_fps > 0 else None,
-                signal_len=signals.shape[1],
-                fs=fs,
-            )
-            logger.info("saved: %s", gif_path)
-            if room.size.numel() == 3:
-                gif_path_3d = args.out_dir / "dynamic_mic_3d.gif"
-                animate_scene_gif(
-                    out_path=gif_path_3d,
-                    room=room.size,
-                    sources=sources,
-                    mics=mics,
-                    src_traj=src_traj,
-                    mic_traj=mic_traj,
-                    fps=args.gif_fps if args.gif_fps > 0 else None,
-                    signal_len=signals.shape[1],
-                    fs=fs,
-                    plot_2d=False,
-                    plot_3d=True,
-                )
-                logger.info("saved: %s", gif_path_3d)
-        except Exception as exc:  # pragma: no cover - optional dependency
-            logger.warning("GIF skipped: %s", exc)
+        save_scene_gifs(
+            out_dir=args.out_dir,
+            room=room.size,
+            sources=sources,
+            mics=mics,
+            src_traj=src_traj,
+            mic_traj=mic_traj,
+            prefix="dynamic_mic",
+            signal_len=signals.shape[1],
+            fs=fs,
+            gif_fps=int(args.gif_fps),
+            logger=logger,
+        )
 
     # ISM simulation + dynamic convolution.
     rirs = simulate_dynamic_rir(
@@ -264,11 +221,16 @@ def main() -> None:
     y_dynamic = DynamicConvolver(mode="trajectory").convolve(signals, rirs)
 
     # Save outputs (audio + metadata).
-    args.out_dir.mkdir(parents=True, exist_ok=True)
-    out_path = args.out_dir / "dynamic_mic_binaural.wav"
-    save_wav(out_path, y_dynamic, fs)
-    meta_path = args.out_dir / "dynamic_mic_binaural_metadata.json"
-    metadata = build_metadata(
+    save_audio(
+        out_dir=args.out_dir,
+        audio=y_dynamic,
+        fs=fs,
+        audio_name="dynamic_mic_binaural.wav",
+        logger=logger,
+    )
+    metadata = save_metadata(
+        out_dir=args.out_dir,
+        metadata_name="dynamic_mic_binaural_metadata.json",
         room=room,
         sources=sources,
         mics=mics,
@@ -278,14 +240,12 @@ def main() -> None:
         signal_len=signals.shape[1],
         source_info=info,
         extra={"mode": "dynamic_mic"},
+        logger=logger,
     )
-    save_metadata_json(meta_path, metadata)
 
     logger.info("sources: %s", info)
     logger.info("dynamic RIR shape: %s", tuple(rirs.shape))
     logger.info("output shape: %s", tuple(y_dynamic.shape))
-    logger.info("saved: %s", out_path)
-    logger.info("saved: %s", meta_path)
 
 
 if __name__ == "__main__":

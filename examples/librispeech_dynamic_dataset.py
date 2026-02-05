@@ -37,13 +37,8 @@ try:
         MicrophoneArray,
         Room,
         Source,
-        build_metadata,
         get_logger,
         load_dataset_sources,
-        plot_scene_and_save,
-        resolve_device,
-        save_metadata_json,
-        save_wav,
         setup_logging,
         simulate_dynamic_rir,
     )
@@ -57,13 +52,8 @@ except ModuleNotFoundError:  # allow running without installation
         MicrophoneArray,
         Room,
         Source,
-        build_metadata,
         get_logger,
         load_dataset_sources,
-        plot_scene_and_save,
-        resolve_device,
-        save_metadata_json,
-        save_wav,
         setup_logging,
         simulate_dynamic_rir,
     )
@@ -73,6 +63,9 @@ if str(EXAMPLES_DIR) not in sys.path:
     sys.path.insert(0, str(EXAMPLES_DIR))
 
 from torchrir.geometry import arrays, sampling, trajectories
+from torchrir.io import save_audio, save_metadata
+from torchrir.util import add_output_args, resolve_device
+from torchrir.viz import save_scene_plots
 
 
 def _dataset_factory(
@@ -204,22 +197,12 @@ def main() -> None:
         default="cpu",
         help="Compute device (cpu/cuda/mps/auto).",
     )
-    parser.add_argument(
-        "--out-dir",
-        type=Path,
-        default=Path("outputs/librispeech_dynamic_dataset"),
-        help="Output directory for per-scene WAV/metadata/plots.",
+    add_output_args(
+        parser,
+        out_dir_default="outputs/librispeech_dynamic_dataset",
+        plot_default=True,
+        include_gif=False,
     )
-    parser.add_argument(
-        "--plot",
-        action="store_true",
-        default=True,
-        help="Plot each scene (PNG).",
-    )
-    parser.add_argument(
-        "--no-plot", action="store_false", dest="plot", help="Disable plotting."
-    )
-    parser.add_argument("--show", action="store_true", help="show plots interactively")
     parser.add_argument("--log-level", type=str, default="INFO", help="Log level.")
     args = parser.parse_args()
 
@@ -276,19 +259,17 @@ def main() -> None:
         sources = Source.from_positions(src_traj[0].tolist())
 
         if args.plot:
-            try:
-                plot_scene_and_save(
-                    out_dir=args.out_dir,
-                    room=room.size,
-                    sources=sources,
-                    mics=mics,
-                    src_traj=src_traj,
-                    mic_traj=mic_traj,
-                    prefix=f"scene_{idx:03d}",
-                    show=args.show,
-                )
-            except Exception as exc:  # pragma: no cover - optional dependency
-                logger.warning("Plot skipped for scene %03d: %s", idx, exc)
+            save_scene_plots(
+                out_dir=args.out_dir,
+                room=room.size,
+                sources=sources,
+                mics=mics,
+                src_traj=src_traj,
+                mic_traj=mic_traj,
+                prefix=f"scene_{idx:03d}",
+                show=args.show,
+                logger=logger,
+            )
 
         # ISM simulation + dynamic convolution.
         rirs = simulate_dynamic_rir(
@@ -302,10 +283,16 @@ def main() -> None:
         y = DynamicConvolver(mode="trajectory").convolve(signals, rirs)
 
         # Save mixture audio and JSON metadata per scene.
-        out_audio = args.out_dir / f"scene_{idx:03d}.wav"
-        save_wav(out_audio, y, fs)
-        meta_path = args.out_dir / f"scene_{idx:03d}_metadata.json"
-        metadata = build_metadata(
+        save_audio(
+            out_dir=args.out_dir,
+            audio=y,
+            fs=fs,
+            audio_name=f"scene_{idx:03d}.wav",
+            logger=logger,
+        )
+        metadata = save_metadata(
+            out_dir=args.out_dir,
+            metadata_name=f"scene_{idx:03d}_metadata.json",
             room=room,
             sources=sources,
             mics=mics,
@@ -322,11 +309,8 @@ def main() -> None:
                 "num_sources": args.num_sources,
                 "subset": args.subset,
             },
+            logger=logger,
         )
-        save_metadata_json(meta_path, metadata)
-
-        logger.info("scene %03d: saved %s", idx, out_audio)
-        logger.info("scene %03d: saved %s", idx, meta_path)
 
 
 if __name__ == "__main__":

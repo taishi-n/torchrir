@@ -25,7 +25,6 @@ try:
         Room,
         Source,
         get_logger,
-        resolve_device,
         setup_logging,
         simulate_dynamic_rir,
         simulate_rir,
@@ -40,11 +39,11 @@ except ModuleNotFoundError:  # allow running without installation
         Room,
         Source,
         get_logger,
-        resolve_device,
         setup_logging,
         simulate_dynamic_rir,
         simulate_rir,
     )
+from torchrir.util import resolve_device
 
 
 def _bench_once(device: torch.device, repeats: int) -> float:
