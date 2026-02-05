@@ -38,7 +38,7 @@ def load_dataset_sources(
 
     Example:
         >>> from pathlib import Path
-        >>> from torchrir import CmuArcticDataset
+        >>> from torchrir.datasets import CmuArcticDataset
         >>> rng = random.Random(0)
         >>> root = Path("datasets/cmu_arctic")
         >>> signals, fs, info = load_dataset_sources(

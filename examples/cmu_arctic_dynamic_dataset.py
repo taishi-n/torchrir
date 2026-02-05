@@ -32,14 +32,12 @@ import torch
 
 try:
     from torchrir import (
-        CmuArcticDataset,
         DynamicConvolver,
         LoggingConfig,
         MicrophoneArray,
         Room,
         Source,
         get_logger,
-        load_dataset_sources,
         setup_logging,
         simulate_dynamic_rir,
     )
@@ -47,14 +45,12 @@ except ModuleNotFoundError:  # allow running without installation
     ROOT = Path(__file__).resolve().parents[1]
     sys.path.insert(0, str(ROOT / "src"))
     from torchrir import (
-        CmuArcticDataset,
         DynamicConvolver,
         LoggingConfig,
         MicrophoneArray,
         Room,
         Source,
         get_logger,
-        load_dataset_sources,
         setup_logging,
         simulate_dynamic_rir,
     )
@@ -63,6 +59,7 @@ EXAMPLES_DIR = Path(__file__).resolve().parent
 if str(EXAMPLES_DIR) not in sys.path:
     sys.path.insert(0, str(EXAMPLES_DIR))
 
+from torchrir.datasets import CmuArcticDataset, load_dataset_sources
 from torchrir.geometry import arrays, sampling, trajectories
 from torchrir.io import save_audio, save_metadata
 from torchrir.util import add_output_args, resolve_device

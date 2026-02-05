@@ -1,11 +1,6 @@
 """TorchRIR public API."""
 
-from .datasets import (
-    CmuArcticDataset,
-    LibriSpeechDataset,
-    collate_dataset_items,
-    load_dataset_sources,
-)
+from .datasets import collate_dataset_items, load_dataset_sources
 from .infra import LoggingConfig, get_logger, setup_logging
 from .io import build_metadata, load_wav_mono, save_metadata_json, save_wav
 from .models import MicrophoneArray, RIRResult, Room, Scene, Source
@@ -22,9 +17,7 @@ __all__ = [
     "simulate_dynamic_rir",
     "SimulationConfig",
     "convolve_rir",
-    "CmuArcticDataset",
     "collate_dataset_items",
-    "LibriSpeechDataset",
     "DynamicConvolver",
     "fft_convolve",
     "get_logger",
