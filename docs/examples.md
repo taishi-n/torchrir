@@ -1,5 +1,162 @@
 # Examples
 
+## Static CMU ARCTIC (fixed sources + fixed mic)
+
+This example mixes multiple CMU ARCTIC utterances using a static ISM RIR and
+produces a binaural output.
+
+### Key arguments
+
+- `--num-sources`: number of source speakers to mix.
+- `--duration`: length (seconds) of each source signal.
+- `--order`: ISM reflection order.
+- `--tmax`: RIR length in seconds.
+- `--room`: room size (Lx Ly Lz).
+- `--plot`: save layout plots.
+
+### Example runs
+
+```bash
+uv run python examples/static.py --num-sources 1 --duration 5 --plot
+```
+
+Expected outputs:
+- `static_binaural.wav`
+- `static_binaural_metadata.json`
+- `static_static_2d.png` (and `static_static_3d.png` if 3D)
+
+```bash
+uv run python examples/static.py --order 12 --tmax 0.6 --device auto
+```
+
+Expected outputs:
+- `static_binaural.wav`
+- `static_binaural_metadata.json`
+
+## Dynamic CMU ARCTIC (moving sources, fixed mic)
+
+This example generates moving source trajectories and convolves with dynamic
+RIRs (trajectory mode).
+
+### Key arguments
+
+- `--steps`: number of RIR time steps for the trajectory.
+- `--order`: ISM reflection order.
+- `--tmax`: RIR length in seconds.
+- `--gif`: save trajectory animation GIF.
+- `--gif-fps`: override GIF FPS (0 uses auto).
+
+### Example runs
+
+```bash
+uv run python examples/dynamic_src.py --steps 24 --gif --plot
+```
+
+Expected outputs:
+- `dynamic_src_binaural.wav`
+- `dynamic_src_binaural_metadata.json`
+- `dynamic_src_static_2d.png` / `dynamic_src_dynamic_2d.png`
+- `dynamic_src.gif` (and `dynamic_src_3d.gif` if 3D)
+
+```bash
+uv run python examples/dynamic_src.py --num-sources 3 --duration 8 --order 10
+```
+
+Expected outputs:
+- `dynamic_src_binaural.wav`
+- `dynamic_src_binaural_metadata.json`
+
+## Dynamic CMU ARCTIC (fixed sources, moving mic)
+
+This example keeps sources fixed and moves the binaural mic along a linear path.
+
+### Key arguments
+
+- `--steps`: number of RIR time steps for the trajectory.
+- `--gif`: save trajectory animation GIF.
+- `--plot`: save layout plots.
+
+### Example runs
+
+```bash
+uv run python examples/dynamic_mic.py --steps 20 --gif --plot
+```
+
+Expected outputs:
+- `dynamic_mic_binaural.wav`
+- `dynamic_mic_binaural_metadata.json`
+- `dynamic_mic_static_2d.png` / `dynamic_mic_dynamic_2d.png`
+- `dynamic_mic.gif` (and `dynamic_mic_3d.gif` if 3D)
+
+```bash
+uv run python examples/dynamic_mic.py --order 12 --tmax 0.6 --device auto
+```
+
+Expected outputs:
+- `dynamic_mic_binaural.wav`
+- `dynamic_mic_binaural_metadata.json`
+
+## Unified CLI (static/dynamic)
+
+The unified CLI wraps the three scenarios above and supports JSON/YAML configs.
+
+### Key arguments
+
+- `--mode`: `static`, `dynamic_src`, or `dynamic_mic`.
+- `--config-in`: load settings from JSON/YAML.
+- `--config-out`: write current settings to JSON/YAML.
+- `--deterministic`: enable deterministic kernels (best-effort).
+
+### Example runs
+
+```bash
+uv run python examples/cli.py --mode static --plot
+```
+
+Expected outputs:
+- `static_binaural.wav`
+- `static_binaural_metadata.json`
+- `static_static_2d.png` (and 3D variant if room is 3D)
+
+```bash
+uv run python examples/cli.py --mode dynamic_src --gif --steps 24
+```
+
+Expected outputs:
+- `dynamic_src_binaural.wav`
+- `dynamic_src_binaural_metadata.json`
+- `dynamic_src.gif` (and 3D variant if room is 3D)
+
+## Benchmark (CPU vs GPU)
+
+This script times static ISM and optional dynamic trajectory simulation.
+
+### Key arguments
+
+- `--repeats`: number of iterations to average.
+- `--gpu`: `cuda`, `mps`, or `auto`.
+- `--dynamic`: benchmark dynamic trajectory path as well.
+
+### Example runs
+
+```bash
+uv run python examples/benchmark_device.py --repeats 10 --gpu auto
+```
+
+Expected output (logs):
+- `cpu avg: ... ms`
+- `<device> avg: ... ms`
+- `speedup: ...x`
+
+```bash
+uv run python examples/benchmark_device.py --dynamic --repeats 5 --gpu mps
+```
+
+Expected output (logs):
+- `cpu dynamic avg: ... ms`
+- `mps dynamic avg: ... ms`
+- `speedup: ...x`
+
 ## Dynamic CMU ARCTIC dataset (fixed room, fixed mic, moving sources)
 
 This example generates a small dynamic dataset inspired by Cross3D: the room
@@ -41,6 +198,10 @@ uv run python examples/cmu_arctic_dynamic_dataset.py \
 - `--order`: ISM reflection order.
 - `--tmax`: RIR length in seconds.
 - `--seed`: RNG seed for reproducibility.
+- `--dataset-dir`: dataset root path.
+- `--out-dir`: output directory for per-scene WAV/JSON/plots.
+- `--plot` / `--no-plot`: enable/disable plotting.
+- `--device`: cpu/cuda/mps/auto.
 
 ### Implementation notes
 
@@ -50,6 +211,16 @@ The example is implemented in `examples/cmu_arctic_dynamic_dataset.py` and uses:
 - `simulate_dynamic_rir` to generate the dynamic RIR sequence.
 - `DynamicConvolver(mode="trajectory")` to produce the final mixture.
 - `build_metadata` + `save_metadata_json` to store scene metadata.
+
+### Additional example
+
+```bash
+uv run python examples/cmu_arctic_dynamic_dataset.py --num-scenes 2 --no-plot --out-dir outputs/ds_small
+```
+
+Expected outputs:
+- `outputs/ds_small/scene_000.wav`, `scene_001.wav`
+- `outputs/ds_small/scene_000_metadata.json`, `scene_001_metadata.json`
 
 ## Dynamic LibriSpeech dataset (fixed room, fixed mic, moving sources)
 
@@ -92,3 +263,17 @@ uv run python examples/librispeech_dynamic_dataset.py \
 - `--order`: ISM reflection order.
 - `--tmax`: RIR length in seconds.
 - `--seed`: RNG seed for reproducibility.
+- `--dataset-dir`: dataset root path.
+- `--out-dir`: output directory for per-scene WAV/JSON/plots.
+- `--plot` / `--no-plot`: enable/disable plotting.
+- `--device`: cpu/cuda/mps/auto.
+
+### Additional example
+
+```bash
+uv run python examples/librispeech_dynamic_dataset.py --subset dev-clean --num-scenes 2 --no-plot
+```
+
+Expected outputs:
+- `scene_000.wav`, `scene_001.wav`
+- `scene_000_metadata.json`, `scene_001_metadata.json`

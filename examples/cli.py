@@ -1,6 +1,15 @@
 from __future__ import annotations
 
-"""Unified CLI for static/dynamic RIR examples."""
+"""Unified CLI for static/dynamic CMU ARCTIC RIR examples.
+
+This CLI wraps the three core scenarios:
+- static: fixed sources + fixed binaural mic
+- dynamic_src: moving sources + fixed binaural mic
+- dynamic_mic: fixed sources + moving binaural mic
+
+It can load/save configs (JSON/YAML), generate plots/GIFs, and writes
+WAV + metadata JSON outputs in the chosen output directory.
+"""
 
 import argparse
 import json
@@ -231,45 +240,106 @@ def _serialize_args(args) -> Dict[str, Any]:
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Unified CMU ARCTIC RIR examples")
     parser.add_argument(
-        "--mode", choices=("static", "dynamic_src", "dynamic_mic"), default="static"
+        "--mode",
+        choices=("static", "dynamic_src", "dynamic_mic"),
+        default="static",
+        help="Scenario to run (static / moving sources / moving mic).",
     )
-    parser.add_argument("--dataset-dir", type=Path, default=Path("datasets/cmu_arctic"))
-    parser.add_argument("--download", action="store_true", default=True)
-    parser.add_argument("--no-download", action="store_false", dest="download")
-    parser.add_argument("--num-sources", type=int, default=2)
-    parser.add_argument("--duration", type=float, default=10.0)
-    parser.add_argument("--seed", type=int, default=0)
     parser.add_argument(
-        "--deterministic", action="store_true", help="enable deterministic kernels"
+        "--dataset-dir",
+        type=Path,
+        default=Path("datasets/cmu_arctic"),
+        help="Root directory for the CMU ARCTIC dataset.",
     )
-    parser.add_argument("--room", type=float, nargs="+", default=[6.0, 4.0, 3.0])
-    parser.add_argument("--steps", type=int, default=16)
-    parser.add_argument("--order", type=int, default=8)
-    parser.add_argument("--tmax", type=float, default=0.4)
-    parser.add_argument("--device", type=str, default="cpu")
-    parser.add_argument("--out-dir", type=Path, default=Path("outputs"))
     parser.add_argument(
-        "--plot", action="store_true", help="plot room and trajectories"
+        "--download",
+        action="store_true",
+        default=True,
+        help="Download the dataset if missing.",
+    )
+    parser.add_argument(
+        "--no-download",
+        action="store_false",
+        dest="download",
+        help="Disable dataset download.",
+    )
+    parser.add_argument(
+        "--num-sources",
+        type=int,
+        default=2,
+        help="Number of source speakers to mix.",
+    )
+    parser.add_argument(
+        "--duration",
+        type=float,
+        default=10.0,
+        help="Target duration (seconds) for each source signal.",
+    )
+    parser.add_argument("--seed", type=int, default=0, help="Random seed.")
+    parser.add_argument(
+        "--deterministic",
+        action="store_true",
+        help="Enable deterministic kernels (best effort).",
+    )
+    parser.add_argument(
+        "--room",
+        type=float,
+        nargs="+",
+        default=[6.0, 4.0, 3.0],
+        help="Room size (Lx Ly [Lz]).",
+    )
+    parser.add_argument(
+        "--steps",
+        type=int,
+        default=16,
+        help="Number of RIR time steps for trajectories.",
+    )
+    parser.add_argument("--order", type=int, default=8, help="ISM reflection order.")
+    parser.add_argument(
+        "--tmax", type=float, default=0.4, help="RIR length in seconds."
+    )
+    parser.add_argument(
+        "--device",
+        type=str,
+        default="cpu",
+        help="Compute device (cpu/cuda/mps/auto).",
+    )
+    parser.add_argument(
+        "--out-dir",
+        type=Path,
+        default=Path("outputs"),
+        help="Output directory for WAV/metadata/plots/GIFs.",
+    )
+    parser.add_argument(
+        "--plot", action="store_true", help="Plot room layout and trajectories."
     )
     parser.add_argument("--show", action="store_true", help="show plots interactively")
     parser.add_argument(
-        "--gif", action="store_true", help="save trajectory animation GIF"
+        "--gif", action="store_true", help="Save trajectory animation GIF."
     )
-    parser.add_argument("--gif-fps", type=float, default=0.0)
-    parser.add_argument("--log-level", type=str, default="INFO")
-    parser.add_argument("--config-in", type=Path, help="load config from JSON/YAML")
-    parser.add_argument("--config-out", type=Path, help="write config to JSON/YAML")
+    parser.add_argument(
+        "--gif-fps",
+        type=float,
+        default=0.0,
+        help="Override GIF FPS (0 uses auto based on steps).",
+    )
+    parser.add_argument("--log-level", type=str, default="INFO", help="Log level.")
+    parser.add_argument("--config-in", type=Path, help="Load config from JSON/YAML.")
+    parser.add_argument("--config-out", type=Path, help="Write config to JSON/YAML.")
     return parser
 
 
 def _run_static(args, rng: random.Random, logger):
+    """Run the static (fixed sources + fixed mic) scenario."""
     device = resolve_device(args.device)
+    # Load dry sources and build a shoebox room.
     signals, fs, info = _load_sources(args, rng, device)
     room = Room.shoebox(
         size=args.room, fs=fs, beta=[0.9] * (6 if len(args.room) == 3 else 4)
     )
     room_size = torch.tensor(args.room, dtype=torch.float32)
 
+    # Sample fixed source and mic positions.
     sources_pos = sampling.sample_positions(
         num=args.num_sources, room_size=room_size, rng=rng
     )
@@ -281,6 +351,7 @@ def _run_static(args, rng: random.Random, logger):
     sources = Source.from_positions(sources_pos.tolist())
     mics = MicrophoneArray.from_positions(mic_pos.tolist())
 
+    # Optional visualization.
     _plot_scene(args, room, sources, mics, prefix="static")
     _plot_gif(
         args,
@@ -294,6 +365,7 @@ def _run_static(args, rng: random.Random, logger):
         fs=fs,
     )
 
+    # ISM simulation + static convolution.
     rirs = simulate_rir(
         room=room,
         sources=sources,
@@ -306,6 +378,7 @@ def _run_static(args, rng: random.Random, logger):
 
     y = convolve_rir(signals, rirs)
 
+    # Persist outputs.
     args.out_dir.mkdir(parents=True, exist_ok=True)
     out_path = args.out_dir / "static_binaural.wav"
     save_wav(out_path, y, fs)
@@ -331,7 +404,9 @@ def _run_static(args, rng: random.Random, logger):
 
 
 def _run_dynamic_src(args, rng: random.Random, logger):
+    """Run the moving-source scenario (fixed mic)."""
     device = resolve_device(args.device)
+    # Load dry sources and build a shoebox room.
     signals, fs, info = _load_sources(args, rng, device)
     room = Room.shoebox(
         size=args.room, fs=fs, beta=[0.9] * (6 if len(args.room) == 3 else 4)
@@ -339,6 +414,7 @@ def _run_dynamic_src(args, rng: random.Random, logger):
     room_size = torch.tensor(args.room, dtype=torch.float32)
 
     steps = max(2, args.steps)
+    # Build linear trajectories for each source; mic is fixed.
     src_start = sampling.sample_positions(
         num=args.num_sources, room_size=room_size, rng=rng
     )
@@ -363,6 +439,7 @@ def _run_dynamic_src(args, rng: random.Random, logger):
     sources = Source.from_positions(src_start.tolist())
     mics = MicrophoneArray.from_positions(mic_pos.tolist())
 
+    # Optional visualization.
     _plot_scene(
         args,
         room,
@@ -384,6 +461,7 @@ def _run_dynamic_src(args, rng: random.Random, logger):
         fs=fs,
     )
 
+    # ISM simulation + dynamic convolution.
     rirs = simulate_dynamic_rir(
         room=room,
         src_traj=src_traj,
@@ -394,6 +472,7 @@ def _run_dynamic_src(args, rng: random.Random, logger):
     )
     y = DynamicConvolver(mode="trajectory").convolve(signals, rirs)
 
+    # Persist outputs.
     args.out_dir.mkdir(parents=True, exist_ok=True)
     out_path = args.out_dir / "dynamic_src_binaural.wav"
     save_wav(out_path, y, fs)
@@ -418,13 +497,16 @@ def _run_dynamic_src(args, rng: random.Random, logger):
 
 
 def _run_dynamic_mic(args, rng: random.Random, logger):
+    """Run the moving-mic scenario (fixed sources)."""
     device = resolve_device(args.device)
+    # Load dry sources and build a shoebox room.
     signals, fs, info = _load_sources(args, rng, device)
     room = Room.shoebox(
         size=args.room, fs=fs, beta=[0.9] * (6 if len(args.room) == 3 else 4)
     )
     room_size = torch.tensor(args.room, dtype=torch.float32)
 
+    # Fixed source positions; mic follows a linear path.
     sources_pos = sampling.sample_positions(
         num=args.num_sources, room_size=room_size, rng=rng
     )
@@ -448,6 +530,7 @@ def _run_dynamic_mic(args, rng: random.Random, logger):
     sources = Source.from_positions(sources_pos.tolist())
     mics = MicrophoneArray.from_positions(mic_traj[0].tolist())
 
+    # Optional visualization.
     _plot_scene(
         args,
         room,
@@ -469,6 +552,7 @@ def _run_dynamic_mic(args, rng: random.Random, logger):
         fs=fs,
     )
 
+    # ISM simulation + dynamic convolution.
     rirs = simulate_dynamic_rir(
         room=room,
         src_traj=src_traj,
@@ -479,6 +563,7 @@ def _run_dynamic_mic(args, rng: random.Random, logger):
     )
     y = DynamicConvolver(mode="trajectory").convolve(signals, rirs)
 
+    # Persist outputs.
     args.out_dir.mkdir(parents=True, exist_ok=True)
     out_path = args.out_dir / "dynamic_mic_binaural.wav"
     save_wav(out_path, y, fs)

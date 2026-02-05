@@ -1,6 +1,14 @@
 from __future__ import annotations
 
-"""Simple CPU vs GPU benchmark for RIR simulation."""
+"""CPU vs GPU benchmark for RIR simulation and dynamic convolution.
+
+This script measures average per-run latency for:
+1) Static RIR generation (ISM).
+2) Optional dynamic trajectory simulation + convolution.
+
+It prints average milliseconds and speedup ratios. Use --dynamic to benchmark
+trajectory-mode RIRs and convolution.
+"""
 
 import argparse
 import sys
@@ -40,6 +48,7 @@ except ModuleNotFoundError:  # allow running without installation
 
 
 def _bench_once(device: torch.device, repeats: int) -> float:
+    # Static ISM benchmark with multiple sources and a dense mic grid.
     room = Room.shoebox(size=[8.0, 6.0, 3.5], fs=16000, beta=[0.92] * 6)
     sources = Source.from_positions([[1.0, 1.5, 1.2], [4.0, 2.5, 1.4]])
     mic_grid = []
@@ -71,6 +80,7 @@ def _bench_once(device: torch.device, repeats: int) -> float:
 
 
 def _bench_dynamic(device: torch.device, repeats: int) -> float:
+    # Dynamic ISM benchmark with moving mic and convolution.
     room = Room.shoebox(size=[8.0, 6.0, 3.5], fs=16000, beta=[0.92] * 6)
     sources = Source.from_positions([[1.0, 1.5, 1.2]])
     mic_grid = []
@@ -125,14 +135,27 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="CPU vs GPU benchmark for RIR generation"
     )
-    parser.add_argument("--repeats", type=int, default=5)
-    parser.add_argument("--gpu", type=str, default="auto", help="cuda/mps/auto")
     parser.add_argument(
-        "--dynamic", action="store_true", help="benchmark dynamic trajectory path"
+        "--repeats",
+        type=int,
+        default=5,
+        help="Number of repeated runs (averaged).",
     )
-    parser.add_argument("--log-level", type=str, default="INFO")
+    parser.add_argument(
+        "--gpu",
+        type=str,
+        default="auto",
+        help="GPU device selection (cuda/mps/auto).",
+    )
+    parser.add_argument(
+        "--dynamic",
+        action="store_true",
+        help="Benchmark dynamic trajectory path (simulate + convolve).",
+    )
+    parser.add_argument("--log-level", type=str, default="INFO", help="Log level.")
     args = parser.parse_args()
 
+    # Logging + CPU baseline.
     setup_logging(LoggingConfig(level=args.log_level))
     logger = get_logger("examples.benchmark_device")
 

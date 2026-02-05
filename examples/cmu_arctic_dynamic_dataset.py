@@ -135,25 +135,86 @@ def _build_source_trajectories(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Dynamic CMU ARCTIC dataset sample")
-    parser.add_argument("--dataset-dir", type=Path, default=Path("datasets/cmu_arctic"))
-    parser.add_argument("--download", action="store_true", default=True)
-    parser.add_argument("--no-download", action="store_false", dest="download")
-    parser.add_argument("--num-scenes", type=int, default=4)
-    parser.add_argument("--num-sources", type=int, default=2)
-    parser.add_argument("--duration", type=float, default=6.0)
-    parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--room", type=float, nargs="+", default=[6.0, 4.0, 3.0])
-    parser.add_argument("--steps", type=int, default=16)
-    parser.add_argument("--order", type=int, default=6)
-    parser.add_argument("--tmax", type=float, default=0.4)
-    parser.add_argument("--device", type=str, default="cpu")
-    parser.add_argument("--out-dir", type=Path, default=Path("outputs/dynamic_dataset"))
-    parser.add_argument("--plot", action="store_true", default=True)
-    parser.add_argument("--no-plot", action="store_false", dest="plot")
+    parser.add_argument(
+        "--dataset-dir",
+        type=Path,
+        default=Path("datasets/cmu_arctic"),
+        help="Root directory for the CMU ARCTIC dataset.",
+    )
+    parser.add_argument(
+        "--download",
+        action="store_true",
+        default=True,
+        help="Download the dataset if missing.",
+    )
+    parser.add_argument(
+        "--no-download",
+        action="store_false",
+        dest="download",
+        help="Disable dataset download.",
+    )
+    parser.add_argument(
+        "--num-scenes",
+        type=int,
+        default=4,
+        help="Number of scenes to generate.",
+    )
+    parser.add_argument(
+        "--num-sources",
+        type=int,
+        default=2,
+        help="Number of sources per scene.",
+    )
+    parser.add_argument(
+        "--duration",
+        type=float,
+        default=6.0,
+        help="Target duration (seconds) for each source signal.",
+    )
+    parser.add_argument("--seed", type=int, default=0, help="Random seed.")
+    parser.add_argument(
+        "--room",
+        type=float,
+        nargs="+",
+        default=[6.0, 4.0, 3.0],
+        help="Room size (Lx Ly [Lz]).",
+    )
+    parser.add_argument(
+        "--steps",
+        type=int,
+        default=16,
+        help="Number of RIR time steps for trajectories.",
+    )
+    parser.add_argument("--order", type=int, default=6, help="ISM reflection order.")
+    parser.add_argument(
+        "--tmax", type=float, default=0.4, help="RIR length in seconds."
+    )
+    parser.add_argument(
+        "--device",
+        type=str,
+        default="cpu",
+        help="Compute device (cpu/cuda/mps/auto).",
+    )
+    parser.add_argument(
+        "--out-dir",
+        type=Path,
+        default=Path("outputs/dynamic_dataset"),
+        help="Output directory for per-scene WAV/metadata/plots.",
+    )
+    parser.add_argument(
+        "--plot",
+        action="store_true",
+        default=True,
+        help="Plot each scene (PNG).",
+    )
+    parser.add_argument(
+        "--no-plot", action="store_false", dest="plot", help="Disable plotting."
+    )
     parser.add_argument("--show", action="store_true", help="show plots interactively")
-    parser.add_argument("--log-level", type=str, default="INFO")
+    parser.add_argument("--log-level", type=str, default="INFO", help="Log level.")
     args = parser.parse_args()
 
+    # Logging + fixed room setup.
     setup_logging(LoggingConfig(level=args.log_level))
     logger = get_logger("examples.cmu_arctic_dynamic_dataset")
 
@@ -215,6 +276,7 @@ def main() -> None:
             except Exception as exc:  # pragma: no cover - optional dependency
                 logger.warning("Plot skipped for scene %03d: %s", idx, exc)
 
+        # ISM simulation + dynamic convolution.
         rirs = simulate_dynamic_rir(
             room=room,
             src_traj=src_traj,
