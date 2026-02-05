@@ -262,6 +262,11 @@ def simulate_dynamic_rir(
 
     src_traj = as_tensor(src_traj, device=device, dtype=dtype)
     mic_traj = as_tensor(mic_traj, device=device, dtype=dtype)
+    device, dtype = infer_device_dtype(
+        src_traj, mic_traj, room.size, device=device, dtype=dtype
+    )
+    src_traj = as_tensor(src_traj, device=device, dtype=dtype)
+    mic_traj = as_tensor(mic_traj, device=device, dtype=dtype)
 
     if src_traj.ndim == 2:
         src_traj = src_traj.unsqueeze(1)
@@ -274,24 +279,95 @@ def simulate_dynamic_rir(
     if src_traj.shape[0] != mic_traj.shape[0]:
         raise ValueError("src_traj and mic_traj must have the same time length")
 
-    t_steps = src_traj.shape[0]
-    rirs = []
-    for t_idx in range(t_steps):
-        rir = simulate_rir(
-            room=room,
-            sources=src_traj[t_idx],
-            mics=mic_traj[t_idx],
-            max_order=max_order,
-            nsample=nsample,
-            tmax=tmax,
-            directivity=directivity,
-            orientation=orientation,
-            config=config,
-            device=device,
-            dtype=dtype,
+    if not isinstance(room, Room):
+        raise TypeError("room must be a Room instance")
+    if nsample is None:
+        if tmax is None:
+            raise ValueError("nsample or tmax must be provided")
+        nsample = int(math.ceil(tmax * room.fs))
+    if nsample <= 0:
+        raise ValueError("nsample must be positive")
+    if max_order < 0:
+        raise ValueError("max_order must be non-negative")
+
+    room_size = as_tensor(room.size, device=device, dtype=dtype)
+    room_size = ensure_dim(room_size)
+    dim = room_size.numel()
+    if src_traj.shape[2] != dim:
+        raise ValueError("src_traj must match room dimension")
+    if mic_traj.shape[2] != dim:
+        raise ValueError("mic_traj must match room dimension")
+
+    src_ori = None
+    mic_ori = None
+    if orientation is not None:
+        if isinstance(orientation, (list, tuple)):
+            if len(orientation) != 2:
+                raise ValueError("orientation tuple must have length 2")
+            src_ori, mic_ori = orientation
+        else:
+            src_ori = orientation
+            mic_ori = orientation
+    if src_ori is not None:
+        src_ori = as_tensor(src_ori, device=device, dtype=dtype)
+    if mic_ori is not None:
+        mic_ori = as_tensor(mic_ori, device=device, dtype=dtype)
+
+    beta = _resolve_beta(room, room_size, device=device, dtype=dtype)
+    beta = _validate_beta(beta, dim)
+    n_vec = _image_source_indices(max_order, dim, device=device, nb_img=None)
+    refl = _reflection_coefficients(n_vec, beta)
+
+    src_pattern, mic_pattern = split_directivity(directivity)
+    mic_dir = None
+    if mic_pattern != "omni":
+        if mic_ori is None:
+            raise ValueError("mic orientation required for non-omni directivity")
+        mic_dir = orientation_to_unit(mic_ori, dim)
+
+    n_src = src_traj.shape[1]
+    n_mic = mic_traj.shape[1]
+    rirs = torch.zeros((src_traj.shape[0], n_src, n_mic, nsample), device=device, dtype=dtype)
+    fdl = cfg.frac_delay_length
+    fdl2 = (fdl - 1) // 2
+    img_chunk = cfg.image_chunk_size
+    if img_chunk <= 0:
+        img_chunk = n_vec.shape[0]
+
+    src_dirs = None
+    if src_pattern != "omni":
+        if src_ori is None:
+            raise ValueError("source orientation required for non-omni directivity")
+        src_dirs = orientation_to_unit(src_ori, dim)
+        if src_dirs.ndim == 1:
+            src_dirs = src_dirs.unsqueeze(0).repeat(n_src, 1)
+        if src_dirs.ndim != 2 or src_dirs.shape[0] != n_src:
+            raise ValueError("source orientation must match number of sources")
+
+    for start in range(0, n_vec.shape[0], img_chunk):
+        end = min(start + img_chunk, n_vec.shape[0])
+        n_vec_chunk = n_vec[start:end]
+        refl_chunk = refl[start:end]
+        sample_chunk, attenuation_chunk = _compute_image_contributions_time_batch(
+            src_traj,
+            mic_traj,
+            room_size,
+            n_vec_chunk,
+            refl_chunk,
+            room,
+            fdl2,
+            src_pattern=src_pattern,
+            mic_pattern=mic_pattern,
+            src_dirs=src_dirs,
+            mic_dir=mic_dir,
         )
-        rirs.append(rir)
-    return torch.stack(rirs, dim=0)
+        t_steps = src_traj.shape[0]
+        sample_flat = sample_chunk.reshape(t_steps * n_src, n_mic, -1)
+        attenuation_flat = attenuation_chunk.reshape(t_steps * n_src, n_mic, -1)
+        rir_flat = rirs.view(t_steps * n_src, n_mic, nsample)
+        _accumulate_rir_batch(rir_flat, sample_flat, attenuation_flat, cfg)
+
+    return rirs
 
 
 def _prepare_entities(
@@ -502,6 +578,54 @@ def _compute_image_contributions_batch(
             else mic_dir.view(1, 1, 1, -1)
         )
         cos_theta = _cos_between(-vec, mic_dir)
+        gain = gain * directivity_gain(mic_pattern, cos_theta)
+
+    attenuation = gain / dist
+    return sample, attenuation
+
+
+def _compute_image_contributions_time_batch(
+    src_traj: Tensor,
+    mic_traj: Tensor,
+    room_size: Tensor,
+    n_vec: Tensor,
+    refl: Tensor,
+    room: Room,
+    fdl2: int,
+    *,
+    src_pattern: str,
+    mic_pattern: str,
+    src_dirs: Optional[Tensor],
+    mic_dir: Optional[Tensor],
+) -> Tuple[Tensor, Tensor]:
+    """Compute samples/attenuation for all time steps in batch."""
+    sign = torch.where((n_vec % 2) == 0, 1.0, -1.0).to(dtype=src_traj.dtype)
+    n = torch.floor_divide(n_vec + 1, 2).to(dtype=src_traj.dtype)
+    base = 2.0 * room_size * n
+    img = base[None, None, :, :] + sign[None, None, :, :] * src_traj[:, :, None, :]
+    vec = mic_traj[:, None, :, None, :] - img[:, :, None, :, :]
+    dist = torch.linalg.norm(vec, dim=-1)
+    dist = torch.clamp(dist, min=1e-6)
+    time = dist / room.c
+    time = time + (fdl2 / room.fs)
+    sample = time * room.fs
+
+    gain = refl.view(1, 1, 1, -1)
+    if src_pattern != "omni":
+        if src_dirs is None:
+            raise ValueError("source orientation required for non-omni directivity")
+        src_dirs_b = src_dirs[None, :, None, None, :]
+        cos_theta = _cos_between(vec, src_dirs_b)
+        gain = gain * directivity_gain(src_pattern, cos_theta)
+    if mic_pattern != "omni":
+        if mic_dir is None:
+            raise ValueError("mic orientation required for non-omni directivity")
+        mic_dir_b = (
+            mic_dir[None, None, :, None, :]
+            if mic_dir.ndim == 2
+            else mic_dir.view(1, 1, 1, 1, -1)
+        )
+        cos_theta = _cos_between(-vec, mic_dir_b)
         gain = gain * directivity_gain(mic_pattern, cos_theta)
 
     attenuation = gain / dist
