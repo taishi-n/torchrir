@@ -57,7 +57,7 @@ from torchrir.io import save_scene_audio, save_scene_metadata
 from torchrir.signal import DynamicConvolver
 from torchrir.sim import simulate_dynamic_rir
 from torchrir.util import add_output_args, resolve_device
-from torchrir.viz import save_scene_plots
+from torchrir.viz import save_scene_gifs, save_scene_plots
 
 MIC_SPACING = 0.08
 
@@ -344,18 +344,32 @@ def main() -> None:
         # Use the initial positions for scene bookkeeping (trajectory is used for RIRs).
         sources = Source.from_positions(src_traj[0].tolist())
 
-        if args.plot:
-            save_scene_plots(
-                out_dir=args.out_dir,
-                room=room.size,
-                sources=sources,
-                mics=mics,
-                src_traj=src_traj,
-                mic_traj=mic_traj,
-                prefix=f"scene_{idx:03d}",
-                show=False,
-                logger=logger,
-            )
+    if args.plot:
+        prefix = f"scene_{idx:03d}"
+        save_scene_plots(
+            out_dir=args.out_dir,
+            room=room.size,
+            sources=sources,
+            mics=mics,
+            src_traj=src_traj,
+            mic_traj=mic_traj,
+            prefix=prefix,
+            show=False,
+            logger=logger,
+        )
+        save_scene_gifs(
+            out_dir=args.out_dir,
+            room=room.size,
+            sources=sources,
+            mics=mics,
+            src_traj=src_traj,
+            mic_traj=mic_traj,
+            prefix=prefix,
+            signal_len=signals.shape[1],
+            fs=fs,
+            gif_fps=-1,
+            logger=logger,
+        )
 
         # ISM simulation + dynamic convolution.
         rirs = simulate_dynamic_rir(
