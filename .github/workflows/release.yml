@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
-      - run: uv sync
+      - run: uv sync --all-groups
       - run: uv run git-cliff -o CHANGELOG.md
       - run: cp CHANGELOG.md docs/changelog.md
       - run: uv run sphinx-build -b html docs docs/_build/html
