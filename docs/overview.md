@@ -11,6 +11,16 @@
 - Metadata export helpers for time axis, DOA, and array attributes (JSON-ready).
 - Unified CLI with JSON/YAML config and deterministic flag support.
 
+## Module layout
+- `torchrir.sim`: simulation backends (ISM implementation in `torchrir.sim.ism`)
+- `torchrir.signal`: convolution utilities and dynamic convolver
+- `torchrir.geometry`: array geometries, sampling, trajectories
+- `torchrir.viz`: plotting and animation helpers
+- `torchrir.models`: room/scene/result data models
+- `torchrir.io`: audio I/O and metadata serialization
+- `torchrir.util`: shared math/tensor/device helpers
+- `torchrir.infra`: logging utilities
+
 ## Device selection
 - `device="cpu"`: CPU execution
 - `device="cuda"`: NVIDIA GPU (CUDA) if available, otherwise fallback to CPU

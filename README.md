@@ -29,6 +29,16 @@ pip install torchrir
 - Dynamic convolution: `DynamicConvolver`
 - Metadata export: `build_metadata`, `save_metadata_json`
 
+## Module Layout (for contributors)
+- `torchrir.sim`: simulation backends (ISM implementation lives under `torchrir.sim.ism`)
+- `torchrir.signal`: convolution utilities and dynamic convolver
+- `torchrir.geometry`: array geometries, sampling, trajectories
+- `torchrir.viz`: plotting and animation helpers
+- `torchrir.models`: room/scene/result data models
+- `torchrir.io`: audio I/O and metadata serialization
+- `torchrir.util`: shared math/tensor/device helpers
+- `torchrir.infra`: logging utilities
+
 ```python
 from torchrir import DynamicConvolver, MicrophoneArray, Room, Source, simulate_rir
 
