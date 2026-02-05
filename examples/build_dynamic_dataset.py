@@ -23,6 +23,11 @@ Run (CMU ARCTIC):
 
 Run (LibriSpeech):
     uv run python examples/build_dynamic_dataset.py --dataset librispeech --subset train-clean-100
+
+Notes:
+    - Use --num-moving-sources to keep some sources fixed.
+    - Plotting is opt-in via --plot.
+    - Downloading is automatic if data is missing (can also be requested via --download).
 """
 
 import argparse
@@ -54,6 +59,8 @@ from torchrir.sim import simulate_dynamic_rir
 from torchrir.util import add_output_args, resolve_device
 from torchrir.viz import save_scene_plots
 
+MIC_SPACING = 0.08
+
 
 def _serialize_args(args) -> dict[str, object]:
     return {
@@ -64,6 +71,7 @@ def _serialize_args(args) -> dict[str, object]:
         "num_scenes": args.num_scenes,
         "num_sources": args.num_sources,
         "num_moving_sources": args.num_moving_sources,
+        "num_mics": args.num_mics,
         "duration": args.duration,
         "seed": args.seed,
         "room": list(args.room),
@@ -87,8 +95,20 @@ def _dataset_factory(
 ):
     if dataset == "cmu_arctic":
         spk = speaker or "bdl"
-        return CmuArcticDataset(root, speaker=spk, download=download)
-    return LibriSpeechDataset(root, subset=subset, speaker=speaker, download=download)
+        try:
+            return CmuArcticDataset(root, speaker=spk, download=download)
+        except FileNotFoundError:
+            if download:
+                raise
+            return CmuArcticDataset(root, speaker=spk, download=True)
+    try:
+        return LibriSpeechDataset(
+            root, subset=subset, speaker=speaker, download=download
+        )
+    except FileNotFoundError:
+        if download:
+            raise
+        return LibriSpeechDataset(root, subset=subset, speaker=speaker, download=True)
 
 
 def _random_trajectory(
@@ -209,6 +229,12 @@ def main() -> None:
         help="Number of sources that move (others stay fixed).",
     )
     parser.add_argument(
+        "--num-mics",
+        type=int,
+        default=2,
+        help="Number of microphones in the fixed array.",
+    )
+    parser.add_argument(
         "--duration",
         type=float,
         default=6.0,
@@ -261,7 +287,7 @@ def main() -> None:
         )
     args.dataset_dir = dataset_root
 
-    # Fixed room and fixed binaural microphone layout across all scenes.
+    # Fixed room and fixed microphone layout across all scenes.
     device = resolve_device(args.device)
     room_size = torch.tensor(args.room, dtype=torch.float32)
     room = Room.shoebox(
@@ -272,7 +298,15 @@ def main() -> None:
     mic_center = sampling.sample_positions(num=1, room_size=room_size, rng=rng).squeeze(
         0
     )
-    mic_pos = sampling.clamp_positions(arrays.binaural_array(mic_center), room_size)
+    if args.num_mics <= 0:
+        raise ValueError("num_mics must be positive")
+    if args.num_mics == 2:
+        mic_pos = arrays.binaural_array(mic_center, offset=MIC_SPACING)
+    else:
+        mic_pos = arrays.linear_array(
+            mic_center, num=args.num_mics, spacing=MIC_SPACING, axis=0
+        )
+    mic_pos = sampling.clamp_positions(mic_pos, room_size)
     mics = MicrophoneArray.from_positions(mic_pos.tolist())
 
     args.out_dir.mkdir(parents=True, exist_ok=True)

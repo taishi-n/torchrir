@@ -208,6 +208,28 @@ uv run python examples/build_dynamic_dataset.py \
   --duration 6
 ```
 
+### Additional examples
+
+```bash
+# CMU ARCTIC: only 1 moving source, plotting enabled
+uv run python examples/build_dynamic_dataset.py \
+  --dataset cmu_arctic \
+  --num-scenes 2 \
+  --num-sources 3 \
+  --num-moving-sources 1 \
+  --plot
+```
+
+```bash
+# LibriSpeech: more steps, fewer scenes
+uv run python examples/build_dynamic_dataset.py \
+  --dataset librispeech \
+  --subset dev-clean \
+  --num-scenes 2 \
+  --num-sources 2 \
+  --steps 96
+```
+
 ### Key arguments
 
 - `--dataset`: dataset backend (`cmu_arctic` / `librispeech`).
@@ -215,6 +237,7 @@ uv run python examples/build_dynamic_dataset.py \
 - `--num-scenes`: number of scenes to generate.
 - `--num-sources`: number of sources per scene.
 - `--num-moving-sources`: number of sources that move (others stay fixed).
+- `--num-mics`: number of microphones in the fixed array.
 - `--duration`: length (seconds) of each source mixture.
 - `--steps`: number of RIR steps (trajectory resolution).
 - `--order`: ISM reflection order.
@@ -223,6 +246,7 @@ uv run python examples/build_dynamic_dataset.py \
 - `--dataset-dir`: dataset root path.
 - `--out-dir`: output directory for per-scene WAV/JSON/plots.
 - `--plot`: enable plotting (default: off).
+- `--download`: download the dataset if missing (default: off; auto-downloads when data is absent).
 - `--device`: cpu/cuda/mps/auto.
 
 ### Implementation notes
