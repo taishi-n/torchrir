@@ -1,14 +1,8 @@
 import pytest
 import torch
 
-from torchrir import (
-    MicrophoneArray,
-    RIRResult,
-    Room,
-    Scene,
-    SimulationConfig,
-    Source,
-)
+from torchrir import MicrophoneArray, RIRResult, Room, Scene, Source
+from torchrir.config import SimulationConfig
 from torchrir.sim import ISMSimulator
 
 

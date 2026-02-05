@@ -7,7 +7,7 @@ from typing import Optional, Tuple
 import torch
 from torch import Tensor
 
-from ..config import SimulationConfig
+from ...config import SimulationConfig
 from ..directivity import split_directivity
 from ...models import MicrophoneArray, Room, Source
 from ...util.orientation import orientation_to_unit

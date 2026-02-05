@@ -42,7 +42,8 @@ pip install torchrir
 - `torchrir.models`: room/scene/result data models
 - `torchrir.io`: audio I/O and metadata serialization
 - `torchrir.util`: shared math/tensor/device helpers
-- `torchrir.infra`: logging utilities
+- `torchrir.logging`: logging utilities
+- `torchrir.config`: simulation configuration objects
 
 ```python
 from torchrir import MicrophoneArray, Room, Source

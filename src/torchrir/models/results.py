@@ -10,7 +10,7 @@ from torch import Tensor
 from .scene import Scene
 
 if TYPE_CHECKING:
-    from ..sim import SimulationConfig
+    from ..config import SimulationConfig
 
 
 @dataclass(frozen=True)

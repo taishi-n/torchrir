@@ -23,7 +23,8 @@
 - {py:mod}`torchrir.models`: Core data models for rooms, sources, microphones, scenes, and results.
 - {py:mod}`torchrir.io`: I/O helpers for audio files and metadata serialization.
 - {py:mod}`torchrir.util`: General-purpose math, device, and tensor utilities for torchrir.
-- {py:mod}`torchrir.infra`: Infrastructure utilities (logging configuration and helpers).
+- {py:mod}`torchrir.logging`: Logging configuration and helpers.
+- {py:mod}`torchrir.config`: Simulation configuration objects.
 - {py:mod}`torchrir.datasets`: Dataset helpers and collate utilities.
 - {py:mod}`torchrir.experimental`: Work-in-progress APIs (ray tracing, FDTD, template datasets).
 
@@ -45,7 +46,7 @@ device, dtype = DeviceSpec(device="auto").resolve()
 - Experimental dataset stubs (`torchrir.experimental`) are not implemented and raise
   `NotImplementedError`.
 - `torchrir.sim.simulate_rir`/`torchrir.sim.simulate_dynamic_rir` require `max_order`
-  (or `SimulationConfig.max_order`) and either `nsample` or `tmax`.
+  (or `torchrir.config.SimulationConfig.max_order`) and either `nsample` or `tmax`.
 - Non-`omni` directivity requires orientation; mismatched shapes raise `ValueError`.
 - `beta` must have 4 (2D) or 6 (3D) elements; invalid sizes raise `ValueError`.
 - `simulate_dynamic_rir` requires `src_traj` and `mic_traj` to have matching time steps.

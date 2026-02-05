@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from ..models import RIRResult, Scene
-from ..sim.config import SimulationConfig
+from ..config import SimulationConfig
 
 
 @dataclass(frozen=True)

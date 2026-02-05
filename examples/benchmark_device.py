@@ -18,25 +18,13 @@ from pathlib import Path
 import torch
 
 try:
-    from torchrir import (
-        LoggingConfig,
-        MicrophoneArray,
-        Room,
-        Source,
-        get_logger,
-        setup_logging,
-    )
+    from torchrir import MicrophoneArray, Room, Source
+    from torchrir.logging import LoggingConfig, get_logger, setup_logging
 except ModuleNotFoundError:  # allow running without installation
     ROOT = Path(__file__).resolve().parents[1]
     sys.path.insert(0, str(ROOT / "src"))
-    from torchrir import (
-        LoggingConfig,
-        MicrophoneArray,
-        Room,
-        Source,
-        get_logger,
-        setup_logging,
-    )
+    from torchrir import MicrophoneArray, Room, Source
+    from torchrir.logging import LoggingConfig, get_logger, setup_logging
 from torchrir.signal import DynamicConvolver
 from torchrir.sim import simulate_dynamic_rir, simulate_rir
 from torchrir.util import resolve_device

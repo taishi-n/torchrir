@@ -7,7 +7,7 @@ from collections.abc import Callable
 import torch
 from torch import Tensor
 
-from ..config import SimulationConfig
+from ...config import SimulationConfig
 
 _SINC_LUT_CACHE: dict[tuple[int, int, str, torch.dtype], Tensor] = {}
 _FDL_GRID_CACHE: dict[tuple[int, str, torch.dtype], Tensor] = {}

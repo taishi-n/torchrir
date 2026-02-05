@@ -8,7 +8,7 @@ from typing import Optional
 import torch
 from torch import Tensor
 
-from ..config import SimulationConfig, default_config
+from ...config import SimulationConfig, default_config
 from ...models import Room
 
 

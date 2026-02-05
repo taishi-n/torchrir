@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol
 
-from .config import SimulationConfig, default_config
+from ..config import SimulationConfig, default_config
 from .ism import simulate_dynamic_rir, simulate_rir
 from ..models import RIRResult, Scene
 

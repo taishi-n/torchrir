@@ -1,7 +1,8 @@
 import torch
 import pytest
 
-from torchrir import MicrophoneArray, Room, SimulationConfig, Source
+from torchrir import MicrophoneArray, Room, Source
+from torchrir.config import SimulationConfig
 from torchrir.sim import simulate_dynamic_rir, simulate_rir
 
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-"""Simulation configuration for torchrir."""
+"""Configuration objects for torchrir."""
 
 from dataclasses import dataclass, replace
 from typing import Optional
@@ -66,3 +66,6 @@ def default_config() -> SimulationConfig:
     cfg = SimulationConfig()
     cfg.validate()
     return cfg
+
+
+__all__ = ["SimulationConfig", "default_config"]

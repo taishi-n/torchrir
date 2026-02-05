@@ -45,12 +45,17 @@ Module packages
    :undoc-members:
    :show-inheritance:
 
-.. automodule:: torchrir.util
+.. automodule:: torchrir.logging
    :members:
    :undoc-members:
    :show-inheritance:
 
-.. automodule:: torchrir.infra
+.. automodule:: torchrir.config
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: torchrir.util
    :members:
    :undoc-members:
    :show-inheritance:

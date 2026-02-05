@@ -21,25 +21,13 @@ from typing import Any, Dict
 import torch
 
 try:
-    from torchrir import (
-        LoggingConfig,
-        MicrophoneArray,
-        Room,
-        Source,
-        get_logger,
-        setup_logging,
-    )
+    from torchrir import MicrophoneArray, Room, Source
+    from torchrir.logging import LoggingConfig, get_logger, setup_logging
 except ModuleNotFoundError:  # allow running without installation
     ROOT = Path(__file__).resolve().parents[1]
     sys.path.insert(0, str(ROOT / "src"))
-    from torchrir import (
-        LoggingConfig,
-        MicrophoneArray,
-        Room,
-        Source,
-        get_logger,
-        setup_logging,
-    )
+    from torchrir import MicrophoneArray, Room, Source
+    from torchrir.logging import LoggingConfig, get_logger, setup_logging
 
 EXAMPLES_DIR = Path(__file__).resolve().parent
 if str(EXAMPLES_DIR) not in sys.path:
