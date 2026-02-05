@@ -7,7 +7,7 @@ from typing import Optional, Sequence
 
 import torch
 
-from .plotting import _positions_to_cpu, _to_cpu, _traj_steps, _trajectory_to_cpu
+from .utils import _positions_to_cpu, _to_cpu, _traj_steps, _trajectory_to_cpu
 
 
 def animate_scene_gif(
