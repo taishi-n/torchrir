@@ -18,7 +18,7 @@ Example:
 
 from .base import BaseDataset, DatasetItem, SentenceLike
 from .utils import choose_speakers, load_dataset_sources
-from ..io.audio import load_wav_mono, save_wav
+from ..io.audio import load, save
 from .collate import CollateBatch, collate_dataset_items
 from .librispeech import LibriSpeechDataset, LibriSpeechSentence
 
@@ -35,8 +35,8 @@ __all__ = [
     "list_cmu_arctic_speakers",
     "SentenceLike",
     "load_dataset_sources",
-    "load_wav_mono",
-    "save_wav",
+    "load",
+    "save",
     "LibriSpeechDataset",
     "LibriSpeechSentence",
 ]

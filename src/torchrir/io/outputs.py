@@ -8,7 +8,7 @@ import logging
 
 from torch import Tensor
 
-from .audio import save_wav
+from .audio import save
 from .metadata import build_metadata, save_metadata_json
 
 if TYPE_CHECKING:
@@ -26,7 +26,7 @@ def save_audio(
     """Save audio to the output directory."""
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / audio_name
-    save_wav(out_path, audio, fs)
+    save(out_path, audio, fs)
     if logger is not None:
         logger.info("saved: %s", out_path)
     return out_path

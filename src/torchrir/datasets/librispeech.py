@@ -12,7 +12,7 @@ from typing import List, Tuple
 import torch
 
 from .base import BaseDataset
-from ..io.audio import load_wav_mono
+from ..io.audio import load_audio
 
 BASE_URL = "https://www.openslr.org/resources/12"
 VALID_SUBSETS = {
@@ -121,7 +121,7 @@ class LibriSpeechDataset(BaseDataset):
         """Load a mono wav for the given utterance ID."""
         speaker_id, chapter_id, _ = utterance_id.split("-", 2)
         path = self._subset_dir / speaker_id / chapter_id / f"{utterance_id}.flac"
-        return load_wav_mono(path)
+        return load_audio(path)
 
     def _download_and_extract(self) -> None:
         """Download and extract the subset archive if needed."""

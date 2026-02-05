@@ -12,7 +12,7 @@ from typing import List, Tuple
 import torch
 
 from .base import BaseDataset
-from ..io.audio import load_wav_mono
+from ..io.audio import load
 
 BASE_URL = "http://www.festvox.org/cmu_arctic/packed"
 VALID_SPEAKERS = {
@@ -147,7 +147,7 @@ class CmuArcticDataset(BaseDataset):
     def load_wav(self, utterance_id: str) -> Tuple[torch.Tensor, int]:
         """Load a mono wav for the given utterance ID."""
         path = self.wav_path(utterance_id)
-        return load_wav_mono(path)
+        return load(path)
 
 
 def _download(url: str, dest: Path, retries: int = 1) -> None:
