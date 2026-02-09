@@ -122,3 +122,36 @@ def test_dynamic_accepts_2d_input():
     )
 
     assert rirs.shape == (3, 1, 1, 256)
+
+
+def test_simulate_rir_hpf_changes_output_when_enabled():
+    pytest.importorskip("scipy.signal")
+
+    room = Room.shoebox(size=[5.0, 4.0, 3.0], fs=16000, beta=[0.9] * 6)
+    sources = Source.from_positions([[1.0, 1.0, 1.0]])
+    mics = MicrophoneArray.from_positions([[2.0, 1.0, 1.0]])
+    nsample = 1024
+
+    rir_no_hpf = simulate_rir(
+        room=room,
+        sources=sources,
+        mics=mics,
+        max_order=3,
+        nsample=nsample,
+        config=SimulationConfig(rir_hpf_enable=False),
+    )
+    rir_hpf = simulate_rir(
+        room=room,
+        sources=sources,
+        mics=mics,
+        max_order=3,
+        nsample=nsample,
+        config=SimulationConfig(
+            rir_hpf_enable=True,
+            rir_hpf_fc=10.0,
+            rir_hpf_kwargs={"n": 2, "rp": 5.0, "rs": 60.0, "type": "butter"},
+        ),
+    )
+
+    assert rir_no_hpf.shape == rir_hpf.shape
+    assert not torch.allclose(rir_no_hpf, rir_hpf)

@@ -6,6 +6,7 @@ import torch
 import torch.nn.functional as F
 
 from torchrir import MicrophoneArray, Room, Source
+from torchrir.config import SimulationConfig
 from torchrir.sim import simulate_rir
 from torchrir.signal import fft_convolve
 
@@ -65,6 +66,7 @@ def test_rir_and_convolved_signal_close():
         max_order=max_order,
         nsample=pra_rir.numel(),
         directivity="omni",
+        config=SimulationConfig(rir_hpf_enable=False),
     )[0, 0]
 
     # Align and compare RIRs

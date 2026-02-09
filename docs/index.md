@@ -59,6 +59,7 @@ See runnable examples and command-line usage: {doc}`examples`.
 ## Documentation pages
 - {doc}`overview`
 - {doc}`examples`
+- {doc}`comparisons`
 - {doc}`changelog`
 - {doc}`api` (API documentation)
 - {ref}`genindex`
@@ -70,6 +71,7 @@ See runnable examples and command-line usage: {doc}`examples`.
 
 overview
 examples
+comparisons
 changelog
 API documentation <api>
 Index <genindex>

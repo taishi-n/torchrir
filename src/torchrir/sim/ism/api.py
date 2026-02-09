@@ -18,6 +18,7 @@ from .contributions import (
 )
 from .diffuse import _apply_diffuse_tail
 from .helpers import _resolve_beta, _validate_beta
+from .hpf import apply_rir_hpf
 from .images import _image_source_indices, _reflection_coefficients
 from .prepare import _prepare_dynamic_tensors, _prepare_static_tensors
 from .validate import (
@@ -128,6 +129,7 @@ def simulate_rir(
 
     if tdiff is not None and tmax is not None and tdiff < tmax:
         rir = _apply_diffuse_tail(rir, room, beta, tdiff, tmax, seed=cfg.seed)
+    rir = apply_rir_hpf(rir, room.fs, cfg)
     return rir
 
 
@@ -231,4 +233,5 @@ def simulate_dynamic_rir(
         rir_flat = rirs.view(t_steps * n_src, n_mic, nsample)
         _accumulate_rir_batch(rir_flat, sample_flat, attenuation_flat, cfg)
 
+    rirs = apply_rir_hpf(rirs, room.fs, cfg)
     return rirs

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 """Configuration objects for torchrir."""
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from typing import Optional
 
 import torch
@@ -30,6 +30,11 @@ class SimulationConfig:
     image_chunk_size: int = 2048
     accumulate_chunk_size: int = 4096
     use_compile: bool = False
+    rir_hpf_enable: bool = True
+    rir_hpf_fc: float = 10.0
+    rir_hpf_kwargs: dict[str, float | int | str] = field(
+        default_factory=lambda: {"n": 2, "rp": 5.0, "rs": 60.0, "type": "butter"}
+    )
 
     def validate(self) -> None:
         """Validate configuration values."""
@@ -49,6 +54,10 @@ class SimulationConfig:
             raise ValueError("image_chunk_size must be positive")
         if self.accumulate_chunk_size <= 0:
             raise ValueError("accumulate_chunk_size must be positive")
+        if self.rir_hpf_fc <= 0:
+            raise ValueError("rir_hpf_fc must be positive")
+        if "n" in self.rir_hpf_kwargs and int(self.rir_hpf_kwargs["n"]) <= 0:
+            raise ValueError("rir_hpf_kwargs['n'] must be positive")
 
     def replace(self, **kwargs) -> "SimulationConfig":
         """Return a new config with updated fields."""

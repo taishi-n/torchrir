@@ -71,6 +71,7 @@ For detailed documentation, see the docs under `docs/` and Read the Docs.
 - [gpuRIR](https://github.com/DavidDiazGuerra/gpuRIR)
 - [Cross3D](https://github.com/DavidDiazGuerra/Cross3D)
 - [pyroomacoustics](https://github.com/LCAV/pyroomacoustics)
-- [das-generator](https://github.com/ehabets/das-generator)
 - [rir-generator](https://github.com/audiolabs/rir-generator)
-- [pyrato](https://github.com/pyfar/pyrato)
+
+## Comparisons
+- Library comparison notes (dynamic RIR capabilities and ISM HPF implementation details) are documented in `docs/comparisons.md`.
