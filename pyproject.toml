@@ -1,6 +1,6 @@
 [project]
 name = "torchrir"
-version = "0.5.0"
+version = "0.4.2"
 description = "PyTorch-based room impulse response (RIR) simulation toolkit for static and dynamic scenes."
 readme = "README.md"
 requires-python = ">=3.11,<3.12"
