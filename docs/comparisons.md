@@ -120,3 +120,31 @@ y = \mathrm{sosfiltfilt}(\mathrm{SOS}, x)
 ```
 
 This is forward-backward filtering (zero-phase response).
+
+## ISM Image-Source Amplitude Scaling
+
+In ISM implementations, a common per-image gain form is:
+
+```{math}
+a_i \propto \frac{g_i}{d_i}
+```
+
+where `g_i` aggregates reflection/directivity terms and `d_i` is propagation distance.
+Some libraries additionally include free-field normalization by `4\pi`:
+
+```{math}
+a_i \propto \frac{g_i}{4\pi d_i}
+```
+
+### Quick comparison
+
+| Library | Typical distance scaling | Notes |
+|---|---|---|
+| `torchrir` | `1/r` | Reflection/directivity gains are multiplied, then divided by distance. |
+| `gpuRIR` | `1/(4πr)` | CUDA core uses explicit `4π` factor in image-source amplitude. |
+| `rir-generator` | `1/(4πr)` | Core C++ implementation uses `4π` free-field normalization. |
+| `pyroomacoustics` | Usually `1/r` in room ISM path | `build_rir_matrix` uses `1/(4πr)`, so scale depends on API path. |
+
+### Practical implication for cross-library tests
+
+Even with matched geometry, `beta`, image limits, and interpolation settings, direct waveform-level comparisons can show an almost constant gain ratio near `4π` between `1/r` and `1/(4πr)` conventions. Normalize this global factor before enforcing strict amplitude-matching thresholds.

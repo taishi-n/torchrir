@@ -12,6 +12,14 @@ try:
 except Exception:
     gpurir = None
 
+# NOTE:
+# torchrir and gpuRIR use different free-field amplitude normalization conventions.
+# torchrir uses gain proportional to 1/r, while gpuRIR is typically interpreted as
+# using 1/(4*pi*r). With matched geometry and reflections, raw waveform amplitudes
+# can therefore differ by an almost constant factor close to 4*pi.
+# Keep this in mind when interpreting direct waveform-L2 comparison results.
+_GPURIR_TO_TORCHRIR_AMP_SCALE = float(4.0 * np.pi)
+
 
 def _configure_gpurir_for_comparison() -> None:
     if gpurir is None:
@@ -108,6 +116,11 @@ def _simulate_gpurir_dynamic(
     return torch.stack(frames, dim=0)
 
 
+def _convert_gpurir_amplitude_to_torchrir(rir: torch.Tensor) -> torch.Tensor:
+    # Convert from gpuRIR's typical 1/(4*pi*r) convention to torchrir's 1/r.
+    return rir * _GPURIR_TO_TORCHRIR_AMP_SCALE
+
+
 def test_static_rir_close_to_gpurir():
     if not torch.cuda.is_available():
         pytest.skip("CUDA not available")
@@ -132,6 +145,7 @@ def test_static_rir_close_to_gpurir():
         tmax=tmax,
         fs=fs,
     )
+    gpurir_rir = _convert_gpurir_amplitude_to_torchrir(gpurir_rir)
 
     room = Room.shoebox(size=room_dim, fs=fs, beta=beta)
     sources = Source.from_positions([src])
@@ -195,6 +209,7 @@ def test_dynamic_rir_close_to_gpurir():
         tmax=tmax,
         fs=fs,
     )
+    gpurir_rirs = _convert_gpurir_amplitude_to_torchrir(gpurir_rirs)
 
     room = Room.shoebox(size=room_dim, fs=fs, beta=beta)
     # NOTE:

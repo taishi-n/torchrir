@@ -103,6 +103,16 @@ For detailed documentation, see the docs under `docs/` and Read the Docs.
 | `rir-generator` | ✅ | Allen & Berkley-style recursive HPF |
 | `pyroomacoustics` | ✅ | IIR, zero-phase |
 
+### ISM Amplitude Scaling (Image-Source Gain)
+| Library | Typical distance scaling | Notes |
+|---|---|---|
+| `torchrir` | `1/r` | Reflection/directivity gains are multiplied, then divided by distance. |
+| `gpuRIR` | `1/(4πr)` | Includes explicit free-field `4π` factor in image-source amplitude. |
+| `rir-generator` | `1/(4πr)` | Core implementation follows `4π` free-field normalization. |
+| `pyroomacoustics` | Usually `1/r` in room ISM path | The `build_rir_matrix` path uses `1/(4πr)`, so scaling depends on API path. |
+
+When comparing raw waveform amplitudes across libraries, a near-constant factor of about `4π` can appear between `1/r` and `1/(4πr)` conventions.
+
 Legend:
 - `✅` native support
 - `🟡` manual setup
