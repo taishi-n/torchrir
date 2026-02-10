@@ -243,16 +243,18 @@ Source lines:
 - `torchrir`: IIR HPF (enabled by default).
 - `pyroomacoustics`: also has HPF-enabled paths.
 - `rir-generator`: uses an Allen-Berkley style HPF.
-- `gpuRIR`: does not assume an equivalent built-in HPF path.
+- `gpuRIR`: does not assume an equivalent built-in HPF path, and project discussion indicates the low-frequency attenuation behavior is an intentional design choice (not just a missing toggle).
 
 Practical note:
 - HPF presence and coefficient differences change waveform and energy, especially in low-frequency bands.
+- In this repository, disabling HPF in `torchrir` for `gpuRIR` parity tests is only a comparison tactic. It does not imply that HPF should be disabled for normal ISM usage.
 
 Source lines:
 - `torchrir`: [`src/torchrir/config.py#L33-L37`](https://github.com/taishi-n/torchrir/blob/main/src/torchrir/config.py#L33-L37), [`src/torchrir/sim/ism/hpf.py#L23-L37`](https://github.com/taishi-n/torchrir/blob/main/src/torchrir/sim/ism/hpf.py#L23-L37), [`src/torchrir/sim/ism/hpf.py#L40-L56`](https://github.com/taishi-n/torchrir/blob/main/src/torchrir/sim/ism/hpf.py#L40-L56)
 - `pyroomacoustics`: [`pyroomacoustics/parameters.py#L192-L194`](https://github.com/LCAV/pyroomacoustics/blob/v0.9.0/pyroomacoustics/parameters.py#L192-L194), [`pyroomacoustics/room.py#L2292-L2295`](https://github.com/LCAV/pyroomacoustics/blob/v0.9.0/pyroomacoustics/room.py#L2292-L2295), [`pyroomacoustics/room.py#L2356-L2357`](https://github.com/LCAV/pyroomacoustics/blob/v0.9.0/pyroomacoustics/room.py#L2356-L2357)
 - `rir-generator`: [`src/rir_generator/_cffi/rir_generator_core.cpp#L135-L139`](https://github.com/audiolabs/rir-generator/blob/v0.3.0/src/rir_generator/_cffi/rir_generator_core.cpp#L135-L139), [`src/rir_generator/_cffi/rir_generator_core.cpp#L232-L243`](https://github.com/audiolabs/rir-generator/blob/v0.3.0/src/rir_generator/_cffi/rir_generator_core.cpp#L232-L243)
 - `gpuRIR`: [`gpuRIR/__init__.py#L95-L117`](https://github.com/DavidDiazGuerra/gpuRIR/blob/master/gpuRIR/__init__.py#L95-L117) (no HPF parameter in the public `simulateRIR` API)
+- `gpuRIR` discussion: [Issue #15](https://github.com/DavidDiazGuerra/gpuRIR/issues/15)
 
 ### 4) Late-reverb / diffuse-tail modeling
 
