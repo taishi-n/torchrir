@@ -13,6 +13,21 @@ Contributions are welcome.
 pip install torchrir
 ```
 
+## Library Comparison
+| Feature | `torchrir` | `gpuRIR` | `pyroomacoustics` | `rir-generator` |
+|---|---|---|---|---|
+| 🎯 Dynamic Sources | ✅ | 🟡 Single moving source | 🟡 Manual loop | ❌ |
+| 🎤 Dynamic Microphones | ✅ | ❌ | 🟡 Manual loop | ❌ |
+| 🖥️ CPU | ✅ | ❌ | ✅ | ✅ |
+| 🧮 CUDA | ✅ | ✅ | ❌ | ❌ |
+| 🍎 MPS | ✅ | ❌ | ❌ | ❌ |
+| 📊 Scene Plot | ✅ | ❌ | ✅ | ❌ |
+| 🎞️ Dynamic Scene GIF | ✅ | ❌ | 🟡 Manual animation script | ❌ |
+| 🗂️ Dataset Build | ✅ | ❌ | ✅ | ❌ |
+
+Detailed notes and equations:
+[Read the Docs: Library Comparisons](https://torchrir.readthedocs.io/en/latest/comparisons.html)
+
 ## CUDA CI (GitHub Actions)
 - CUDA tests run in `.github/workflows/cuda-ci.yml` on a self-hosted runner with labels:
   `self-hosted`, `linux`, `x64`, `cuda`.
@@ -69,7 +84,8 @@ rir = simulate_rir(room=room, sources=sources, mics=mics, max_order=6, tmax=0.3)
 # y = DynamicConvolver(mode="trajectory").convolve(signal, rirs)
 ```
 
-For detailed documentation, see the docs under `docs/` and Read the Docs.
+For detailed documentation:
+[Read the Docs](https://torchrir.readthedocs.io/en/latest/)
 
 ## Future Work
 - Ray tracing backend: implement `torchrir.experimental.RayTracingSimulator` with frequency-dependent absorption/scattering.
@@ -80,24 +96,3 @@ For detailed documentation, see the docs under `docs/` and Read the Docs.
 - [Cross3D](https://github.com/DavidDiazGuerra/Cross3D)
 - [pyroomacoustics](https://github.com/LCAV/pyroomacoustics)
 - [rir-generator](https://github.com/audiolabs/rir-generator)
-
-## Related Library Comparison (Quick View)
-
-### Dynamic Simulation
-| Feature | `torchrir` | `gpuRIR` | `pyroomacoustics` | `rir-generator` |
-|---|---|---|---|---|
-| 🎯 Dynamic Sources | ✅ | 🟡 Single moving source | 🟡 Manual loop | ❌ |
-| 🎤 Dynamic Microphones | ✅ | ❌ | 🟡 Manual loop | ❌ |
-| 🖥️ CPU | ✅ | ❌ | ✅ | ✅ |
-| 🧮 CUDA | ✅ | ✅ | ❌ | ❌ |
-| 🍎 MPS | ✅ | ❌ | ❌ | ❌ |
-| 📊 Scene Plot | ✅ | ❌ | ✅ | ❌ |
-| 🎞️ Dynamic Scene GIF | ✅ | ❌ | 🟡 Manual animation script | ❌ |
-| 🗂️ Dataset Build | ✅ | ❌ | ✅ | ❌ |
-
-Legend:
-- `✅` native support
-- `🟡` manual setup
-- `❌` unavailable
-
-Detailed notes and equations: `docs/comparisons.md`.
