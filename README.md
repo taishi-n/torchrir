@@ -13,6 +13,12 @@ Contributions are welcome.
 pip install torchrir
 ```
 
+## CUDA CI (GitHub Actions)
+- CUDA tests run in `.github/workflows/cuda-ci.yml` on a self-hosted runner with labels:
+  `self-hosted`, `linux`, `x64`, `cuda`.
+- The workflow validates installation via `uv sync --group test`, checks `torch.cuda.is_available()`,
+  and runs `tests/test_device_parity.py` with `-k cuda`.
+
 ## Examples
 - `examples/static.py`: fixed sources/mics with configurable mic count (default: binaural).  
   `uv run python examples/static.py --plot`

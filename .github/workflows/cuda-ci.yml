@@ -1,0 +1,53 @@
+name: cuda-ci
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/cuda-ci.yml"
+      - "pyproject.toml"
+      - "uv.lock"
+      - "src/**"
+      - "tests/**"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/cuda-ci.yml"
+      - "pyproject.toml"
+      - "uv.lock"
+      - "src/**"
+      - "tests/**"
+
+jobs:
+  install-and-test-cuda:
+    name: Install + CUDA tests
+    runs-on:
+      - self-hosted
+      - linux
+      - x64
+      - cuda
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - uses: astral-sh/setup-uv@v5
+
+      - name: Show GPU info
+        run: nvidia-smi
+
+      - name: Install dependencies
+        run: uv sync --group test
+
+      - name: Verify torchrir import and CUDA
+        run: |
+          uv run python -c "import torch, torchrir; print('torch', torch.__version__); print('cuda_available', torch.cuda.is_available()); assert torch.cuda.is_available(), 'CUDA is not available on this runner'"
+
+      - name: Run CUDA parity tests
+        run: uv run pytest -q tests/test_device_parity.py -k cuda
