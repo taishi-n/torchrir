@@ -3,7 +3,7 @@ from __future__ import annotations
 """Collate helpers for DataLoader usage."""
 
 from dataclasses import dataclass
-from typing import Any, Iterable, List, Optional
+from typing import Any, Iterable, Optional
 
 import torch
 from torch import Tensor

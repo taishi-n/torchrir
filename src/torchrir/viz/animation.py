@@ -70,8 +70,6 @@ def animate_scene_gif(
     dim = int(room_size.numel())
     view_dim = 3 if (plot_3d and dim == 3) else 2
     view_room = room_size[:view_dim]
-    view_src = src_pos[:, :view_dim]
-    view_mic = mic_pos[:, :view_dim]
 
     if src_traj is None and mic_traj is None:
         raise ValueError("at least one trajectory is required for animation")

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 """Simulation strategy interfaces and implementations."""
 
-from dataclasses import dataclass
 from typing import Protocol
 
 from ..config import SimulationConfig, default_config

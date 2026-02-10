@@ -2,7 +2,7 @@ from __future__ import annotations
 
 """Matplotlib-based plotting helpers for room scenes."""
 
-from typing import Any, Iterable, Optional, Sequence, Tuple
+from typing import Any, Optional, Sequence
 
 import torch
 from torch import Tensor

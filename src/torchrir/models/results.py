@@ -18,7 +18,7 @@ class RIRResult:
     """Container for RIRs with metadata.
 
     Example:
-        >>> from torchrir import ISMSimulator
+        >>> from torchrir.sim import ISMSimulator
         >>> result = ISMSimulator().simulate(scene, config)
         >>> rirs = result.rirs
     """

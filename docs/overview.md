@@ -34,11 +34,11 @@
 ## Device selection
 - `device="cpu"`: CPU execution
 - `device="mps"`: Apple Silicon GPU via Metal (MPS) if available, otherwise fallback to CPU
-- `device="cuda"`: CUDA code path exists but is not yet validated in this project
+- `device="cuda"`: CUDA execution (validated in CI on CUDA runners; requires a CUDA-enabled PyTorch environment)
 - `device="auto"`: backend is selected by internal priority
 
 ```python
-from torchrir import DeviceSpec
+from torchrir.util import DeviceSpec
 
 device, dtype = DeviceSpec(device="auto").resolve()
 ```
