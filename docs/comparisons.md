@@ -10,19 +10,55 @@ This page summarizes implementation-level differences between TorchRIR and relat
 
 | Feature | `torchrir` | `gpuRIR` | `pyroomacoustics` | `rir-generator` |
 |---|---|---|---|---|
-| 🎯 Dynamic Sources | ✅ | 🟡 Single-source workflow | 🟡 Manual loop | ❌ |
+| 🎯 Dynamic Sources | ✅ | 🟡 Single moving source | 🟡 Manual loop | ❌ |
 | 🎤 Dynamic Microphones | ✅ | ❌ | 🟡 Manual loop | ❌ |
 | 🖥️ CPU | ✅ | ❌ | ✅ | ✅ |
-| 🧮 CUDA | 🚧 Coming soon | ✅ | ❌ | ❌ |
+| 🧮 CUDA | ✅ | ✅ | ❌ | ❌ |
 | 🍎 MPS | ✅ | ❌ | ❌ | ❌ |
 | 📊 Visualization | ✅ | ❌ | ✅ | ❌ |
-| 🗂️ Dataset Build | ✅ | ❌ | 🟡 Custom scripts | ❌ |
+| 🗂️ Dataset Build | ✅ | ❌ | ✅ | ❌ |
 
 Legend:
 - `✅` native support
 - `🟡` manual setup
-- `🚧` coming soon
 - `❌` unavailable
+
+## Visualization and Dataset Build (Source-Level)
+
+Marking criterion in this section:
+- Mark as `✅` when the functionality is provided as a library API/submodule (not only in examples).
+- Mark as `🟡` when possible only via manual composition without a dedicated library feature surface.
+- Mark as `❌` when no corresponding library functionality exists.
+
+### Visualization
+
+- `torchrir` (`✅`):
+  - Dedicated visualization submodule and public functions are provided.
+  - Source lines: `src/torchrir/viz/__init__.py:6-17`, `src/torchrir/viz/scene.py:14-23`, `src/torchrir/viz/scene.py:51-63`, `src/torchrir/viz/io.py:22-36`, `src/torchrir/viz/io.py:93-107`, `src/torchrir/viz/io.py:127-141`
+- `gpuRIR` (`❌`):
+  - Package exports simulation/control functions only; plotting appears in example scripts.
+  - Source lines: `gpuRIR/__init__.py:11`, `examples/example.py:8-9`, `examples/example.py:35-36`, `examples/polar_plots.py:3`, `examples/polar_plots.py:9-10`, `examples/polar_plots.py:66-75`
+- `pyroomacoustics` (`✅`):
+  - Library-level plotting APIs exist (`Room.plot`, `Room.plot_rir`), with optional plotting helpers in other submodules.
+  - Source lines: `pyroomacoustics/room.py:1535-1547`, `pyroomacoustics/room.py:1827-1843`, `pyroomacoustics/__init__.py:123-134`
+- `rir-generator` (`❌`):
+  - The package API is focused on RIR generation (`generate`) and does not include plotting APIs.
+  - Source lines: `src/rir_generator/__init__.py:36-50`
+
+### Dataset Build
+
+- `torchrir` (`✅`):
+  - Dataset utilities are provided as library modules (`torchrir.datasets`) including dataset wrappers and source-loading utilities used by dataset generation workflows.
+  - Source lines: `src/torchrir/datasets/__init__.py:1-7`, `src/torchrir/datasets/__init__.py:19-42`, `src/torchrir/datasets/utils.py:30-37`
+- `gpuRIR` (`❌`):
+  - No dataset submodule or dataset-building API is exposed.
+  - Source lines: `gpuRIR/__init__.py:11`
+- `pyroomacoustics` (`✅`):
+  - Dataset functionality is provided in-library via `pyroomacoustics.datasets` with corpus classes and `build_corpus` methods.
+  - Source lines: `pyroomacoustics/__init__.py:98-99`, `pyroomacoustics/__init__.py:123`, `pyroomacoustics/datasets/__init__.py:1-4`, `pyroomacoustics/datasets/cmu_arctic.py:114-117`, `pyroomacoustics/datasets/cmu_arctic.py:196-202`, `pyroomacoustics/datasets/google_speech_commands.py:72-73`, `pyroomacoustics/datasets/google_speech_commands.py:99-105`
+- `rir-generator` (`❌`):
+  - No dataset module or dataset-building API is present.
+  - Source lines: `src/rir_generator/__init__.py:36-50`
 
 ## ISM High-Pass Filter (HPF) Implementations
 

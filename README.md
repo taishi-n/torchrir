@@ -73,7 +73,6 @@ For detailed documentation, see the docs under `docs/` and Read the Docs.
 
 ## Future Work
 - Ray tracing backend: implement `torchrir.experimental.RayTracingSimulator` with frequency-dependent absorption/scattering.
-- CUDA-native acceleration: introduce dedicated CUDA kernels for large-scale RIR generation.
 - Dataset expansion: add additional dataset integrations beyond CMU ARCTIC (see `torchrir.experimental.TemplateDataset`), including torchaudio datasets (e.g., LibriSpeech, VCTK, LibriTTS, SpeechCommands, CommonVoice, GTZAN, MUSDB-HQ).
 
 ## Related Libraries
@@ -87,36 +86,17 @@ For detailed documentation, see the docs under `docs/` and Read the Docs.
 ### Dynamic Simulation
 | Feature | `torchrir` | `gpuRIR` | `pyroomacoustics` | `rir-generator` |
 |---|---|---|---|---|
-| 🎯 Dynamic Sources | ✅ | 🟡 Single-source workflow | 🟡 Manual loop | ❌ |
+| 🎯 Dynamic Sources | ✅ | 🟡 Single moving source | 🟡 Manual loop | ❌ |
 | 🎤 Dynamic Microphones | ✅ | ❌ | 🟡 Manual loop | ❌ |
 | 🖥️ CPU | ✅ | ❌ | ✅ | ✅ |
-| 🧮 CUDA | 🚧 Coming soon | ✅ | ❌ | ❌ |
+| 🧮 CUDA | ✅ | ✅ | ❌ | ❌ |
 | 🍎 MPS | ✅ | ❌ | ❌ | ❌ |
 | 📊 Visualization | ✅ | ❌ | ✅ | ❌ |
-| 🗂️ Dataset Build | ✅ | ❌ | 🟡 Custom scripts | ❌ |
-
-### ISM HPF (RIR High-Pass Filter)
-| Library | Built-in HPF | Method |
-|---|---|---|
-| `torchrir` | ✅ | IIR, zero-phase |
-| `gpuRIR` | ❌ | No built-in HPF |
-| `rir-generator` | ✅ | Allen & Berkley-style recursive HPF |
-| `pyroomacoustics` | ✅ | IIR, zero-phase |
-
-### ISM Amplitude Scaling (Image-Source Gain)
-| Library | Typical distance scaling | Notes |
-|---|---|---|
-| `torchrir` | `1/r` | Reflection/directivity gains are multiplied, then divided by distance. |
-| `gpuRIR` | `1/(4πr)` | Includes explicit free-field `4π` factor in image-source amplitude. |
-| `rir-generator` | `1/(4πr)` | Core implementation follows `4π` free-field normalization. |
-| `pyroomacoustics` | Usually `1/r` in room ISM path | The `build_rir_matrix` path uses `1/(4πr)`, so scaling depends on API path. |
-
-When comparing raw waveform amplitudes across libraries, a near-constant factor of about `4π` can appear between `1/r` and `1/(4πr)` conventions.
+| 🗂️ Dataset Build | ✅ | ❌ | ✅ | ❌ |
 
 Legend:
 - `✅` native support
 - `🟡` manual setup
-- `🚧` coming soon
 - `❌` unavailable
 
 Detailed notes and equations: `docs/comparisons.md`.
