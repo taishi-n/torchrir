@@ -11,6 +11,7 @@ from typing import List, Tuple
 
 import torch
 
+from ._archive import safe_extractall
 from .base import BaseDataset
 from ..io.audio import load
 
@@ -110,14 +111,14 @@ class CmuArcticDataset(BaseDataset):
             logger.info("Extracting %s", archive_path)
             try:
                 with tarfile.open(archive_path, "r:bz2") as tar:
-                    tar.extractall(self._base_dir)
+                    safe_extractall(tar, self._base_dir)
             except (tarfile.ReadError, EOFError, OSError) as exc:
                 logger.warning("Extraction failed (%s); re-downloading.", exc)
                 if archive_path.exists():
                     archive_path.unlink()
                 _download(url, archive_path)
                 with tarfile.open(archive_path, "r:bz2") as tar:
-                    tar.extractall(self._base_dir)
+                    safe_extractall(tar, self._base_dir)
 
     def sentences(self) -> List[CmuArcticSentence]:
         """Parse all sentence metadata."""

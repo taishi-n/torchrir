@@ -11,6 +11,7 @@ from typing import List, Tuple
 
 import torch
 
+from ._archive import safe_extractall
 from .base import BaseDataset
 from ..io.audio import load_audio
 
@@ -136,14 +137,14 @@ class LibriSpeechDataset(BaseDataset):
             logger.info("Extracting %s", archive_path)
             try:
                 with tarfile.open(archive_path, "r:gz") as tar:
-                    tar.extractall(self.root)
+                    safe_extractall(tar, self.root)
             except (tarfile.ReadError, EOFError, OSError) as exc:
                 logger.warning("Extraction failed (%s); re-downloading.", exc)
                 if archive_path.exists():
                     archive_path.unlink()
                 _download(url, archive_path)
                 with tarfile.open(archive_path, "r:gz") as tar:
-                    tar.extractall(self.root)
+                    safe_extractall(tar, self.root)
 
 
 def _download(url: str, dest: Path, retries: int = 1) -> None:

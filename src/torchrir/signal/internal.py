@@ -32,12 +32,16 @@ def _ensure_dynamic_rirs(rirs: Tensor, signal: Tensor) -> Tensor:
     if rirs.ndim == 2:
         return rirs.view(rirs.shape[0], 1, 1, rirs.shape[1])
     if rirs.ndim == 3:
-        if signal.ndim == 2 and rirs.shape[1] == signal.shape[0]:
-            return rirs.view(rirs.shape[0], rirs.shape[1], 1, rirs.shape[2])
+        if signal.ndim == 2 and signal.shape[0] != 1:
+            raise ValueError(
+                "3D dynamic RIRs are only supported for single-source signals "
+                "and are interpreted as (T, n_mic, rir_len). "
+                "Use 4D (T, n_src, n_mic, rir_len) for multi-source inputs."
+            )
         return rirs.view(rirs.shape[0], 1, rirs.shape[1], rirs.shape[2])
     if rirs.ndim == 4:
         return rirs
     raise ValueError(
         "rirs must have shape (T, rir_len), (T, n_mic, rir_len), "
-        "(T, n_src, rir_len), or (T, n_src, n_mic, rir_len)"
+        "or (T, n_src, n_mic, rir_len)"
     )

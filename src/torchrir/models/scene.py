@@ -42,6 +42,10 @@ class Scene:
         dim = self.room.size.numel()
         n_src = self.sources.positions.shape[0]
         n_mic = self.mics.positions.shape[0]
+        if self.sources.positions.shape[1] != dim:
+            raise ValueError("source position dimension must match room dimension")
+        if self.mics.positions.shape[1] != dim:
+            raise ValueError("mic position dimension must match room dimension")
 
         t_src = _validate_traj(self.src_traj, n_src, dim, "src_traj")
         t_mic = _validate_traj(self.mic_traj, n_mic, dim, "mic_traj")
@@ -59,6 +63,8 @@ def _validate_traj(
         return None
     if not torch.is_tensor(traj):
         raise TypeError(f"{name} must be a Tensor")
+    if not torch.all(torch.isfinite(traj)):
+        raise ValueError(f"{name} must contain finite values")
     if traj.ndim == 2:
         if count != 1:
             raise ValueError(f"{name} must have shape (T, {count}, {dim})")

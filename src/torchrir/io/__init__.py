@@ -8,7 +8,7 @@ from typing import Callable, Tuple
 
 from torch import Tensor
 
-from .audio import AudioInfo, _load_audio, _save_audio, info_audio
+from .audio import AudioData, AudioInfo, _load_audio, _save_audio, info_audio
 from .metadata import build_metadata, save_metadata_json
 from .outputs import save_scene_audio, save_scene_metadata
 
@@ -170,6 +170,7 @@ def info(
 
 
 __all__ = [
+    "AudioData",
     "AudioBackend",
     "build_metadata",
     "get_audio_backend",

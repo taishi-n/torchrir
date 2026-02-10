@@ -55,6 +55,7 @@ device, dtype = DeviceSpec(device="auto").resolve()
 - `simulate_dynamic_rir` requires `src_traj` and `mic_traj` to have matching time steps.
 - Dynamic simulation currently loops per time step; very long trajectories can be slow.
 - MPS disables the sinc LUT path (falls back to direct sinc), which can be slower and slightly different numerically.
+- HPF requires SciPy and currently applies filtering via CPU-domain processing, which can add host/device transfer overhead on CUDA/MPS runs.
 - Deterministic mode is best-effort; some backends may still be non-deterministic.
 - YAML configs require `PyYAML`; otherwise a `ModuleNotFoundError` is raised.
 - CMU ARCTIC downloads require network access.

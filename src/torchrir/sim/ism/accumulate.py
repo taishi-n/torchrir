@@ -17,68 +17,6 @@ _AccumFn = Callable[[Tensor, Tensor, Tensor], None]
 _ACCUM_BATCH_COMPILED: dict[tuple[str, torch.dtype, int, int, bool, int], _AccumFn] = {}
 
 
-def _accumulate_rir(
-    rir: Tensor, sample: Tensor, amplitude: Tensor, cfg: SimulationConfig
-) -> None:
-    """Accumulate fractional-delay contributions into the RIR tensor."""
-    idx0 = torch.floor(sample).to(torch.int64)
-    frac = sample - idx0.to(sample.dtype)
-
-    n_mic, nsample = rir.shape
-    fdl = cfg.frac_delay_length
-    lut_gran = cfg.sinc_lut_granularity
-    use_lut = cfg.use_lut and rir.device.type != "mps"
-
-    dtype = amplitude.dtype
-    n = _get_fdl_grid(fdl, device=rir.device, dtype=dtype)
-    offsets = _get_fdl_offsets(fdl, device=rir.device)
-    window = _get_fdl_window(fdl, device=rir.device, dtype=dtype)
-
-    if use_lut:
-        sinc_lut = _get_sinc_lut(fdl, lut_gran, device=rir.device, dtype=dtype)
-
-    mic_offsets = (
-        torch.arange(n_mic, device=rir.device, dtype=torch.int64) * nsample
-    ).view(n_mic, 1, 1)
-    rir_flat = rir.view(-1)
-
-    chunk_size = cfg.accumulate_chunk_size
-    n_img = idx0.shape[1]
-    for start in range(0, n_img, chunk_size):
-        end = min(start + chunk_size, n_img)
-        idx = idx0[:, start:end]
-        amp = amplitude[:, start:end]
-        frac_m = frac[:, start:end]
-
-        if use_lut:
-            x_off_frac = (1.0 - frac_m) * lut_gran
-            lut_gran_off = torch.floor(x_off_frac).to(torch.int64)
-            x_off = x_off_frac - lut_gran_off.to(dtype)
-            lut_pos = lut_gran_off[..., None] + (
-                n[None, None, :].to(torch.int64) * lut_gran
-            )
-
-            s0 = torch.take(sinc_lut, lut_pos)
-            s1 = torch.take(sinc_lut, lut_pos + 1)
-            interp = s0 + x_off[..., None] * (s1 - s0)
-            filt = interp * window[None, None, :]
-        else:
-            fdl2 = (fdl - 1) // 2
-            t = n[None, None, :] - fdl2 - frac_m[..., None]
-            filt = torch.sinc(t) * window[None, None, :]
-
-        contrib = amp[..., None] * filt
-        target = idx[..., None] + offsets[None, None, :]
-        valid = (target >= 0) & (target < nsample)
-        if not valid.any():
-            continue
-
-        target = target + mic_offsets
-        target_flat = target[valid].to(torch.int64)
-        values_flat = contrib[valid]
-        rir_flat.scatter_add_(0, target_flat, values_flat)
-
-
 def _accumulate_rir_batch(
     rir: Tensor, sample: Tensor, amplitude: Tensor, cfg: SimulationConfig
 ) -> None:

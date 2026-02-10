@@ -4,10 +4,20 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Tuple
+from typing import Optional, Tuple
 import warnings
 
 import torch
+
+
+@dataclass(frozen=True)
+class AudioData:
+    """Audio payload with metadata needed for explicit I/O round trips."""
+
+    audio: torch.Tensor
+    sample_rate: int
+    format: Optional[str] = None
+    subtype: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -22,8 +32,8 @@ class AudioInfo:
     duration: float
 
 
-def _load_audio(path: Path, *, caller: str) -> Tuple[torch.Tensor, int]:
-    """Load an audio file and return mono audio and sample rate."""
+def _load_audio_data(path: Path, *, caller: str) -> AudioData:
+    """Load an audio file and return explicit audio + metadata."""
     import soundfile as sf
 
     info = sf.info(str(path))
@@ -37,9 +47,23 @@ def _load_audio(path: Path, *, caller: str) -> Tuple[torch.Tensor, int]:
         audio_t = audio_t[:, 0]
     else:
         audio_t = audio_t.squeeze(1)
-    setattr(audio_t, "_torchrir_subtype", info.subtype)
-    setattr(audio_t, "_torchrir_format", info.format)
-    return audio_t, sample_rate
+    return AudioData(
+        audio=audio_t,
+        sample_rate=sample_rate,
+        format=info.format,
+        subtype=info.subtype,
+    )
+
+
+def _load_audio(path: Path, *, caller: str) -> Tuple[torch.Tensor, int]:
+    """Load an audio file and return mono audio and sample rate."""
+    data = _load_audio_data(path, caller=caller)
+    return data.audio, data.sample_rate
+
+
+def load_audio_data(path: Path) -> AudioData:
+    """Load an audio file and return audio + metadata in a stable container."""
+    return _load_audio_data(path, caller="load_audio_data")
 
 
 def load(path: Path) -> Tuple[torch.Tensor, int]:
@@ -47,8 +71,6 @@ def load(path: Path) -> Tuple[torch.Tensor, int]:
 
     Notes:
         - Multichannel input uses channel 0 only (warns).
-        - The original file subtype/format are stored on the returned tensor
-          as `_torchrir_subtype` and `_torchrir_format` for reuse by save.
         - For non-wav formats, use ``torchrir.io.audio.load_audio``.
 
     Example:
@@ -68,8 +90,6 @@ def load_audio(path: Path) -> Tuple[torch.Tensor, int]:
 
     Notes:
         - Multichannel input uses channel 0 only (warns).
-        - The original file subtype/format are stored on the returned tensor
-          as `_torchrir_subtype` and `_torchrir_format` for reuse by save_audio.
     """
     return _load_audio(path, caller="load_audio")
 
@@ -96,6 +116,7 @@ def _save_audio(
     if audio.ndim == 2 and audio.shape[0] <= 8:
         audio = audio.transpose(0, 1)
     if subtype is None:
+        # Backward-compatible fallback for tensors that carry custom attrs.
         subtype = getattr(audio, "_torchrir_subtype", None)
     sf.write(str(path), audio.numpy(), sample_rate, subtype=subtype)
 
@@ -111,9 +132,10 @@ def save(
 ) -> None:
     """Save a mono or multi-channel wav to disk.
 
-    By default this normalizes to the specified peak and preserves the input
-    file subtype when `subtype=None` and the tensor came from `load`.
+    By default this normalizes to the specified peak.
     Values outside [-1, 1] are preserved when normalization is disabled.
+    To preserve explicit file metadata, use ``load_audio_data`` /
+    ``save_audio_data`` or pass ``subtype`` directly.
     For non-wav formats, use ``torchrir.io.audio.save_audio``.
 
     Example:
@@ -155,6 +177,25 @@ def save_audio(
         normalize=normalize,
         peak=peak,
         subtype=subtype,
+    )
+
+
+def save_audio_data(
+    path: Path,
+    data: AudioData,
+    *,
+    normalize: bool = True,
+    peak: float = 1.0,
+    subtype: str | None = None,
+) -> None:
+    """Save audio from AudioData, optionally preserving its stored subtype."""
+    _save_audio(
+        path,
+        data.audio,
+        data.sample_rate,
+        normalize=normalize,
+        peak=peak,
+        subtype=data.subtype if subtype is None else subtype,
     )
 
 

@@ -14,6 +14,7 @@ from torchrir.io import (
     set_audio_backend,
 )
 from torchrir.io.audio import load_audio, save_audio
+from torchrir.io.audio import load_audio_data, save_audio_data
 
 
 def _sine_wave(num_samples: int, fs: int) -> torch.Tensor:
@@ -85,3 +86,20 @@ def test_info_wav(tmp_path: Path) -> None:
     assert meta.sample_rate == fs
     assert meta.num_channels == 1
     assert meta.num_frames == audio.numel()
+
+
+def test_load_audio_data_and_save_audio_data_roundtrip(tmp_path: Path) -> None:
+    fs = 16000
+    path = tmp_path / "tone.wav"
+    out_path = tmp_path / "tone_copy.wav"
+    audio = _sine_wave(512, fs)
+    save(path, audio, fs, normalize=False)
+
+    data = load_audio_data(path)
+    assert data.sample_rate == fs
+    assert data.audio.ndim == 1
+    save_audio_data(out_path, data, normalize=False)
+
+    loaded, loaded_fs = load(out_path)
+    assert loaded_fs == fs
+    assert loaded.shape == data.audio.shape

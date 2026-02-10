@@ -4,7 +4,12 @@ version = "0.6.1"
 description = "PyTorch-based room impulse response (RIR) simulation toolkit for static and dynamic scenes."
 readme = "README.md"
 requires-python = ">=3.11,<3.12"
-dependencies = ["numpy>=2.2.6", "torch>=2.10.0"]
+dependencies = [
+  "numpy>=2.2.6",
+  "torch>=2.10.0",
+  "scipy>=1.14.0",
+  "soundfile>=0.13.1",
+]
 
 [project.urls]
 Repository = "https://github.com/taishi-n/torchrir"
@@ -15,7 +20,6 @@ dev = [
   "git-cliff>=2.10.1",
   "matplotlib>=3.10.8",
   "pillow>=11.2.1",
-  "soundfile>=0.13.1",
   "ruff>=0.12.2",
   "ty>=0.0.14,<0.1",
 ]
