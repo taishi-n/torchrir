@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Microphone array geometry helpers."""
+
+from __future__ import annotations
 
 import math
 from typing import Sequence

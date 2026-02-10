@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Matplotlib-based plotting helpers for room scenes."""
+
+from __future__ import annotations
 
 from typing import Any, Optional, Sequence
 

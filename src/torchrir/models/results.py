@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Result containers for simulation outputs."""
+
+from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Optional, TYPE_CHECKING

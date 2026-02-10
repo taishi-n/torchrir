@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Configuration objects for torchrir."""
+
+from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
 from typing import Optional

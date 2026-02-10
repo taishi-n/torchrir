@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Device and dtype helpers."""
+
+from __future__ import annotations
 
 import warnings
 from dataclasses import dataclass

@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Simulation strategy interfaces and implementations."""
+
+from __future__ import annotations
 
 from typing import Protocol
 

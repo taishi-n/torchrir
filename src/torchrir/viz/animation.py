@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Animation helpers for dynamic scenes."""
+
+from __future__ import annotations
 
 from pathlib import Path
 from typing import Optional, Sequence

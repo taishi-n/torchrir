@@ -1,0 +1,52 @@
+name: ci
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/ci.yml"
+      - "pyproject.toml"
+      - "uv.lock"
+      - "src/**"
+      - "tests/**"
+      - "docs/**"
+      - "README.md"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/ci.yml"
+      - "pyproject.toml"
+      - "uv.lock"
+      - "src/**"
+      - "tests/**"
+      - "docs/**"
+      - "README.md"
+
+jobs:
+  lint-type-test:
+    name: Lint + Type + Tests (CPU)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - uses: astral-sh/setup-uv@v5
+
+      - name: Install dependencies
+        run: uv sync --all-groups
+
+      - name: Ruff
+        run: uv run ruff check src tests docs
+
+      - name: Ty
+        run: uv run ty check
+
+      - name: Pytest
+        run: uv run pytest -q

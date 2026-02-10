@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """RIR high-pass filtering utilities."""
+
+from __future__ import annotations
 
 from typing import Any
 

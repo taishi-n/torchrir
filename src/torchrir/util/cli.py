@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """CLI helpers shared by example scripts."""
+
+from __future__ import annotations
 
 from pathlib import Path
 

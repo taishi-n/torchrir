@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Shared helpers for visualization utilities."""
+
+from __future__ import annotations
 
 from pathlib import Path
 from typing import Any, Optional, Sequence

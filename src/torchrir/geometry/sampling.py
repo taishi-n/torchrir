@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Sampling helpers for scene geometry."""
+
+from __future__ import annotations
 
 import random
 from typing import List

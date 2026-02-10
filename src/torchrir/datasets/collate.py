@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Collate helpers for DataLoader usage."""
+
+from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, Iterable, Optional

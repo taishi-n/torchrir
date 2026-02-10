@@ -1,6 +1,11 @@
 from __future__ import annotations
 
+import importlib
+import inspect
+import os
+import subprocess
 import sys
+import tomllib
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -8,9 +13,21 @@ SRC_ROOT = PROJECT_ROOT / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
+
+def _read_project_version() -> str:
+    pyproject = PROJECT_ROOT / "pyproject.toml"
+    try:
+        with pyproject.open("rb") as f:
+            data = tomllib.load(f)
+        return str(data["project"]["version"])
+    except Exception:
+        return "0.0.0"
+
+
 project = "torchrir"
 author = "torchrir contributors"
-release = "0.1.0"
+release = _read_project_version()
+version = release
 
 extensions = [
     "sphinx.ext.autodoc",
@@ -29,11 +46,6 @@ myst_enable_extensions = [
 html_theme = "sphinx_rtd_theme"
 
 exclude_patterns = ["_build"]
-
-import importlib
-import inspect
-import os
-import subprocess
 
 REPO_URL = "https://github.com/taishi-n/torchrir"
 

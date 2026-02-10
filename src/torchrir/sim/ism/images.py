@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Image source indexing and reflection coefficient helpers."""
+
+from __future__ import annotations
 
 from typing import Optional, Tuple
 

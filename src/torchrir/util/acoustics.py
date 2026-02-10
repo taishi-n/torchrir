@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Acoustic utility formulas."""
+
+from __future__ import annotations
 
 import math
 from typing import Optional

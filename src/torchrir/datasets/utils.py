@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Dataset-agnostic utilities."""
+
+from __future__ import annotations
 
 import random
 from typing import Callable, List, Optional, Sequence, Tuple

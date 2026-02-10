@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """I/O helpers for visualization."""
+
+from __future__ import annotations
 
 from pathlib import Path
 from typing import Optional, Sequence

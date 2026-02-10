@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Logging helpers for torchrir."""
+
+from __future__ import annotations
 
 from dataclasses import dataclass, replace
 import logging

@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Audio file utilities (dataset-agnostic)."""
+
+from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path

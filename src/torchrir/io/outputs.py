@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Output helpers for saving audio and metadata."""
+
+from __future__ import annotations
 
 from pathlib import Path
 from typing import Any, Optional, TYPE_CHECKING

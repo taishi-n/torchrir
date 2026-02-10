@@ -1,16 +1,23 @@
+import importlib
 import numpy as np
 import pytest
 import torch
 import torch.nn.functional as F
+from typing import Any, cast
 
 from torchrir import MicrophoneArray, Room, Source
 from torchrir.config import SimulationConfig
 from torchrir.sim import simulate_dynamic_rir, simulate_rir
 
-try:
-    import gpuRIR as gpurir
-except Exception:
-    gpurir = None
+
+def _import_gpurir() -> Any | None:
+    try:
+        return importlib.import_module("gpuRIR")
+    except Exception:
+        return None
+
+
+gpurir = _import_gpurir()
 
 # NOTE:
 # torchrir and gpuRIR use different free-field amplitude normalization conventions.
@@ -74,12 +81,15 @@ def _simulate_gpurir_static(
     tmax: float,
     fs: int,
 ) -> torch.Tensor:
+    if gpurir is None:
+        raise RuntimeError("gpuRIR is not installed")
+    gpurir_mod = cast(Any, gpurir)
     room_sz = np.asarray(room_dim, dtype=np.float32)
     beta_np = np.asarray(beta, dtype=np.float32)
     pos_src = np.asarray(src, dtype=np.float32).reshape(1, 3)
     pos_rcv = np.asarray(mic, dtype=np.float32).reshape(1, 3)
     nb_img_np = np.asarray(nb_img, dtype=np.int32)
-    rir = gpurir.simulateRIR(
+    rir = gpurir_mod.simulateRIR(
         room_sz,
         beta_np,
         pos_src,

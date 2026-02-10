@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Internal tensor-shape helpers for convolution."""
+
+from __future__ import annotations
 
 from torch import Tensor
 

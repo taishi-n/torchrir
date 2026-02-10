@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Experimental dataset stubs for future integrations."""
+
+from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path

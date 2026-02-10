@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Dataset protocol definitions."""
+
+from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Optional, Protocol, Sequence, Tuple

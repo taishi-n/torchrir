@@ -1,10 +1,10 @@
-from __future__ import annotations
-
 """Dynamic convolution utilities.
 
 DynamicConvolver is the public API for time-varying convolution. Lower-level
 helpers live in internal modules and are not part of the stable surface.
 """
+
+from __future__ import annotations
 
 import math
 from dataclasses import dataclass

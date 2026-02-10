@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Diffuse tail modeling for ISM."""
+
+from __future__ import annotations
 
 import math
 from typing import Optional

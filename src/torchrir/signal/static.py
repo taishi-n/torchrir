@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Static convolution utilities."""
+
+from __future__ import annotations
 
 import torch
 from torch import Tensor

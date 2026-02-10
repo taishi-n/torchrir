@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Validation helpers for ISM inputs."""
+
+from __future__ import annotations
 
 import math
 from typing import Optional

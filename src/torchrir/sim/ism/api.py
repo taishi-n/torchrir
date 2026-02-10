@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """ISM API for static and dynamic RIR simulation."""
+
+from __future__ import annotations
 
 from typing import Optional, Tuple
 

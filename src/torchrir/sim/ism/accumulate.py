@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Fractional-delay accumulation for ISM."""
+
+from __future__ import annotations
 
 from collections.abc import Callable
 

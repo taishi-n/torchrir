@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Experimental simulation backends (placeholders)."""
+
+from __future__ import annotations
 
 from dataclasses import dataclass
 
