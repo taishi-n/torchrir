@@ -51,3 +51,16 @@ jobs:
 
       - name: Run CUDA parity tests
         run: uv run pytest -q tests/test_device_parity.py -k cuda
+
+      - name: Install gpuRIR (optional)
+        id: install-gpurir
+        continue-on-error: true
+        run: uv pip install https://github.com/DavidDiazGuerra/gpuRIR.git
+
+      - name: Run gpuRIR comparison tests
+        if: steps.install-gpurir.outcome == 'success'
+        run: uv run pytest -q tests/test_compare_gpurir.py
+
+      - name: Skip gpuRIR comparison tests
+        if: steps.install-gpurir.outcome != 'success'
+        run: echo "Skipping gpuRIR comparison tests because gpuRIR installation failed."

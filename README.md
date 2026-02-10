@@ -17,7 +17,11 @@ pip install torchrir
 - CUDA tests run in `.github/workflows/cuda-ci.yml` on a self-hosted runner with labels:
   `self-hosted`, `linux`, `x64`, `cuda`.
 - The workflow validates installation via `uv sync --group test`, checks `torch.cuda.is_available()`,
-  and runs `tests/test_device_parity.py` with `-k cuda`.
+  runs `tests/test_device_parity.py` with `-k cuda`, and then tries to install
+  `gpuRIR` from GitHub.
+- If `gpuRIR` installs successfully, the workflow runs `tests/test_compare_gpurir.py`
+  (static + dynamic RIR comparisons). If installation fails, those comparison tests
+  are skipped without failing the whole CUDA CI job.
 
 ## Examples
 - `examples/static.py`: fixed sources/mics with configurable mic count (default: binaural).  
@@ -71,7 +75,6 @@ For detailed documentation, see the docs under `docs/` and Read the Docs.
 - Ray tracing backend: implement `torchrir.experimental.RayTracingSimulator` with frequency-dependent absorption/scattering.
 - CUDA-native acceleration: introduce dedicated CUDA kernels for large-scale RIR generation.
 - Dataset expansion: add additional dataset integrations beyond CMU ARCTIC (see `torchrir.experimental.TemplateDataset`), including torchaudio datasets (e.g., LibriSpeech, VCTK, LibriTTS, SpeechCommands, CommonVoice, GTZAN, MUSDB-HQ).
-- Add regression tests comparing generated RIRs against gpuRIR outputs.
 
 ## Related Libraries
 - [gpuRIR](https://github.com/DavidDiazGuerra/gpuRIR)
