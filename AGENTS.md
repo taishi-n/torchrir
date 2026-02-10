@@ -47,6 +47,8 @@
 - Use Commitizen for version bumps, tagging, and changelog updates.
   - Run: `uv run cz bump --changelog --yes`
   - Version comes from `pyproject.toml` (PEP 621) and tag format is `vX.Y.Z`.
+- Warning: on every version bump, ensure `uv.lock` is updated to the same project version and committed before pushing.
+  - Before `git push`, verify there is no leftover `uv.lock` diff and include it in the release-related commits when changed.
 - After bumping, push commits and tags (`git push origin main --tags`).
 - Signed tags are created manually by the user. Example:
   - `git tag -s vX.Y.Z -m "vX.Y.Z"`
