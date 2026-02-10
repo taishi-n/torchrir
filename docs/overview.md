@@ -6,13 +6,14 @@
   with per-source/mic orientation handling.
 - Acoustic parameters via `beta` or `t60` (Sabine), optional diffuse tail via `tdiff`.
 - Dynamic convolution via `torchrir.signal.DynamicConvolver` (`trajectory` or `hop` modes).
-- CPU/MPS execution with optional `torch.compile` acceleration for ISM accumulation
+- CPU/CUDA/MPS execution with optional `torch.compile` acceleration for ISM accumulation
   (when enabled; MPS disables LUT).
 - Standard array geometries (linear, circular, polyhedron, binaural, Eigenmike)
   and trajectory sampling utilities.
 - Dataset utilities (CMU ARCTIC, LibriSpeech, template stubs) plus DataLoader collate helpers.
 - Plotting utilities for static/dynamic scenes and GIF animation.
 - Metadata export helpers for time axis, DOA, array attributes, and trajectories (JSON-ready).
+- Explicit audio metadata I/O container via `torchrir.io.AudioData` (`load_audio_data` / `save_audio_data`).
 - Dataset examples can emit per-source reference audio (RIR-convolved premix) and record it in metadata.
 - Unified CLI example with JSON/YAML config and deterministic flag support.
 
@@ -24,7 +25,8 @@
 - {py:mod}`torchrir.models`: Core data models for rooms, sources, microphones, scenes, and results.
 - {py:mod}`torchrir.io`: I/O helpers for audio files and metadata serialization
   (wav-only `load`/`save`/`info` with backend selection; non-wav via
-  `torchrir.io.audio.*`).
+  `torchrir.io.audio.*`; explicit metadata-preserving audio I/O via
+  `torchrir.io.AudioData` and `torchrir.io.audio.load_audio_data`).
 - {py:mod}`torchrir.util`: General-purpose math, device, and tensor utilities for torchrir.
 - {py:mod}`torchrir.logging`: Logging configuration and helpers.
 - {py:mod}`torchrir.config`: Simulation configuration objects.
@@ -53,6 +55,7 @@ device, dtype = DeviceSpec(device="auto").resolve()
 - Non-`omni` directivity requires orientation; mismatched shapes raise `ValueError`.
 - `beta` must have 4 (2D) or 6 (3D) elements; invalid sizes raise `ValueError`.
 - `simulate_dynamic_rir` requires `src_traj` and `mic_traj` to have matching time steps.
+- `torchrir.signal.DynamicConvolver` with 3D dynamic RIR input (`(T, n_mic, rir_len)`) is treated as single-source only; multi-source dynamic convolution must use 4D RIR input (`(T, n_src, n_mic, rir_len)`).
 - Dynamic simulation currently loops per time step; very long trajectories can be slow.
 - MPS disables the sinc LUT path (falls back to direct sinc), which can be slower and slightly different numerically.
 - HPF requires SciPy and currently applies filtering via CPU-domain processing, which can add host/device transfer overhead on CUDA/MPS runs.
@@ -64,7 +67,7 @@ device, dtype = DeviceSpec(device="auto").resolve()
 
 ## Specification (current)
 ### Purpose
-- Provide room impulse response (RIR) simulation on PyTorch with CPU/MPS support.
+- Provide room impulse response (RIR) simulation on PyTorch with CPU/CUDA/MPS support.
 - Support static and dynamic scenes with a maintainable, modern API.
 
 ### Room model

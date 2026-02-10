@@ -4,7 +4,7 @@
 
 ## Summary
 TorchRIR is a PyTorch-based toolkit for room impulse response (RIR) simulation
-with CPU/MPS support, static and dynamic scenes, and dataset utilities.
+with CPU/CUDA/MPS support, static and dynamic scenes, and dataset utilities.
 If you find bugs or have feature requests, please open an issue.
 Contributions are welcome.
 

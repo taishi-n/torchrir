@@ -57,6 +57,7 @@ Detailed notes and equations:
 - Static RIR: `torchrir.sim.simulate_rir`
 - Dynamic RIR: `torchrir.sim.simulate_dynamic_rir`
 - Dynamic convolution: `torchrir.signal.DynamicConvolver`
+- Audio metadata I/O: `torchrir.io.AudioData`, `torchrir.io.audio.load_audio_data`
 - Metadata export: `torchrir.io.build_metadata`, `torchrir.io.save_metadata_json`
 
 ## Module Layout (for contributors)
