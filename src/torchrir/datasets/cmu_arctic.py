@@ -56,10 +56,10 @@ class CmuArcticSentence:
 class CmuArcticDataset(BaseDataset):
     """CMU ARCTIC dataset loader.
 
-    Example:
-        ```pycon
-        >>> dataset = CmuArcticDataset(Path("datasets/cmu_arctic"), speaker="bdl", download=True)
-        >>> audio, fs = dataset.load_audio("arctic_a0001")
+    Examples:
+        ```python
+        dataset = CmuArcticDataset(Path("datasets/cmu_arctic"), speaker="bdl", download=True)
+        audio, fs = dataset.load_audio("arctic_a0001")
         ```
     """
 

@@ -21,10 +21,10 @@ from .static import fft_convolve
 class DynamicConvolver:
     """Convolver for time-varying RIRs.
 
-    Example:
-        ```pycon
-        >>> convolver = DynamicConvolver(mode="trajectory")
-        >>> y = convolver.convolve(signal, rirs)
+    Examples:
+        ```python
+        convolver = DynamicConvolver(mode="trajectory")
+        y = convolver.convolve(signal, rirs)
         ```
     """
 
@@ -39,9 +39,9 @@ class DynamicConvolver:
     def convolve(self, signal: Tensor, rirs: Tensor) -> Tensor:
         """Convolve signals with time-varying RIRs.
 
-        Example:
-            ```pycon
-            >>> y = DynamicConvolver(mode="hop", hop=1024).convolve(signal, rirs)
+        Examples:
+            ```python
+            y = DynamicConvolver(mode="hop", hop=1024).convolve(signal, rirs)
             ```
         """
         if self.mode not in ("trajectory", "hop"):

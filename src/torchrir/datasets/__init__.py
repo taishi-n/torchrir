@@ -5,18 +5,18 @@ DataLoader usage. Experimental dataset stubs live under
 ``torchrir.experimental``. Use ``load_dataset_sources`` to build fixed-length
 source signals from random utterances.
 
-Example:
-    ```pycon
-    >>> from torch.utils.data import DataLoader
-    >>> from torchrir.datasets import CmuArcticDataset, collate_dataset_items
-    >>> dataset = CmuArcticDataset("datasets/cmu_arctic", speaker="bdl", download=True)
-    >>> loader = DataLoader(dataset, batch_size=4, collate_fn=collate_dataset_items)
+Examples:
+    ```python
+    from torch.utils.data import DataLoader
+    from torchrir.datasets import CmuArcticDataset, collate_dataset_items
+    dataset = CmuArcticDataset("datasets/cmu_arctic", speaker="bdl", download=True)
+    loader = DataLoader(dataset, batch_size=4, collate_fn=collate_dataset_items)
     ```
 
-    ```pycon
-    >>> from pathlib import Path
-    >>> from torchrir.datasets import LibriSpeechDataset
-    >>> librispeech = LibriSpeechDataset(Path("datasets/librispeech"), subset="train-clean-100")
+    ```python
+    from pathlib import Path
+    from torchrir.datasets import LibriSpeechDataset
+    librispeech = LibriSpeechDataset(Path("datasets/librispeech"), subset="train-clean-100")
     ```
 """
 

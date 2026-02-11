@@ -73,9 +73,9 @@ def load(path: Path) -> Tuple[torch.Tensor, int]:
         - Multichannel input uses channel 0 only (warns).
         - For non-wav formats, use ``torchrir.io.audio.load_audio``.
 
-    Example:
-        ```pycon
-        >>> audio, fs = load(Path("datasets/cmu_arctic/.../arctic_a0001.wav"))
+    Examples:
+        ```python
+        audio, fs = load(Path("datasets/cmu_arctic/.../arctic_a0001.wav"))
         ```
     """
     suffix = path.suffix.lower()
@@ -140,9 +140,9 @@ def save(
     ``save_audio_data`` or pass ``subtype`` directly.
     For non-wav formats, use ``torchrir.io.audio.save_audio``.
 
-    Example:
-        ```pycon
-        >>> save(Path("outputs/example.wav"), audio, sample_rate)
+    Examples:
+        ```python
+        save(Path("outputs/example.wav"), audio, sample_rate)
         ```
     """
     suffix = path.suffix.lower()

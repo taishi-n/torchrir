@@ -22,13 +22,13 @@ def plot_scene_static(
 ):
     """Plot a static room with source and mic positions.
 
-    Example:
-        ```pycon
-        >>> ax = plot_scene_static(
-        ...     room=[6.0, 4.0, 3.0],
-        ...     sources=[[1.0, 2.0, 1.5]],
-        ...     mics=[[2.0, 2.0, 1.5]],
-        ... )
+    Examples:
+        ```python
+        ax = plot_scene_static(
+            room=[6.0, 4.0, 3.0],
+            sources=[[1.0, 2.0, 1.5]],
+            mics=[[2.0, 2.0, 1.5]],
+        )
         ```
     """
     plt, ax = _setup_axes(ax, room)
@@ -66,13 +66,13 @@ def plot_scene_dynamic(
 
     If trajectories are static, only positions are plotted.
 
-    Example:
-        ```pycon
-        >>> ax = plot_scene_dynamic(
-        ...     room=[6.0, 4.0, 3.0],
-        ...     src_traj=src_traj,
-        ...     mic_traj=mic_traj,
-        ... )
+    Examples:
+        ```python
+        ax = plot_scene_dynamic(
+            room=[6.0, 4.0, 3.0],
+            src_traj=src_traj,
+            mic_traj=mic_traj,
+        )
         ```
     """
     plt, ax = _setup_axes(ax, room)

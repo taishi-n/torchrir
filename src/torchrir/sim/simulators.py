@@ -26,9 +26,9 @@ class RIRSimulator(Protocol):
 class ISMSimulator:
     """ISM-based simulator using the current core implementation.
 
-    Example:
-        ```pycon
-        >>> result = ISMSimulator(max_order=6, tmax=0.3).simulate(scene, config)
+    Examples:
+        ```python
+        result = ISMSimulator(max_order=6, tmax=0.3).simulate(scene, config)
         ```
     """
 

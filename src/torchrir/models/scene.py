@@ -17,9 +17,9 @@ from ..util.tensor import as_tensor
 class StaticScene:
     """Container for static scene simulation inputs.
 
-    Example:
-        ```pycon
-        >>> scene = StaticScene(room=room, sources=sources, mics=mics)
+    Examples:
+        ```python
+        scene = StaticScene(room=room, sources=sources, mics=mics)
         ```
     """
 
@@ -41,9 +41,9 @@ class StaticScene:
 class DynamicScene:
     """Container for dynamic scene simulation inputs.
 
-    Example:
-        ```pycon
-        >>> scene = DynamicScene(room=room, sources=sources, mics=mics, src_traj=src_traj, mic_traj=mic_traj)
+    Examples:
+        ```python
+        scene = DynamicScene(room=room, sources=sources, mics=mics, src_traj=src_traj, mic_traj=mic_traj)
         ```
     """
 

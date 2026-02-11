@@ -40,18 +40,18 @@ def build_metadata(
 ) -> Dict[str, Any]:
     """Build JSON-serializable metadata for a simulation output.
 
-    Example:
-        ```pycon
-        >>> metadata = build_metadata(
-        ...     room=room,
-        ...     sources=sources,
-        ...     mics=mics,
-        ...     rirs=rirs,
-        ...     src_traj=src_traj,
-        ...     mic_traj=mic_traj,
-        ...     signal_len=signal.shape[-1],
-        ... )
-        >>> save_metadata_json(Path(\"outputs/scene_metadata.json\"), metadata)
+    Examples:
+        ```python
+        metadata = build_metadata(
+            room=room,
+            sources=sources,
+            mics=mics,
+            rirs=rirs,
+            src_traj=src_traj,
+            mic_traj=mic_traj,
+            signal_len=signal.shape[-1],
+        )
+        save_metadata_json(Path(\"outputs/scene_metadata.json\"), metadata)
         ```
     """
     nsample = int(rirs.shape[-1])
@@ -138,9 +138,9 @@ def build_metadata(
 def save_metadata_json(path: Path, metadata: Dict[str, Any]) -> None:
     """Save metadata as JSON to the given path.
 
-    Example:
-        ```pycon
-        >>> save_metadata_json(Path(\"outputs/scene_metadata.json\"), metadata)
+    Examples:
+        ```python
+        save_metadata_json(Path(\"outputs/scene_metadata.json\"), metadata)
         ```
     """
     path.parent.mkdir(parents=True, exist_ok=True)

@@ -11,10 +11,10 @@ from typing import Optional
 class LoggingConfig:
     """Configuration for torchrir logging.
 
-    Example:
-        ```pycon
-        >>> config = LoggingConfig(level="INFO")
-        >>> logger = setup_logging(config)
+    Examples:
+        ```python
+        config = LoggingConfig(level="INFO")
+        logger = setup_logging(config)
         ```
     """
 
@@ -42,10 +42,10 @@ class LoggingConfig:
 def setup_logging(config: LoggingConfig, *, name: str = "torchrir") -> logging.Logger:
     """Configure and return the base torchrir logger.
 
-    Example:
-        ```pycon
-        >>> logger = setup_logging(LoggingConfig(level="DEBUG"))
-        >>> logger.info("ready")
+    Examples:
+        ```python
+        logger = setup_logging(LoggingConfig(level="DEBUG"))
+        logger.info("ready")
         ```
     """
     logger = logging.getLogger(name)
@@ -63,9 +63,9 @@ def setup_logging(config: LoggingConfig, *, name: str = "torchrir") -> logging.L
 def get_logger(name: Optional[str] = None) -> logging.Logger:
     """Return a torchrir logger, namespaced under the torchrir root.
 
-    Example:
-        ```pycon
-        >>> logger = get_logger("examples.static")
+    Examples:
+        ```python
+        logger = get_logger("examples.static")
         ```
     """
     if not name:

@@ -15,10 +15,10 @@ def choose_speakers(
 ) -> List[str]:
     """Select unique speakers for the requested number of sources.
 
-    Example:
-        ```pycon
-        >>> rng = random.Random(0)
-        >>> speakers = choose_speakers(dataset, num_sources=2, rng=rng)
+    Examples:
+        ```python
+        rng = random.Random(0)
+        speakers = choose_speakers(dataset, num_sources=2, rng=rng)
         ```
     """
     speakers = dataset.list_speakers()
@@ -38,18 +38,18 @@ def load_dataset_sources(
 ) -> Tuple[torch.Tensor, int, List[Tuple[str, List[str]]]]:
     """Load and concatenate utterances for each speaker into fixed-length signals.
 
-    Example:
-        ```pycon
-        >>> from pathlib import Path
-        >>> from torchrir.datasets import CmuArcticDataset
-        >>> rng = random.Random(0)
-        >>> root = Path("datasets/cmu_arctic")
-        >>> signals, fs, info = load_dataset_sources(
-        ...     dataset_factory=lambda spk: CmuArcticDataset(root, speaker=spk, download=True),
-        ...     num_sources=2,
-        ...     duration_s=10.0,
-        ...     rng=rng,
-        ... )
+    Examples:
+        ```python
+        from pathlib import Path
+        from torchrir.datasets import CmuArcticDataset
+        rng = random.Random(0)
+        root = Path("datasets/cmu_arctic")
+        signals, fs, info = load_dataset_sources(
+            dataset_factory=lambda spk: CmuArcticDataset(root, speaker=spk, download=True),
+            num_sources=2,
+            duration_s=10.0,
+            rng=rng,
+        )
         ```
     """
     dataset0 = dataset_factory(None)

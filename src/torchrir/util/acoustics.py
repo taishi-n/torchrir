@@ -26,9 +26,9 @@ def estimate_beta_from_t60(
         This function corresponds to gpuRIR's ``beta_SabineEstimation``. TorchRIR
         uses snake_case naming for consistency.
 
-    Example:
-        ```pycon
-        >>> beta = estimate_beta_from_t60(torch.tensor([6.0, 4.0, 3.0]), t60=0.4)
+    Examples:
+        ```python
+        beta = estimate_beta_from_t60(torch.tensor([6.0, 4.0, 3.0]), t60=0.4)
         ```
     """
     if t60 <= 0:
@@ -64,9 +64,9 @@ def estimate_t60_from_beta(
 ) -> float:
     """Estimate T60 from reflection coefficients using Sabine's formula.
 
-    Example:
-        ```pycon
-        >>> t60 = estimate_t60_from_beta(torch.tensor([6.0, 4.0, 3.0]), beta=torch.full((6,), 0.9))
+    Examples:
+        ```python
+        t60 = estimate_t60_from_beta(torch.tensor([6.0, 4.0, 3.0]), beta=torch.full((6,), 0.9))
         ```
     """
     size = as_tensor(size, device=device, dtype=dtype)
@@ -113,9 +113,9 @@ def attenuation_db_to_time_sabine(att_db: float, t60: float) -> float:
         This function corresponds to gpuRIR's ``att2t_SabineEstimation``. TorchRIR
         uses snake_case naming for consistency.
 
-    Example:
-        ```pycon
-        >>> t = attenuation_db_to_time_sabine(att_db=60.0, t60=0.4)
+    Examples:
+        ```python
+        t = attenuation_db_to_time_sabine(att_db=60.0, t60=0.4)
         ```
     """
     if t60 <= 0:
@@ -133,9 +133,9 @@ def estimate_image_counts_from_tmax(
     Note:
         This function corresponds to gpuRIR's ``t2n`` helper, renamed for clarity.
 
-    Example:
-        ```pycon
-        >>> nb_img = estimate_image_counts_from_tmax(0.3, torch.tensor([6.0, 4.0, 3.0]))
+    Examples:
+        ```python
+        nb_img = estimate_image_counts_from_tmax(0.3, torch.tensor([6.0, 4.0, 3.0]))
         ```
     """
     if tmax <= 0:

@@ -42,10 +42,10 @@ class LibriSpeechSentence:
 class LibriSpeechDataset(BaseDataset):
     """LibriSpeech dataset loader.
 
-    Example:
-        ```pycon
-        >>> dataset = LibriSpeechDataset(Path("datasets/librispeech"), subset="train-clean-100", download=True)
-        >>> audio, fs = dataset.load_audio("103-1240-0000")
+    Examples:
+        ```python
+        dataset = LibriSpeechDataset(Path("datasets/librispeech"), subset="train-clean-100", download=True)
+        audio, fs = dataset.load_audio("103-1240-0000")
         ```
     """
 

@@ -15,9 +15,9 @@ from ..util.tensor import as_tensor, ensure_dim
 class Room:
     """Room geometry and acoustic parameters.
 
-    Example:
-        ```pycon
-        >>> room = Room.shoebox(size=[6.0, 4.0, 3.0], fs=16000, beta=[0.9] * 6)
+    Examples:
+        ```python
+        room = Room.shoebox(size=[6.0, 4.0, 3.0], fs=16000, beta=[0.9] * 6)
         ```
     """
 
@@ -73,9 +73,9 @@ class Room:
     ) -> "Room":
         """Create a rectangular (shoebox) room.
 
-        Example:
-            ```pycon
-            >>> room = Room.shoebox(size=[6.0, 4.0, 3.0], fs=16000, beta=[0.9] * 6)
+        Examples:
+            ```python
+            room = Room.shoebox(size=[6.0, 4.0, 3.0], fs=16000, beta=[0.9] * 6)
             ```
         """
         size_t = as_tensor(size, device=device, dtype=dtype)
@@ -90,9 +90,9 @@ class Room:
 class Source:
     """Source container with positions and optional orientation.
 
-    Example:
-        ```pycon
-        >>> sources = Source.from_positions([[1.0, 2.0, 1.5]])
+    Examples:
+        ```python
+        sources = Source.from_positions([[1.0, 2.0, 1.5]])
         ```
     """
 
@@ -133,9 +133,9 @@ class Source:
 class MicrophoneArray:
     """Microphone array container.
 
-    Example:
-        ```pycon
-        >>> mics = MicrophoneArray.from_positions([[2.0, 2.0, 1.5]])
+    Examples:
+        ```python
+        mics = MicrophoneArray.from_positions([[2.0, 2.0, 1.5]])
         ```
     """
 

@@ -12,10 +12,10 @@ import torch
 class SimulationConfig:
     """Configuration values for RIR simulation and convolution.
 
-    Example:
-        ```pycon
-        >>> cfg = SimulationConfig(max_order=6, tmax=0.3, device="auto")
-        >>> cfg.validate()
+    Examples:
+        ```python
+        cfg = SimulationConfig(max_order=6, tmax=0.3, device="auto")
+        cfg.validate()
         ```
     """
 
@@ -71,9 +71,9 @@ class SimulationConfig:
 def default_config() -> SimulationConfig:
     """Return the default simulation configuration.
 
-    Example:
-        ```pycon
-        >>> cfg = default_config()
+    Examples:
+        ```python
+        cfg = default_config()
         ```
     """
     cfg = SimulationConfig()
