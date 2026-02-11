@@ -78,7 +78,10 @@ Detailed notes and equations:
 
 ## Design Notes
 - Scene typing is explicit: use `StaticScene` for fixed geometry and `DynamicScene` for trajectory-based simulation.
+- `DynamicScene` accepts tensor-like trajectories (e.g., lists) and normalizes them to tensors internally.
 - `Scene` remains as a backward-compatibility wrapper and emits `DeprecationWarning`.
+- `Scene.validate()` performs validation without emitting additional deprecation warnings.
+- `ISMSimulator` fails fast when `max_order` or `tmax` conflicts with the provided `SimulationConfig`.
 - Model dataclasses are frozen, but tensor payloads remain mutable (shallow immutability).
 - `torchrir.load` / `torchrir.save` and `torchrir.io.load` / `save` / `info` are deprecated compatibility aliases.
 

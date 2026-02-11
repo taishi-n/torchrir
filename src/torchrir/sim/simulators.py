@@ -54,6 +54,16 @@ class ISMSimulator:
         normalized_scene = _normalize_scene(scene)
         normalized_scene.validate()
         cfg = config or default_config()
+        _ensure_no_conflict(
+            field="max_order",
+            simulator_value=self.max_order,
+            config_value=cfg.max_order,
+        )
+        _ensure_no_conflict(
+            field="tmax",
+            simulator_value=self.tmax,
+            config_value=cfg.tmax,
+        )
         if isinstance(normalized_scene, DynamicScene):
             rirs = simulate_dynamic_rir(
                 room=normalized_scene.room,
@@ -99,3 +109,18 @@ def _normalize_scene(scene: SceneLike) -> StaticScene | DynamicScene:
             return scene.to_dynamic_scene()
         return scene.to_static_scene()
     raise TypeError("scene must be StaticScene, DynamicScene, or Scene")
+
+
+def _ensure_no_conflict(
+    *,
+    field: str,
+    simulator_value: int | float | None,
+    config_value: int | float | None,
+) -> None:
+    if simulator_value is None or config_value is None:
+        return
+    if simulator_value != config_value:
+        raise ValueError(
+            f"conflicting '{field}' values: "
+            f"ISMSimulator has {simulator_value}, config has {config_value}"
+        )

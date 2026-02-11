@@ -1,5 +1,7 @@
 import pytest
 import torch
+import warnings
+from typing import Any, cast
 
 from torchrir import (
     DynamicScene,
@@ -95,6 +97,11 @@ def test_legacy_scene_deprecated_for_static() -> None:
     with pytest.deprecated_call(match="Scene is deprecated"):
         scene = Scene(room=room, sources=sources, mics=mics)
     assert scene.is_dynamic() is False
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        scene.validate()
+    deprecations = [w for w in caught if issubclass(w.category, DeprecationWarning)]
+    assert not deprecations
 
 
 def test_legacy_scene_rejects_half_dynamic() -> None:
@@ -110,3 +117,40 @@ def test_legacy_scene_rejects_half_dynamic() -> None:
 def test_ism_simulator_rejects_missing_timing() -> None:
     with pytest.raises(ValueError, match="tmax or nsample must be provided"):
         ISMSimulator(max_order=1)
+
+
+def test_dynamic_scene_normalizes_non_tensor_traj() -> None:
+    room = Room.shoebox(size=[4.0, 3.0, 2.5], fs=16000, beta=[0.9] * 6)
+    sources = Source.from_positions([[1.0, 1.0, 1.0]])
+    mics = MicrophoneArray.from_positions([[2.0, 1.5, 1.0]])
+    scene = DynamicScene(
+        room=room,
+        sources=sources,
+        mics=mics,
+        src_traj=cast(Any, [[[1.0, 1.0, 1.0]], [[1.1, 1.0, 1.0]]]),
+        mic_traj=cast(Any, [[[2.0, 1.5, 1.0]], [[2.0, 1.5, 1.0]]]),
+    )
+    assert torch.is_tensor(scene.src_traj)
+    assert torch.is_tensor(scene.mic_traj)
+
+
+def test_ism_simulator_rejects_conflicting_config_max_order() -> None:
+    room = Room.shoebox(size=[4.0, 3.0, 2.5], fs=16000, beta=[0.9] * 6)
+    sources = Source.from_positions([[1.0, 1.0, 1.0]])
+    mics = MicrophoneArray.from_positions([[2.0, 1.5, 1.0]])
+    scene = StaticScene(room=room, sources=sources, mics=mics)
+    cfg = SimulationConfig(max_order=2)
+    sim = ISMSimulator(max_order=1, tmax=0.05)
+    with pytest.raises(ValueError, match="conflicting 'max_order'"):
+        sim.simulate(scene, cfg)
+
+
+def test_ism_simulator_rejects_conflicting_config_tmax() -> None:
+    room = Room.shoebox(size=[4.0, 3.0, 2.5], fs=16000, beta=[0.9] * 6)
+    sources = Source.from_positions([[1.0, 1.0, 1.0]])
+    mics = MicrophoneArray.from_positions([[2.0, 1.5, 1.0]])
+    scene = StaticScene(room=room, sources=sources, mics=mics)
+    cfg = SimulationConfig(tmax=0.10)
+    sim = ISMSimulator(max_order=1, tmax=0.05)
+    with pytest.raises(ValueError, match="conflicting 'tmax'"):
+        sim.simulate(scene, cfg)

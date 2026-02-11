@@ -55,6 +55,9 @@ device, dtype = DeviceSpec(device="auto").resolve()
 - Experimental dataset stubs (`torchrir.experimental`) are not implemented and raise
   `NotImplementedError`.
 - `torchrir.models.Scene` is deprecated; use `StaticScene`/`DynamicScene`.
+- `DynamicScene` normalizes tensor-like trajectories to tensors during initialization.
+- `Scene.validate()` does not re-emit deprecation warnings.
+- `ISMSimulator` raises `ValueError` when `max_order` or `tmax` conflicts with the provided `SimulationConfig`.
 - `torchrir.load`/`save` and `torchrir.io.load`/`save`/`info` are deprecated aliases.
 - `torchrir.sim.simulate_rir`/`torchrir.sim.simulate_dynamic_rir` require `max_order`
   (or `torchrir.config.SimulationConfig.max_order`) and either `nsample` or `tmax`.

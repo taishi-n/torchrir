@@ -10,6 +10,7 @@ import torch
 from torch import Tensor
 
 from .room import MicrophoneArray, Room, Source
+from ..util.tensor import as_tensor
 
 
 @dataclass(frozen=True)
@@ -49,6 +50,19 @@ class DynamicScene:
     mic_traj: Tensor
 
     def __post_init__(self) -> None:
+        src_traj = as_tensor(self.src_traj)
+        mic_traj = as_tensor(self.mic_traj)
+        object.__setattr__(self, "src_traj", src_traj)
+        object.__setattr__(self, "mic_traj", mic_traj)
+        self._validate_internal()
+
+    def is_dynamic(self) -> bool:
+        return True
+
+    def validate(self) -> None:
+        self._validate_internal()
+
+    def _validate_internal(self) -> None:
         _validate_scene_entities(self.room, self.sources, self.mics)
         dim = int(self.room.size.numel())
         n_src = int(self.sources.positions.shape[0])
@@ -57,12 +71,6 @@ class DynamicScene:
         t_mic = _validate_traj(self.mic_traj, n_mic, dim, "mic_traj")
         if t_src != t_mic:
             raise ValueError("src_traj and mic_traj must have matching time steps")
-
-    def is_dynamic(self) -> bool:
-        return True
-
-    def validate(self) -> None:
-        self.__post_init__()
 
 
 @dataclass(frozen=True)
@@ -86,6 +94,9 @@ class Scene:
             DeprecationWarning,
             stacklevel=2,
         )
+        self._validate_internal()
+
+    def _validate_internal(self) -> None:
         _validate_scene_entities(self.room, self.sources, self.mics)
         has_src = self.src_traj is not None
         has_mic = self.mic_traj is not None
@@ -109,7 +120,7 @@ class Scene:
         return self.src_traj is not None and self.mic_traj is not None
 
     def validate(self) -> None:
-        self.__post_init__()
+        self._validate_internal()
 
     def to_static_scene(self) -> StaticScene:
         if self.is_dynamic():
