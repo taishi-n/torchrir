@@ -23,6 +23,7 @@ uv run python examples/static.py --num-sources 1 --duration 5 --plot
 ```
 
 Expected outputs:
+
 - `static.wav`
 - `static_ref01.wav`, `static_ref02.wav`, ...
 - `static_metadata.json`
@@ -34,6 +35,7 @@ uv run python examples/static.py --order 12 --tmax 0.6 --device auto
 ```
 
 Expected outputs:
+
 - `static.wav`
 - `static_ref01.wav`, `static_ref02.wav`, ...
 - `static_metadata.json`
@@ -59,6 +61,7 @@ uv run python examples/dynamic_src.py --steps 24 --plot
 ```
 
 Expected outputs:
+
 - `dynamic_src.wav`
 - `dynamic_src_ref01.wav`, `dynamic_src_ref02.wav`, ...
 - `dynamic_src_metadata.json`
@@ -70,6 +73,7 @@ uv run python examples/dynamic_src.py --num-sources 3 --duration 8 --order 10
 ```
 
 Expected outputs:
+
 - `dynamic_src.wav`
 - `dynamic_src_ref01.wav`, `dynamic_src_ref02.wav`, ...
 - `dynamic_src_metadata.json`
@@ -91,6 +95,7 @@ uv run python examples/dynamic_mic.py --steps 20 --plot
 ```
 
 Expected outputs:
+
 - `dynamic_mic.wav`
 - `dynamic_mic_ref01.wav`, `dynamic_mic_ref02.wav`, ...
 - `dynamic_mic_metadata.json`
@@ -102,6 +107,7 @@ uv run python examples/dynamic_mic.py --order 12 --tmax 0.6 --device auto
 ```
 
 Expected outputs:
+
 - `dynamic_mic.wav`
 - `dynamic_mic_ref01.wav`, `dynamic_mic_ref02.wav`, ...
 - `dynamic_mic_metadata.json`
@@ -125,6 +131,7 @@ uv run python examples/cli.py --mode static --plot
 ```
 
 Expected outputs:
+
 - `static_binaural.wav`
 - `static_binaural_metadata.json`
 - `static_static_2d.png` (and 3D variant if room is 3D)
@@ -134,6 +141,7 @@ uv run python examples/cli.py --mode dynamic_src --gif --steps 24
 ```
 
 Expected outputs:
+
 - `dynamic_src_binaural.wav`
 - `dynamic_src_binaural_metadata.json`
 - `dynamic_src.gif` (and 3D variant if room is 3D)
@@ -159,6 +167,7 @@ uv run python examples/benchmark_device.py --repeats 10 --gpu auto
 ```
 
 Expected output (logs):
+
 - `cpu avg: ... ms`
 - `<device> avg: ... ms`
 - `speedup: ...x`
@@ -168,6 +177,7 @@ uv run python examples/benchmark_device.py --dynamic --repeats 5 --gpu mps
 ```
 
 Expected output (logs):
+
 - `cpu dynamic avg: ... ms`
 - `mps dynamic avg: ... ms`
 - `speedup: ...x`
@@ -282,5 +292,6 @@ uv run python examples/build_dynamic_dataset.py --dataset cmu_arctic --num-scene
 ```
 
 Expected outputs:
+
 - `outputs/ds_small/scene_000.wav`, `scene_001.wav`
 - `outputs/ds_small/scene_000_metadata.json`, `scene_001_metadata.json`

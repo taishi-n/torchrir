@@ -16,8 +16,8 @@
 - Metadata export helpers for time axis, DOA, array attributes, and trajectories (JSON-ready).
 - Explicit audio metadata I/O container via `torchrir.io.AudioData` (`load_audio_data` / `save_audio_data`).
 - Explicit wav/audio I/O split:
-  - wav-only: `torchrir.io.load_wav` / `save_wav` / `info_wav`
-  - backend-supported formats: `torchrir.io.load_audio` / `save_audio` / `info_audio`
+    - wav-only: `torchrir.io.load_wav` / `save_wav` / `info_wav`
+    - backend-supported formats: `torchrir.io.load_audio` / `save_audio` / `info_audio`
 - Dataset examples can emit per-source reference audio (RIR-convolved premix) and record it in metadata.
 - Unified CLI example with JSON/YAML config and deterministic flag support.
 
