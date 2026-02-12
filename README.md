@@ -112,8 +112,16 @@ For detailed documentation:
 [Read the Docs](https://torchrir.readthedocs.io/en/latest/)
 
 ## Future Work
-- Ray tracing backend: implement `torchrir.experimental.RayTracingSimulator` with frequency-dependent absorption/scattering.
-- Dataset expansion: add additional dataset integrations beyond CMU ARCTIC (see `torchrir.experimental.TemplateDataset`), including torchaudio datasets (e.g., LibriSpeech, VCTK, LibriTTS, SpeechCommands, CommonVoice, GTZAN, MUSDB-HQ).
+- Advanced room geometry pipeline beyond shoebox rooms (e.g., irregular polygons/meshes and boundary handling).  
+  Motivation: [pyroomacoustics#393](https://github.com/LCAV/pyroomacoustics/issues/393), [pyroomacoustics#405](https://github.com/LCAV/pyroomacoustics/issues/405)
+- General reflection/path capping controls (e.g., first-K, strongest-K, or energy-threshold-based path selection).  
+  Motivation: [pyroomacoustics#338](https://github.com/LCAV/pyroomacoustics/issues/338)
+- Microphone hardware response modeling (frequency response, sensitivity, and self-noise).  
+  Motivation: [pyroomacoustics#394](https://github.com/LCAV/pyroomacoustics/issues/394)
+- Near-field speech source modeling for more realistic close-talk scenarios.  
+  Motivation: [pyroomacoustics#417](https://github.com/LCAV/pyroomacoustics/issues/417)
+- Integrated 3D spatial response visualization (e.g., array/directivity beam-pattern rendering).  
+  Motivation: [pyroomacoustics#397](https://github.com/LCAV/pyroomacoustics/issues/397)
 
 ## Related Libraries
 - [gpuRIR](https://github.com/DavidDiazGuerra/gpuRIR)
