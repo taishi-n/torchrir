@@ -11,6 +11,7 @@ from typing import List, Tuple
 
 import torch
 
+from .attribution import DatasetAttribution, attribution_for
 from ._archive import safe_extractall
 from .base import BaseDataset
 from ..io.audio import load_audio
@@ -147,6 +148,10 @@ class LibriSpeechDataset(BaseDataset):
                 _download(url, archive_path)
                 with tarfile.open(archive_path, "r:gz") as tar:
                     safe_extractall(tar, self.root)
+
+    def attribution_info(self) -> DatasetAttribution:
+        """Return attribution and license information for LibriSpeech."""
+        return attribution_for("librispeech", subset=self.subset)
 
 
 def _download(url: str, dest: Path, retries: int = 1) -> None:

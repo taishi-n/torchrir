@@ -33,9 +33,14 @@ EXAMPLES_DIR = Path(__file__).resolve().parent
 if str(EXAMPLES_DIR) not in sys.path:
     sys.path.insert(0, str(EXAMPLES_DIR))
 
-from torchrir.datasets import CmuArcticDataset, load_dataset_sources
+from torchrir.datasets import (
+    CmuArcticDataset,
+    attribution_for,
+    default_modification_notes,
+    load_dataset_sources,
+)
 from torchrir.geometry import arrays, sampling, trajectories
-from torchrir.io import save_scene_audio, save_scene_metadata
+from torchrir.io import save_attribution_file, save_scene_audio, save_scene_metadata
 from torchrir.signal import DynamicConvolver
 from torchrir.sim import simulate_dynamic_rir, simulate_rir
 from torchrir.util import add_output_args, resolve_device
@@ -186,6 +191,21 @@ def _serialize_args(args) -> Dict[str, Any]:
     }
 
 
+def _prepare_attribution(
+    args, *, dynamic: bool
+) -> tuple[dict[str, Any], list[str], str]:
+    dataset_attribution = attribution_for("cmu_arctic")
+    dataset_license = dataset_attribution.to_dict()
+    modifications = default_modification_notes(dynamic=dynamic)
+    attribution_path = save_attribution_file(
+        out_dir=args.out_dir,
+        dataset_attribution=dataset_attribution,
+        modifications=modifications,
+        logger=get_logger("examples.cli"),
+    )
+    return dataset_license, modifications, attribution_path.name
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Unified CMU ARCTIC RIR examples")
     parser.add_argument(
@@ -267,6 +287,9 @@ def _build_parser() -> argparse.ArgumentParser:
 
 def _run_static(args, rng: random.Random, logger):
     """Run the static (fixed sources + fixed mic) scenario."""
+    dataset_license, modifications, attribution_file = _prepare_attribution(
+        args, dynamic=False
+    )
     device = resolve_device(args.device)
     # Load dry sources and build a shoebox room.
     signals, fs, info = _load_sources(args, rng, device)
@@ -337,7 +360,13 @@ def _run_static(args, rng: random.Random, logger):
         mic_traj=None,
         signal_len=signals.shape[1],
         source_info=info,
-        extra={"mode": "static", "args": _serialize_args(args)},
+        extra={
+            "mode": "static",
+            "args": _serialize_args(args),
+            "dataset_license": dataset_license,
+            "modifications": modifications,
+            "attribution_file": attribution_file,
+        },
         logger=logger,
     )
 
@@ -348,6 +377,9 @@ def _run_static(args, rng: random.Random, logger):
 
 def _run_dynamic_src(args, rng: random.Random, logger):
     """Run the moving-source scenario (fixed mic)."""
+    dataset_license, modifications, attribution_file = _prepare_attribution(
+        args, dynamic=True
+    )
     device = resolve_device(args.device)
     # Load dry sources and build a shoebox room.
     signals, fs, info = _load_sources(args, rng, device)
@@ -438,7 +470,13 @@ def _run_dynamic_src(args, rng: random.Random, logger):
         mic_traj=mic_traj,
         signal_len=signals.shape[1],
         source_info=info,
-        extra={"mode": "dynamic_src", "args": _serialize_args(args)},
+        extra={
+            "mode": "dynamic_src",
+            "args": _serialize_args(args),
+            "dataset_license": dataset_license,
+            "modifications": modifications,
+            "attribution_file": attribution_file,
+        },
         logger=logger,
     )
     logger.info("sources: %s", info)
@@ -448,6 +486,9 @@ def _run_dynamic_src(args, rng: random.Random, logger):
 
 def _run_dynamic_mic(args, rng: random.Random, logger):
     """Run the moving-mic scenario (fixed sources)."""
+    dataset_license, modifications, attribution_file = _prepare_attribution(
+        args, dynamic=True
+    )
     device = resolve_device(args.device)
     # Load dry sources and build a shoebox room.
     signals, fs, info = _load_sources(args, rng, device)
@@ -536,7 +577,13 @@ def _run_dynamic_mic(args, rng: random.Random, logger):
         mic_traj=mic_traj,
         signal_len=signals.shape[1],
         source_info=info,
-        extra={"mode": "dynamic_mic", "args": _serialize_args(args)},
+        extra={
+            "mode": "dynamic_mic",
+            "args": _serialize_args(args),
+            "dataset_license": dataset_license,
+            "modifications": modifications,
+            "attribution_file": attribution_file,
+        },
         logger=logger,
     )
     logger.info("sources: %s", info)

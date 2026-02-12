@@ -17,6 +17,7 @@ Outputs (per scene index k):
     - scene_k.wav
     - scene_k_refXX.wav (per-source convolved references)
     - scene_k_metadata.json
+    - ATTRIBUTION.txt (dataset attribution and redistribution note)
     - scene_k_static_2d.png / scene_k_dynamic_2d.png (and 3D variants when enabled)
 
 Run (CMU ARCTIC):
@@ -52,10 +53,15 @@ except ModuleNotFoundError:  # allow running without installation
 EXAMPLES_DIR = Path(__file__).resolve().parent
 if str(EXAMPLES_DIR) not in sys.path:
     sys.path.insert(0, str(EXAMPLES_DIR))
-
-from torchrir.datasets import CmuArcticDataset, LibriSpeechDataset, load_dataset_sources
+from torchrir.datasets import (
+    CmuArcticDataset,
+    LibriSpeechDataset,
+    attribution_for,
+    default_modification_notes,
+    load_dataset_sources,
+)
 from torchrir.geometry import arrays, sampling, trajectories
-from torchrir.io import save_scene_audio, save_scene_metadata
+from torchrir.io import save_attribution_file, save_scene_audio, save_scene_metadata
 from torchrir.signal import DynamicConvolver
 from torchrir.sim import simulate_dynamic_rir
 from torchrir.util import add_output_args, resolve_device
@@ -312,6 +318,17 @@ def main() -> None:
     mics = MicrophoneArray.from_positions(mic_pos.tolist())
 
     args.out_dir.mkdir(parents=True, exist_ok=True)
+    dataset_attribution = attribution_for(
+        args.dataset, args.subset if args.dataset == "librispeech" else None
+    )
+    dataset_license = dataset_attribution.to_dict()
+    modifications = default_modification_notes(dynamic=True)
+    attribution_path = save_attribution_file(
+        out_dir=args.out_dir,
+        dataset_attribution=dataset_attribution,
+        modifications=modifications,
+        logger=logger,
+    )
 
     for idx in range(args.num_scenes):
         # Use a per-scene RNG so each scene has independent random motion + sources.
@@ -431,6 +448,9 @@ def main() -> None:
                 "mode": "dynamic_dataset",
                 "dataset": args.dataset,
                 "subset": args.subset if args.dataset == "librispeech" else None,
+                "dataset_license": dataset_license,
+                "modifications": modifications,
+                "attribution_file": attribution_path.name,
                 "motion_modes": modes,
                 "moving_sources": moving,
                 "reference_audio": reference_audio,

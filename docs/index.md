@@ -32,6 +32,8 @@ pip install torchrir
 - CMU ARCTIC
 - LibriSpeech
 - Experimental template stub: `torchrir.experimental`
+- Dataset attribution and redistribution notes:
+  [THIRD_PARTY_DATASETS.md](https://github.com/taishi-n/torchrir/blob/main/THIRD_PARTY_DATASETS.md)
 
 ### License
 TorchRIR is released under the Apache 2.0 license. See `LICENSE`.

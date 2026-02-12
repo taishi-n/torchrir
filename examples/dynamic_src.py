@@ -12,6 +12,7 @@ Outputs (default `--out-dir outputs`):
 - dynamic_src.wav
 - dynamic_src_ref01.wav, dynamic_src_ref02.wav, ... (per-source convolved references)
 - dynamic_src_metadata.json
+- ATTRIBUTION.txt
 - optional plots and GIFs under the same directory
 """
 
@@ -34,9 +35,14 @@ except ModuleNotFoundError:  # allow running without installation
 EXAMPLES_DIR = Path(__file__).resolve().parent
 if str(EXAMPLES_DIR) not in sys.path:
     sys.path.insert(0, str(EXAMPLES_DIR))
-from torchrir.datasets import CmuArcticDataset, load_dataset_sources
+from torchrir.datasets import (
+    CmuArcticDataset,
+    attribution_for,
+    default_modification_notes,
+    load_dataset_sources,
+)
 from torchrir.geometry import arrays, sampling, trajectories
-from torchrir.io import save_scene_audio, save_scene_metadata
+from torchrir.io import save_attribution_file, save_scene_audio, save_scene_metadata
 from torchrir.signal import DynamicConvolver
 from torchrir.sim import simulate_dynamic_rir
 from torchrir.util import add_output_args, resolve_device
@@ -132,6 +138,15 @@ def main() -> None:
     rng = random.Random(args.seed)
     device = resolve_device(args.device)
     room_size = torch.tensor(args.room, dtype=torch.float32)
+    dataset_attribution = attribution_for("cmu_arctic")
+    dataset_license = dataset_attribution.to_dict()
+    modifications = default_modification_notes(dynamic=True)
+    attribution_path = save_attribution_file(
+        out_dir=args.out_dir,
+        dataset_attribution=dataset_attribution,
+        modifications=modifications,
+        logger=logger,
+    )
 
     # Build dataset factory so each speaker loads from the same root.
     def dataset_factory(speaker: str | None):
@@ -282,7 +297,13 @@ def main() -> None:
         mic_traj=mic_traj,
         signal_len=signals.shape[1],
         source_info=info,
-        extra={"mode": "dynamic_src", "reference_audio": reference_audio},
+        extra={
+            "mode": "dynamic_src",
+            "reference_audio": reference_audio,
+            "dataset_license": dataset_license,
+            "modifications": modifications,
+            "attribution_file": attribution_path.name,
+        },
         logger=logger,
     )
 

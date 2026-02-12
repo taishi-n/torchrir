@@ -19,7 +19,7 @@ from .audio import (
     save_audio_data,
 )
 from .metadata import build_metadata, save_metadata_json
-from .outputs import save_scene_audio, save_scene_metadata
+from .outputs import save_attribution_file, save_scene_audio, save_scene_metadata
 
 
 @dataclass(frozen=True)
@@ -276,6 +276,32 @@ def info(
         stacklevel=2,
     )
     return info_wav(path, backend=backend, format=format)
+
+
+__all__ = [
+    "AudioBackend",
+    "AudioData",
+    "AudioInfo",
+    "build_metadata",
+    "get_audio_backend",
+    "info",
+    "info_audio",
+    "info_wav",
+    "list_audio_backends",
+    "load",
+    "load_audio",
+    "load_audio_data",
+    "load_wav",
+    "save",
+    "save_attribution_file",
+    "save_audio",
+    "save_audio_data",
+    "save_metadata_json",
+    "save_scene_audio",
+    "save_scene_metadata",
+    "save_wav",
+    "set_audio_backend",
+]
 
 
 __all__ = [

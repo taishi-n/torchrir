@@ -21,6 +21,7 @@ Examples:
 """
 
 from .base import BaseDataset, DatasetItem, SentenceLike
+from .attribution import DatasetAttribution, attribution_for, default_modification_notes
 from .utils import choose_speakers, load_dataset_sources
 from ..io.audio import load, save
 from .collate import CollateBatch, collate_dataset_items
@@ -34,9 +35,12 @@ __all__ = [
     "CmuArcticSentence",
     "choose_speakers",
     "DatasetItem",
+    "DatasetAttribution",
     "CollateBatch",
+    "default_modification_notes",
     "collate_dataset_items",
     "cmu_arctic_speakers",
+    "attribution_for",
     "SentenceLike",
     "load_dataset_sources",
     "load",

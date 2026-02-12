@@ -11,6 +11,7 @@ from typing import List, Tuple
 
 import torch
 
+from .attribution import DatasetAttribution, attribution_for
 from ._archive import safe_extractall
 from .base import BaseDataset
 from ..io.audio import load
@@ -151,6 +152,10 @@ class CmuArcticDataset(BaseDataset):
         """Load mono audio for the given utterance ID."""
         path = self.audio_path(utterance_id)
         return load(path)
+
+    def attribution_info(self) -> DatasetAttribution:
+        """Return attribution and license information for CMU ARCTIC."""
+        return attribution_for("cmu_arctic")
 
 
 def _download(url: str, dest: Path, retries: int = 1) -> None:

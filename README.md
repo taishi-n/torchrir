@@ -52,6 +52,10 @@ Detailed notes and equations:
 - `examples/benchmark_device.py`: CPU/GPU benchmark for RIR simulation.  
   `uv run python examples/benchmark_device.py --dynamic`
 
+## Dataset Notices
+- For dataset attribution and redistribution notes, see
+  [THIRD_PARTY_DATASETS.md](THIRD_PARTY_DATASETS.md).
+
 ## Core API Overview
 - Geometry: `Room`, `Source`, `MicrophoneArray`
 - Scene models: `StaticScene`, `DynamicScene` (`Scene` is deprecated)

@@ -27,6 +27,7 @@ Expected outputs:
 - `static.wav`
 - `static_ref01.wav`, `static_ref02.wav`, ...
 - `static_metadata.json`
+- `ATTRIBUTION.txt`
 - `static_static_2d.png` (and `static_static_3d.png` if 3D)
 - `static.gif` (and `static_3d.gif` if 3D)
 
@@ -39,6 +40,7 @@ Expected outputs:
 - `static.wav`
 - `static_ref01.wav`, `static_ref02.wav`, ...
 - `static_metadata.json`
+- `ATTRIBUTION.txt`
 
 ## Dynamic CMU ARCTIC (moving sources, fixed mic)
 
@@ -65,6 +67,7 @@ Expected outputs:
 - `dynamic_src.wav`
 - `dynamic_src_ref01.wav`, `dynamic_src_ref02.wav`, ...
 - `dynamic_src_metadata.json`
+- `ATTRIBUTION.txt`
 - `dynamic_src_static_2d.png` / `dynamic_src_dynamic_2d.png`
 - `dynamic_src.gif` (and `dynamic_src_3d.gif` if 3D)
 
@@ -77,6 +80,7 @@ Expected outputs:
 - `dynamic_src.wav`
 - `dynamic_src_ref01.wav`, `dynamic_src_ref02.wav`, ...
 - `dynamic_src_metadata.json`
+- `ATTRIBUTION.txt`
 
 ## Dynamic CMU ARCTIC (fixed sources, moving mic)
 
@@ -99,6 +103,7 @@ Expected outputs:
 - `dynamic_mic.wav`
 - `dynamic_mic_ref01.wav`, `dynamic_mic_ref02.wav`, ...
 - `dynamic_mic_metadata.json`
+- `ATTRIBUTION.txt`
 - `dynamic_mic_static_2d.png` / `dynamic_mic_dynamic_2d.png`
 - `dynamic_mic.gif` (and `dynamic_mic_3d.gif` if 3D)
 
@@ -111,6 +116,7 @@ Expected outputs:
 - `dynamic_mic.wav`
 - `dynamic_mic_ref01.wav`, `dynamic_mic_ref02.wav`, ...
 - `dynamic_mic_metadata.json`
+- `ATTRIBUTION.txt`
 
 ## Unified CLI (static/dynamic)
 
@@ -134,6 +140,7 @@ Expected outputs:
 
 - `static_binaural.wav`
 - `static_binaural_metadata.json`
+- `ATTRIBUTION.txt`
 - `static_static_2d.png` (and 3D variant if room is 3D)
 
 ```bash
@@ -144,6 +151,7 @@ Expected outputs:
 
 - `dynamic_src_binaural.wav`
 - `dynamic_src_binaural_metadata.json`
+- `ATTRIBUTION.txt`
 - `dynamic_src.gif` (and 3D variant if room is 3D)
 
 ## Benchmark (CPU vs GPU)
@@ -204,6 +212,7 @@ For each scene index `k`:
 - `scene_k.wav` — multi-microphone mixture
 - `scene_k_refXX.wav` — per-source reference audio after RIR convolution (premix)
 - `scene_k_metadata.json` — room size, trajectories, DOA, array attributes, etc.
+- `ATTRIBUTION.txt` — dataset attribution and redistribution note for the run
 - `scene_k_static_2d.png` / `scene_k_dynamic_2d.png` — layout plots
   (3D variants are saved when the room is 3D)
 - `scene_k.gif` — animation (and `scene_k_3d.gif` when the room is 3D)
@@ -283,7 +292,8 @@ The example is implemented in `examples/build_dynamic_dataset.py` and uses:
 - `torchrir.signal.DynamicConvolver(mode="trajectory")` to produce the final mixture.
 - `save_scene_audio` + `save_scene_metadata` to store scene metadata (kept as separate calls).
   Metadata includes a `reference_audio` list describing the saved `scene_k_refXX.wav` files
-  (each entry corresponds to a single source convolved with its dynamic RIR).
+  (each entry corresponds to a single source convolved with its dynamic RIR), plus
+  `dataset_license` and `modifications` fields for attribution tracking.
 
 ### Additional example
 
@@ -295,3 +305,4 @@ Expected outputs:
 
 - `outputs/ds_small/scene_000.wav`, `scene_001.wav`
 - `outputs/ds_small/scene_000_metadata.json`, `scene_001_metadata.json`
+- `outputs/ds_small/ATTRIBUTION.txt`

@@ -8,6 +8,8 @@ from typing import Optional, Protocol, Sequence, Tuple
 import torch
 from torch.utils.data import Dataset
 
+from .attribution import DatasetAttribution
+
 
 class SentenceLike(Protocol):
     """Minimal sentence interface for dataset entries."""
@@ -42,6 +44,10 @@ class BaseDataset(Dataset[DatasetItem]):
 
     def load_audio(self, utterance_id: str) -> Tuple[torch.Tensor, int]:
         """Load audio for an utterance and return (audio, sample_rate)."""
+        raise NotImplementedError
+
+    def attribution_info(self) -> DatasetAttribution:
+        """Return attribution and license information for this dataset."""
         raise NotImplementedError
 
     def __len__(self) -> int:
