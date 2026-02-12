@@ -1121,7 +1121,7 @@ wheels = [
 
 [[package]]
 name = "torchrir"
-version = "0.7.0"
+version = "0.7.1"
 source = { virtual = "." }
 dependencies = [
     { name = "numpy" },
