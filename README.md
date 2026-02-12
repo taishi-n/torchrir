@@ -24,6 +24,11 @@ pip install torchrir
 | 📊 Scene Plot | ✅ | ❌ | ✅ | ❌ |
 | 🎞️ Dynamic Scene GIF | ✅ | ❌ | 🟡 Manual animation script | ❌ |
 | 🗂️ Dataset Build | ✅ | ❌ | ✅ | ❌ |
+| 🎛️ Signal Processing | ❌ Scope out | ❌ | ✅ | ❌ |
+| 🧱 Non-shoebox Geometry | 🚧 Candidate | ❌ | ✅ | ❌ |
+| 🌐 Geometric Acoustics | 🚧 Candidate | ❌ | ✅ | ❌ |
+
+Legend: `✅` native support, `🟡` manual setup, `🚧` candidate (not yet implemented), `❌` unavailable
 
 Detailed notes and equations:
 [Read the Docs: Library Comparisons](https://torchrir.readthedocs.io/en/latest/comparisons.html)

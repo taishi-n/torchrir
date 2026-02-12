@@ -7,7 +7,7 @@ This page summarizes implementation-level differences between TorchRIR and relat
 - `rir-generator`
 - `pyroomacoustics`
 
-## Dynamic Simulation Feature Comparison
+## Feature Comparison
 
 | Feature | `torchrir` | `gpuRIR` | `pyroomacoustics` | `rir-generator` |
 |---|---|---|---|---|
@@ -19,12 +19,21 @@ This page summarizes implementation-level differences between TorchRIR and relat
 | 📊 Scene Plot | ✅ | ❌ | ✅ | ❌ |
 | 🎞️ Dynamic Scene GIF | ✅ | ❌ | 🟡 Manual animation script | ❌ |
 | 🗂️ Dataset Build | ✅ | ❌ | ✅ | ❌ |
+| 🎛️ Signal Processing | ❌ Scope out | ❌ | ✅ | ❌ |
+| 🧱 Non-shoebox Geometry | 🚧 Candidate | ❌ | ✅ | ❌ |
+| 🌐 Geometric Acoustics | 🚧 Candidate | ❌ | ✅ | ❌ |
 
 Legend:
 
 - `✅` native support
 - `🟡` manual setup
+- `🚧` candidate (not yet implemented)
 - `❌` unavailable
+
+Notes:
+
+- `Signal Processing` includes beamforming, DOA, BSS, adaptive filtering, STFT, and denoising.
+- In `torchrir`, this row is comparison-only and marked as scope out.
 
 ## Visualization, Dynamic GIF, and Dataset Build (Source-Level)
 
