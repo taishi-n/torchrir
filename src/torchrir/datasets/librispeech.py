@@ -62,6 +62,8 @@ class LibriSpeechDataset(BaseDataset):
         Args:
             root: Root directory where the dataset is stored.
             subset: LibriSpeech subset name (e.g., "train-clean-100").
+            speaker: Optional speaker ID directory name (e.g., "103").
+                If provided, restrict loading to that speaker.
             download: Download and extract if missing.
         """
         if subset not in VALID_SUBSETS:

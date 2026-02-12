@@ -12,6 +12,8 @@
 - Standard array geometries (linear, circular, polyhedron, binaural, Eigenmike)
   and trajectory sampling utilities.
 - Dataset utilities (CMU ARCTIC, LibriSpeech, template stubs) plus DataLoader collate helpers.
+  See [Datasets](datasets.md) for accepted options, directory layouts, and
+  invalid-input handling.
 - Plotting utilities for static/dynamic scenes and GIF animation.
 - Metadata export helpers for time axis, DOA, array attributes, and trajectories (JSON-ready).
 - Explicit audio metadata I/O container via `torchrir.io.AudioData` (`load_audio_data` / `save_audio_data`).
@@ -35,6 +37,7 @@
 - `torchrir.logging`: Logging configuration and helpers.
 - `torchrir.config`: Simulation configuration objects.
 - `torchrir.datasets`: Dataset helpers and collate utilities.
+  See [Datasets](datasets.md) for practical usage guidance.
 - `torchrir.experimental`: Work-in-progress APIs (ray tracing, FDTD, template datasets).
 
 ## Device selection
@@ -70,7 +73,10 @@ device, dtype = DeviceSpec(device="auto").resolve()
 - HPF requires SciPy and currently applies filtering via CPU-domain processing, which can add host/device transfer overhead on CUDA/MPS runs.
 - Deterministic mode is best-effort; some backends may still be non-deterministic.
 - YAML configs require `PyYAML`; otherwise a `ModuleNotFoundError` is raised.
-- Downloading CMU ARCTIC requires network access.
+- Downloading CMU ARCTIC requires network access when `download=True`; local
+  preloaded datasets are supported with `download=False`.
+- Dataset option validation and error behavior are documented in
+  [Datasets](datasets.md).
 - GIF output requires Pillow (via Matplotlib's animation writer).
 - Dataclass models are frozen but hold mutable tensors (shallow immutability).
 

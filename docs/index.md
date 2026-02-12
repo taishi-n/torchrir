@@ -32,6 +32,8 @@ pip install torchrir
 - CMU ARCTIC
 - LibriSpeech
 - Experimental template dataset stub under `torchrir.experimental`
+- Dataset usage details (options, directory layouts, error handling):
+  [Datasets](datasets.md)
 - Dataset attribution and redistribution notes:
   [THIRD_PARTY_DATASETS.md](https://github.com/taishi-n/torchrir/blob/main/THIRD_PARTY_DATASETS.md)
 
@@ -52,12 +54,15 @@ See the detailed overview: [Overview](overview.md).
 ### Dataset generation
 - Use `torchrir.datasets.load_dataset_sources` to build fixed-length sources.
 - Use the dataset example scripts to generate per-scene WAV files and metadata.
+- See dataset-specific options and validation behavior:
+  [Datasets](datasets.md).
 
 See runnable examples and command-line usage: [Examples](examples.md).
 
 ## Documentation Pages
 - [Getting started](getting-started.md)
 - [Overview](overview.md)
+- [Datasets](datasets.md)
 - [Examples](examples.md)
 - [Library Comparisons](comparisons.md)
 - [Changelog](changelog.md)

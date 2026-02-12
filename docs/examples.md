@@ -279,6 +279,22 @@ uv run python examples/build_dynamic_dataset.py \
 - `--download`: explicitly request dataset download when files are missing (the script also retries with download enabled after a missing-data error).
 - `--device`: cpu/cuda/mps/auto.
 
+### Dataset option validity and error handling
+
+- `--dataset` accepts only `cmu_arctic` or `librispeech` (argparse `choices`).
+- `--subset` is only used for `librispeech`; unsupported values raise
+  `ValueError` in `LibriSpeechDataset`.
+- `--dataset-dir` is the dataset root passed to the loader.
+  - CMU ARCTIC expects `ARCTIC/cmu_us_<speaker>_arctic/...` under that root.
+  - LibriSpeech expects `LibriSpeech/<subset>/<speaker>/<chapter>/...` under that root.
+- `--download` is optional for this script:
+  - If files are missing and `--download` is not set, the script retries once
+    with download enabled.
+  - For strict offline runs, pre-populate `--dataset-dir` and ensure all files
+    exist before execution.
+- In LibriSpeech mode, malformed utterance IDs passed to `load_audio` (not in
+  `speaker-chapter-utterance` format) raise `ValueError`.
+
 !!! note
     `cuda` is available and validated in CI. Actual runtime behavior still depends
     on your local CUDA/PyTorch environment.

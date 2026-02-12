@@ -61,6 +61,31 @@ For detailed notes and equations, see
 - For dataset attribution and redistribution notes, see
   [THIRD_PARTY_DATASETS.md](THIRD_PARTY_DATASETS.md).
 
+## Dataset API Quick Guide
+- `torchrir.datasets.CmuArcticDataset(root, speaker=..., download=...)`
+  - Accepted `speaker`: `aew`, `ahw`, `aup`, `awb`, `axb`, `bdl`, `clb`, `eey`, `fem`, `gka`, `jmk`, `ksp`, `ljm`, `lnh`, `rms`, `rxr`, `slp`, `slt`
+  - Invalid `speaker` raises `ValueError`.
+  - Missing local files with `download=False` raises `FileNotFoundError`.
+- `torchrir.datasets.LibriSpeechDataset(root, subset=..., speaker=..., download=...)`
+  - Accepted `subset`: `dev-clean`, `dev-other`, `test-clean`, `test-other`, `train-clean-100`, `train-clean-360`, `train-other-500`
+  - Invalid `subset` raises `ValueError`.
+  - Missing subset/speaker paths with `download=False` raise `FileNotFoundError`.
+- Local-only (no download) example:
+  ```python
+  from pathlib import Path
+  from torchrir.datasets import CmuArcticDataset, LibriSpeechDataset
+
+  cmu = CmuArcticDataset(Path("datasets/cmu_arctic"), speaker="bdl", download=False)
+  libri = LibriSpeechDataset(
+      Path("datasets/librispeech"),
+      subset="train-clean-100",
+      speaker="103",
+      download=False,
+  )
+  ```
+- Full dataset usage details, expected directory layout, and invalid-input handling:
+  [Read the Docs: Datasets](https://torchrir.readthedocs.io/en/latest/datasets.html)
+
 ## Core API Overview
 - Geometry: `Room`, `Source`, `MicrophoneArray`
 - Scene models: `StaticScene`, `DynamicScene` (`Scene` is deprecated)

@@ -48,6 +48,10 @@ notice. Prefer top-level `torchrir` and documented submodules for stable use.
 
 ::: torchrir.util
 
+### `torchrir.datasets`
+
+::: torchrir.datasets
+
 ### `torchrir.experimental`
 
 ::: torchrir.experimental
