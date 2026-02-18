@@ -9,6 +9,9 @@ from torch import Tensor
 
 from ..models import MicrophoneArray, Room, Source
 from ..util.tensor import as_tensor, ensure_dim
+from .utils import _add_axes_annotation, _ensure_default_mpl_style
+
+_MIC_COLOR = "tab:orange"
 
 
 def plot_scene_static(
@@ -19,6 +22,8 @@ def plot_scene_static(
     ax: Any | None = None,
     title: Optional[str] = None,
     show: bool = False,
+    annotate_sources: bool = True,
+    annotation_lines: Optional[Sequence[str]] = None,
 ):
     """Plot a static room with source and mic positions.
 
@@ -40,7 +45,10 @@ def plot_scene_static(
     mic = _extract_positions(mics, ax)
 
     _scatter_positions(ax, src, label="sources", marker="^")
-    _scatter_positions(ax, mic, label="mics", marker="o")
+    _scatter_positions(ax, mic, label="mics", marker="o", color=_MIC_COLOR)
+    if annotate_sources:
+        _annotate_source_indices(ax, src)
+    _add_axes_annotation(ax, annotation_lines)
 
     if title:
         ax.set_title(title)
@@ -61,6 +69,8 @@ def plot_scene_dynamic(
     ax: Any | None = None,
     title: Optional[str] = None,
     show: bool = False,
+    annotate_sources: bool = True,
+    annotation_lines: Optional[Sequence[str]] = None,
 ):
     """Plot source and mic trajectories within a room.
 
@@ -86,7 +96,19 @@ def plot_scene_dynamic(
     mic_pos_t = _extract_positions(mic_pos, ax) if mic_pos is not None else mic_traj[0]
 
     _plot_entity(ax, src_traj, src_pos_t, step=step, label="sources", marker="^")
-    _plot_entity(ax, mic_traj, mic_pos_t, step=step, label="mics", marker="o")
+    _plot_entity(
+        ax,
+        mic_traj,
+        mic_pos_t,
+        step=step,
+        label="mics",
+        marker="o",
+        color=_MIC_COLOR,
+        uniform_color=True,
+    )
+    if annotate_sources:
+        _annotate_source_indices(ax, src_pos_t)
+    _add_axes_annotation(ax, annotation_lines)
 
     if title:
         ax.set_title(title)
@@ -101,6 +123,8 @@ def _setup_axes(
 ) -> tuple[Any, Any]:
     """Create 2D/3D axes based on room dimension."""
     import matplotlib.pyplot as plt
+
+    _ensure_default_mpl_style()
 
     size = _room_size(room, ax)
     dim = size.numel()
@@ -250,6 +274,8 @@ def _plot_entity(
     step: int,
     label: str,
     marker: str,
+    color: Optional[str] = None,
+    uniform_color: bool = False,
 ) -> None:
     """Plot trajectories and/or static positions with a unified legend entry."""
     if traj.numel() == 0:
@@ -267,9 +293,18 @@ def _plot_entity(
     if not palette:
         palette = ["C0", "C1", "C2", "C3", "C4", "C5"]
 
+    n_items = int(traj.shape[1])
+    if uniform_color:
+        base_color = color if color is not None else palette[0]
+        entity_colors = [base_color] * n_items
+    elif color is not None:
+        entity_colors = [color] * n_items
+    else:
+        entity_colors = [palette[idx % len(palette)] for idx in range(n_items)]
+
     dim = traj.shape[2]
     for idx in range(traj.shape[1]):
-        color = palette[idx % len(palette)]
+        item_color = entity_colors[idx]
         lbl = label if idx == 0 else "_nolegend_"
         if moving:
             if dim == 2:
@@ -278,7 +313,7 @@ def _plot_entity(
                     xy[:, 0],
                     xy[:, 1],
                     label=lbl,
-                    color=color,
+                    color=item_color,
                     marker=marker,
                     markevery=[0],
                 )
@@ -289,19 +324,19 @@ def _plot_entity(
                     xyz[:, 1],
                     xyz[:, 2],
                     label=lbl,
-                    color=color,
+                    color=item_color,
                     marker=marker,
                     markevery=[0],
                 )
         pos = positions[idx : idx + 1]
-        _scatter_positions(ax, pos, label="_nolegend_", marker=marker, color=color)
+        _scatter_positions(ax, pos, label="_nolegend_", marker=marker, color=item_color)
     if not moving:
         _scatter_positions(
             ax,
             positions[:1],
             label=label,
             marker=marker,
-            color=palette[0],
+            color=entity_colors[0],
         )
 
 
@@ -311,3 +346,17 @@ def _is_moving(traj: Tensor, positions: Tensor, *, tol: float = 1e-6) -> bool:
         return False
     pos0 = positions.unsqueeze(0).expand_as(traj)
     return bool(torch.any(torch.linalg.norm(traj - pos0, dim=-1) > tol).item())
+
+
+def _annotate_source_indices(ax: Any, src_positions: Tensor) -> None:
+    """Annotate source indices (S0, S1, ...) near the provided positions."""
+    if src_positions.numel() == 0:
+        return
+    dim = int(src_positions.shape[1])
+    for src_idx in range(int(src_positions.shape[0])):
+        pos = src_positions[src_idx]
+        label = f"S{src_idx}"
+        if dim == 2:
+            ax.text(float(pos[0]), float(pos[1]), label)
+        else:
+            ax.text(float(pos[0]), float(pos[1]), float(pos[2]), label)

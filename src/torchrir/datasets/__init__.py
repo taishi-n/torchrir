@@ -3,7 +3,8 @@
 Includes CMU ARCTIC and LibriSpeech dataset wrappers plus collate utilities for
 DataLoader usage. Experimental dataset stubs live under
 ``torchrir.experimental``. Use ``load_dataset_sources`` to build fixed-length
-source signals from random utterances.
+source signals from random utterances. Dynamic CMU ARCTIC scene generation is
+available via ``build_dynamic_cmu_arctic_dataset``.
 
 Examples:
     ```python
@@ -28,6 +29,7 @@ from .collate import CollateBatch, collate_dataset_items
 from .librispeech import LibriSpeechDataset, LibriSpeechSentence
 
 from .cmu_arctic import CmuArcticDataset, CmuArcticSentence, cmu_arctic_speakers
+from .dynamic_cmu_arctic import build_dynamic_cmu_arctic_dataset
 
 __all__ = [
     "BaseDataset",
@@ -40,6 +42,7 @@ __all__ = [
     "default_modification_notes",
     "collate_dataset_items",
     "cmu_arctic_speakers",
+    "build_dynamic_cmu_arctic_dataset",
     "attribution_for",
     "SentenceLike",
     "load_dataset_sources",

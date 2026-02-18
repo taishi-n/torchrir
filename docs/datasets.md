@@ -12,6 +12,7 @@ Covered APIs:
 - `torchrir.datasets.LibriSpeechDataset`
 - `torchrir.datasets.load_dataset_sources`
 - `torchrir.datasets.collate_dataset_items`
+- `torchrir.datasets.build_dynamic_cmu_arctic_dataset`
 
 ## Quick start (local data, no download)
 
@@ -168,3 +169,82 @@ need predictable offline execution.
 
 For licensing and redistribution guidance, see
 [`THIRD_PARTY_DATASETS.md`](https://github.com/taishi-n/torchrir/blob/main/THIRD_PARTY_DATASETS.md).
+
+## Dynamic CMU ARCTIC builder (oobss-compatible)
+
+`build_dynamic_cmu_arctic_dataset(...)` generates dynamic scenes in the layout
+expected by `oobss` loader type `torchrir_dynamic`.
+
+### Python API
+
+```python
+from pathlib import Path
+from torchrir.datasets import build_dynamic_cmu_arctic_dataset
+
+build_dynamic_cmu_arctic_dataset(
+    cmu_root=Path("datasets/cmu_arctic"),
+    dataset_root=Path("outputs/cmu_arctic_torchrir_dynamic_dataset"),
+    n_scenes=2,
+    overwrite=True,
+)
+```
+
+Default behavior preserved from the legacy oobss builder:
+
+- `n_sources=3`
+- moving speed range `0.3-0.8` m/s
+- motion profile: `0-35%` static, `35-65%` moving, `65-100%` static
+
+### CLI usage
+
+Module entrypoint:
+
+```bash
+python -m torchrir.datasets.dynamic_cmu_arctic \
+  --cmu-root datasets/cmu_arctic \
+  --dataset-root outputs/cmu_arctic_torchrir_dynamic_dataset \
+  --n-scenes 10 \
+  --save-layout-mp4 \
+  --save-layout-mp4-3d \
+  --overwrite-dataset
+```
+
+Console script entrypoint:
+
+```bash
+torchrir-build-dynamic-cmu-arctic \
+  --cmu-root datasets/cmu_arctic \
+  --dataset-root outputs/cmu_arctic_torchrir_dynamic_dataset \
+  --n-scenes 10 \
+  --layout-video-fps 12 \
+  --overwrite-dataset
+```
+
+Useful video flags:
+
+- `--no-save-layout-mp4`: disable MP4 rendering
+- `--no-save-layout-mp4-3d`: skip `room_layout_3d.mp4`
+- `--layout-video-fps <float>`: override frame rate
+- `--layout-video-no-audio`: disable mixture-audio mux into MP4
+- `--no-save-layout-images`: disable static layout images
+- `--no-save-layout-images-3d`: skip `room_layout_3d.png`
+- `--no-annotate-source-indices`: disable source index labels (`S0`, `S1`, ...)
+
+### Output structure
+
+```text
+<dataset-root>/
+  scene_0000/
+    mixture.wav
+    source_00.wav
+    source_01.wav
+    ...
+    metadata.json
+    source_info.json
+    room_layout_2d.png
+    room_layout_3d.png
+    room_layout_2d.mp4
+    room_layout_3d.mp4
+  scene_0001/
+    ...
+```

@@ -7,6 +7,31 @@ from typing import Any, Optional, Sequence
 
 import torch
 
+_MPL_DEFAULT_STYLE_APPLIED = False
+_MM_PER_INCH = 25.4
+_STATIC_FIGSIZE_INCHES = (160.0 / _MM_PER_INCH, 100.0 / _MM_PER_INCH)
+_STATIC_SAVE_DPI = 300
+
+
+def _ensure_default_mpl_style() -> None:
+    """Apply the default torchrir.viz matplotlib style once per process.
+
+    The default style uses SciencePlots grid profile without LaTeX:
+    ``plt.style.use(["science", "grid", "no-latex"])``.
+    """
+    global _MPL_DEFAULT_STYLE_APPLIED
+    if _MPL_DEFAULT_STYLE_APPLIED:
+        return
+
+    try:
+        import matplotlib.pyplot as plt
+        import scienceplots  # noqa: F401
+    except Exception:
+        return
+
+    plt.style.use(["science", "grid", "no-latex"])
+    _MPL_DEFAULT_STYLE_APPLIED = True
+
 
 def _to_cpu(value: Any) -> torch.Tensor:
     """Move a value to CPU as a tensor."""
@@ -51,8 +76,46 @@ def _save_axes(ax: Any, path: Path, *, show: bool) -> None:
     import matplotlib.pyplot as plt
 
     fig = ax.figure
+    fig.set_size_inches(*_STATIC_FIGSIZE_INCHES)
     fig.tight_layout()
-    fig.savefig(path)
+    fig.savefig(path, dpi=_STATIC_SAVE_DPI)
     if show:
         plt.show()
     plt.close(fig)
+
+
+def _add_axes_annotation(
+    ax: Any,
+    annotation_lines: Optional[Sequence[str]] = None,
+    *,
+    x: float = 0.02,
+    y: float = 0.98,
+    fontsize: float | None = None,
+) -> Any | None:
+    """Add top-left annotation text to 2D/3D matplotlib axes."""
+    if not annotation_lines:
+        return None
+    lines = [str(line).strip() for line in annotation_lines if str(line).strip()]
+    if not lines:
+        return None
+
+    text = "\n".join(lines)
+    if hasattr(ax, "text2D"):
+        return ax.text2D(
+            x,
+            y,
+            text,
+            transform=ax.transAxes,
+            ha="left",
+            va="top",
+            fontsize=fontsize,
+        )
+    return ax.text(
+        x,
+        y,
+        text,
+        transform=ax.transAxes,
+        ha="left",
+        va="top",
+        fontsize=fontsize,
+    )

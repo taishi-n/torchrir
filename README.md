@@ -54,6 +54,8 @@ For detailed notes and equations, see
   `uv run python examples/cli.py --mode static --plot`
 - `examples/build_dynamic_dataset.py`: small dynamic dataset generation script (CMU ARCTIC / LibriSpeech; fixed room/mics, randomized source motion).  
   `uv run python examples/build_dynamic_dataset.py --dataset cmu_arctic --num-scenes 4 --num-sources 2`
+- `torchrir.datasets.dynamic_cmu_arctic`: oobss-compatible dynamic CMU ARCTIC builder CLI.  
+  `python -m torchrir.datasets.dynamic_cmu_arctic --cmu-root datasets/cmu_arctic --n-scenes 2 --overwrite-dataset`
 - `examples/benchmark_device.py`: CPU/GPU benchmark for RIR simulation.  
   `uv run python examples/benchmark_device.py --dynamic`
 
@@ -70,6 +72,10 @@ For detailed notes and equations, see
   - Accepted `subset`: `dev-clean`, `dev-other`, `test-clean`, `test-other`, `train-clean-100`, `train-clean-360`, `train-other-500`
   - Invalid `subset` raises `ValueError`.
   - Missing subset/speaker paths with `download=False` raise `FileNotFoundError`.
+- `torchrir.datasets.build_dynamic_cmu_arctic_dataset(...)`
+  - Builds oobss-compatible scene folders with `mixture.wav`, `source_XX.wav`, `metadata.json`, and `source_info.json`.
+  - Static layout images (`room_layout_2d.png`, `room_layout_3d.png`) and optional layout videos (`room_layout_2d.mp4`, `room_layout_3d.mp4`) are generated, with source-index annotations by default.
+  - Default behavior includes `n_sources=3`, moving speed range `0.3-0.8 m/s`, and motion profile ratios `0-35%`, `35-65%`, `65-100%`.
 - Local-only (no download) example:
   ```python
   from pathlib import Path
@@ -103,7 +109,8 @@ For detailed notes and equations, see
 - `torchrir.sim`: simulation backends (ISM implementation lives under `torchrir.sim.ism`)
 - `torchrir.signal`: convolution utilities and dynamic convolver
 - `torchrir.geometry`: array geometries, sampling, trajectories
-- `torchrir.viz`: plotting and animation helpers
+- `torchrir.viz`: plotting and GIF/MP4 animation helpers
+  - Default plot style follows SciencePlots Grid (`science` + `grid`).
 - `torchrir.models`: room/scene/result data models
 - `torchrir.io`: audio I/O and metadata serialization (`*_wav` for wav-only, `*_audio` for backend-supported formats)
 - `torchrir.util`: shared math/tensor/device helpers
