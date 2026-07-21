@@ -7,12 +7,13 @@ import random
 import matplotlib.pyplot as plt
 import torch
 
-from torchrir import MicrophoneArray, Room, Source
+from torchrir import DynamicScene, MicrophoneArray, Room, Source, StaticScene
+from torchrir.config import SimulationConfig
 from torchrir.datasets import CmuArcticDataset, load_dataset_sources
 from torchrir.geometry import arrays
 from torchrir.io import save_wav
 from torchrir.signal import DynamicConvolver, convolve_rir
-from torchrir.sim import simulate_dynamic_rir, simulate_rir
+from torchrir.sim import simulate
 from torchrir.viz import animate_scene_gif, plot_scene_static
 
 
@@ -106,15 +107,12 @@ sources_static = Source.from_positions(src_pos)
 # --8<-- [start:static]
 device = "auto"
 
-rirs_static = simulate_rir(
-    room=room,
-    sources=sources_static,
-    mics=mics,
-    max_order=6,
-    tmax=0.4,
-    directivity="omni",
-    device=device,
+static_scene = StaticScene(room=room, sources=sources_static, mics=mics)
+static_result = simulate(
+    static_scene,
+    SimulationConfig(max_order=6, tmax=0.4, directivity="omni", device=device),
 )
+rirs_static = static_result.rirs
 print("Static RIR shape:", tuple(rirs_static.shape))  # (n_src, n_mic, rir_len)
 
 original_static = signals.to(rirs_static.device, dtype=rirs_static.dtype)
@@ -184,20 +182,23 @@ dist_start = torch.linalg.norm(src_traj[0, 1] - src_traj[0, 0]).item()
 dist_end = torch.linalg.norm(src_traj[-1, 1] - src_traj[-1, 0]).item()
 assert dist_end < dist_start
 
-rirs_dynamic = simulate_dynamic_rir(
+dynamic_scene = DynamicScene(
     room=room,
+    sources=sources_dynamic,
+    mics=mics,
     src_traj=src_traj,
     mic_traj=mic_traj,
-    max_order=6,
-    tmax=0.4,
-    directivity="omni",
-    device=device,
 )
+dynamic_result = simulate(
+    dynamic_scene,
+    SimulationConfig(max_order=6, tmax=0.4, directivity="omni", device=device),
+)
+rirs_dynamic = dynamic_result.rirs
 print("Dynamic RIR shape:", tuple(rirs_dynamic.shape))  # (T, n_src, n_mic, rir_len)
 
 original_dynamic = signals.to(rirs_dynamic.device, dtype=rirs_dynamic.dtype)
 convolved_dynamic = DynamicConvolver(mode="trajectory").convolve(
-    original_dynamic, rirs_dynamic
+    original_dynamic, dynamic_result
 )
 print(
     "Dynamic convolved shape:", tuple(convolved_dynamic.shape)

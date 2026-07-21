@@ -29,5 +29,11 @@ def split_directivity(directivity: str | tuple[str, str]) -> tuple[str, str]:
     if isinstance(directivity, (list, tuple)):
         if len(directivity) != 2:
             raise ValueError("directivity tuple must have length 2")
-        return directivity[0], directivity[1]
-    return directivity, directivity
+        source_pattern, microphone_pattern = directivity
+    else:
+        source_pattern = microphone_pattern = directivity
+    for pattern in (source_pattern, microphone_pattern):
+        if not isinstance(pattern, str):
+            raise TypeError("directivity patterns must be strings")
+        directivity_gain(pattern, torch.tensor(1.0))
+    return source_pattern, microphone_pattern

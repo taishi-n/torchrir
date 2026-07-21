@@ -3,13 +3,33 @@ name = "torchrir"
 version = "0.8.1"
 description = "PyTorch-based room impulse response (RIR) simulation toolkit for static and dynamic scenes."
 readme = "README.md"
-requires-python = ">=3.11,<3.12"
+requires-python = ">=3.11,<3.14"
 dependencies = [
   "numpy>=2.2.6",
   "torch>=2.10.0",
   "scipy>=1.14.0",
-  "soundfile>=0.13.1",
+]
+
+[project.optional-dependencies]
+audio = ["soundfile>=0.13.1"]
+viz = [
+  "matplotlib>=3.10.8",
+  "pillow>=11.2.1",
   "scienceplots>=2.1.1",
+]
+datasets = [
+  "matplotlib>=3.10.8",
+  "pillow>=11.2.1",
+  "scienceplots>=2.1.1",
+  "soundfile>=0.13.1",
+]
+oobss = ["oobss>=0.1.0"]
+all = [
+  "matplotlib>=3.10.8",
+  "oobss>=0.1.0",
+  "pillow>=11.2.1",
+  "scienceplots>=2.1.1",
+  "soundfile>=0.13.1",
 ]
 
 [project.urls]
@@ -34,7 +54,8 @@ docs = [
   "mkdocs-autorefs>=1.4.0",
   "pymdown-extensions>=10.16.0",
 ]
-test = ["pyroomacoustics>=0.9.0", "pytest>=9.0.2"]
+test = ["pytest>=9.0.2", "soundfile>=0.13.1"]
+comparison = ["pyroomacoustics>=0.9.0"]
 
 [tool.commitizen]
 name = "cz_conventional_commits"

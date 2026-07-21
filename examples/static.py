@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """Static CMU ARCTIC example (fixed sources + fixed mic array).
 
 This script:
@@ -18,25 +16,16 @@ Outputs (default `--out-dir outputs`):
   - static.gif (and static_3d.gif if 3D)
 """
 
+from __future__ import annotations
+
 import argparse
 import random
-import sys
 from pathlib import Path
 
 import torch
 
-try:
-    from torchrir import MicrophoneArray, Room, Source
-    from torchrir.logging import LoggingConfig, get_logger, setup_logging
-except ModuleNotFoundError:  # allow running without installation
-    ROOT = Path(__file__).resolve().parents[1]
-    sys.path.insert(0, str(ROOT / "src"))
-    from torchrir import MicrophoneArray, Room, Source
-    from torchrir.logging import LoggingConfig, get_logger, setup_logging
-
-EXAMPLES_DIR = Path(__file__).resolve().parent
-if str(EXAMPLES_DIR) not in sys.path:
-    sys.path.insert(0, str(EXAMPLES_DIR))
+from torchrir import MicrophoneArray, Room, Source, StaticScene
+from torchrir.config import SimulationConfig
 from torchrir.datasets import (
     CmuArcticDataset,
     attribution_for,
@@ -44,9 +33,10 @@ from torchrir.datasets import (
     load_dataset_sources,
 )
 from torchrir.geometry import arrays, sampling
-from torchrir.io import save_attribution_file, save_scene_audio, save_scene_metadata
+from torchrir.io import save_attribution_file, save_result_metadata, save_scene_audio
+from torchrir.logging import LoggingConfig, get_logger, setup_logging
 from torchrir.signal import convolve_rir
-from torchrir.sim import simulate_rir
+from torchrir.sim import simulate
 from torchrir.util import add_output_args, resolve_device
 from torchrir.viz import save_scene_gifs, save_scene_plots
 
@@ -210,14 +200,16 @@ def main() -> None:
         )
 
     # ISM simulation + convolution.
-    rirs = simulate_rir(
-        room=room,
-        sources=sources,
-        mics=mics,
-        max_order=args.order,
-        tmax=args.tmax,
-        device=device,
+    scene = StaticScene(room=room, sources=sources, mics=mics)
+    result = simulate(
+        scene,
+        SimulationConfig(
+            max_order=args.order,
+            tmax=args.tmax,
+            device=device,
+        ),
     )
+    rirs = result.rirs
 
     y_static = convolve_rir(signals, rirs)
 
@@ -252,15 +244,10 @@ def main() -> None:
         audio_name="static.wav",
         logger=logger,
     )
-    metadata = save_scene_metadata(
+    save_result_metadata(
         out_dir=args.out_dir,
         metadata_name="static_metadata.json",
-        room=room,
-        sources=sources,
-        mics=mics,
-        rirs=rirs,
-        src_traj=None,
-        mic_traj=None,
+        result=result,
         signal_len=signals.shape[1],
         source_info=info,
         extra={

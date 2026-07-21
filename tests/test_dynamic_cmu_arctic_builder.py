@@ -147,8 +147,8 @@ def test_dynamic_cmu_arctic_builder_calls_video_save(
 
     assert len(calls) == 1
     call = calls[0]
-    assert (dataset_root / "scene_0000") == call["out_dir"]
-    assert (dataset_root / "scene_0000" / "mixture.wav") == call["mixture_path"]
+    assert cast(Path, call["out_dir"]).name == "scene_0000"
+    assert cast(Path, call["mixture_path"]).name == "mixture.wav"
     assert call["save_3d"] is False
     assert call["mp4_fps"] == pytest.approx(12.0)
     assert call["mux_audio"] is False
@@ -224,3 +224,31 @@ def test_build_layout_annotation_lines_format() -> None:
         "move:7.00-13.00 s",
         "speed:S1=0.52m/s, S2=0.80m/s",
     ]
+
+
+def test_builder_restores_existing_dataset_after_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    dataset_root = tmp_path / "out_ds"
+    dataset_root.mkdir()
+    marker = dataset_root / "keep.txt"
+    marker.write_text("original", encoding="utf-8")
+
+    def _fail_build(**kwargs):
+        staging_root = cast(Path, kwargs["dataset_root"])
+        staging_root.mkdir(parents=True)
+        (staging_root / "partial.txt").write_text("partial", encoding="utf-8")
+        raise RuntimeError("injected failure")
+
+    monkeypatch.setattr(
+        dynamic_builder, "_build_dynamic_cmu_arctic_dataset_in_place", _fail_build
+    )
+    with pytest.raises(RuntimeError, match="injected failure"):
+        build_dynamic_cmu_arctic_dataset(
+            cmu_root=tmp_path / "cmu",
+            dataset_root=dataset_root,
+            overwrite=True,
+        )
+
+    assert marker.read_text(encoding="utf-8") == "original"
+    assert not list(tmp_path.glob(".out_ds.tmp-*"))

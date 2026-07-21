@@ -44,11 +44,11 @@ See the detailed overview: [Overview](overview.md).
 
 ## Core Workflows
 ### Static room acoustic simulation
-- Compute static RIRs with `torchrir.sim.simulate_rir`.
+- Compute static and dynamic RIR results with `torchrir.sim.simulate`.
 - Convolve dry signals with `torchrir.signal.convolve_rir`.
 
 ### Dynamic room acoustic simulation
-- Compute time-varying RIRs with `torchrir.sim.simulate_dynamic_rir`.
+- Use `StaticScene` or `DynamicScene` to make geometry and time axes explicit.
 - Convolve with `torchrir.signal.DynamicConvolver(mode="trajectory")`.
 
 ### Dataset generation

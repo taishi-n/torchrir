@@ -12,8 +12,8 @@ from torchrir import (
     Source,
     StaticScene,
 )
-from torchrir.config import SimulationConfig
-from torchrir.sim import ISMSimulator
+from torchrir.config import ResolvedSimulationConfig, SimulationConfig
+from torchrir.sim import ISMSimulator, simulate
 
 
 def test_scene_validate_static():
@@ -111,12 +111,20 @@ def test_legacy_scene_rejects_half_dynamic() -> None:
     src_traj = torch.tensor([[[1.0, 1.0, 1.0]], [[1.2, 1.1, 1.0]]], dtype=torch.float32)
     with pytest.deprecated_call(match="Scene is deprecated"):
         with pytest.raises(ValueError, match="requires both src_traj and mic_traj"):
-            Scene(room=room, sources=sources, mics=mics, src_traj=src_traj, mic_traj=None)
+            Scene(
+                room=room, sources=sources, mics=mics, src_traj=src_traj, mic_traj=None
+            )
 
 
 def test_ism_simulator_rejects_missing_timing() -> None:
-    with pytest.raises(ValueError, match="tmax or nsample must be provided"):
-        ISMSimulator(max_order=1)
+    room = Room.shoebox(size=[4.0, 3.0, 2.5], fs=16000, beta=[0.9] * 6)
+    scene = StaticScene(
+        room=room,
+        sources=Source.from_positions([[1.0, 1.0, 1.0]]),
+        mics=MicrophoneArray.from_positions([[2.0, 1.5, 1.0]]),
+    )
+    with pytest.raises(ValueError, match="nsample or tmax must be provided"):
+        ISMSimulator().simulate(scene, SimulationConfig(max_order=1))
 
 
 def test_dynamic_scene_normalizes_non_tensor_traj() -> None:
@@ -154,3 +162,72 @@ def test_ism_simulator_rejects_conflicting_config_tmax() -> None:
     sim = ISMSimulator(max_order=1, tmax=0.05)
     with pytest.raises(ValueError, match="conflicting 'tmax'"):
         sim.simulate(scene, cfg)
+
+
+def test_scene_oriented_simulation_returns_effective_config() -> None:
+    room = Room.shoebox(size=[4, 3, 2], fs=8000, beta=[0.9] * 6)
+    scene = StaticScene(
+        room=room,
+        sources=Source.from_positions([[1, 1, 1]]),
+        mics=MicrophoneArray.from_positions([[2, 1, 1]]),
+    )
+    result = simulate(scene, SimulationConfig(max_order=0, nsample=128))
+    assert isinstance(result.config, ResolvedSimulationConfig)
+    assert result.config.max_order == 0
+    assert result.config.nsample == 128
+    assert result.config.fs == 8000
+    assert result.config.dtype == torch.float32
+
+
+def test_rir_result_rejects_shape_that_conflicts_with_scene() -> None:
+    room = Room.shoebox(size=[4.0, 3.0], fs=8000)
+    scene = StaticScene(
+        room=room,
+        sources=Source.from_positions([[1.0, 1.0], [1.5, 1.0]]),
+        mics=MicrophoneArray.from_positions([[2.0, 1.0]]),
+    )
+    with pytest.raises(ValueError, match="scene has 2"):
+        RIRResult(
+            rirs=torch.zeros(1, 1, 32),
+            scene=scene,
+            config=SimulationConfig(max_order=0, nsample=32),
+        )
+
+
+def test_dynamic_scene_passes_entity_orientation_to_simulator() -> None:
+    room = Room.shoebox(size=[4.0, 3.0], fs=8000, beta=[0.9] * 4)
+    sources = Source.from_positions([[1.0, 1.0]], orientation=[1.0, 0.0])
+    mics = MicrophoneArray.from_positions([[2.0, 1.0]], orientation=[-1.0, 0.0])
+    scene = DynamicScene(
+        room=room,
+        sources=sources,
+        mics=mics,
+        src_traj=[[[1.0, 1.0]], [[1.2, 1.0]]],
+        mic_traj=[[[2.0, 1.0]], [[2.0, 1.0]]],
+        timestamps=[0.0, 0.01],
+    )
+    result = simulate(
+        scene,
+        SimulationConfig(
+            max_order=0,
+            nsample=128,
+            directivity=("cardioid", "cardioid"),
+        ),
+    )
+    assert result.rirs.shape == (2, 1, 1, 128)
+    assert result.timestamps is not None
+    assert scene.timestamps is not None
+    assert torch.equal(result.timestamps, scene.timestamps)
+
+
+def test_dynamic_scene_rejects_non_monotonic_timestamps() -> None:
+    room = Room.shoebox(size=[4.0, 3.0], fs=8000, beta=[0.9] * 4)
+    with pytest.raises(ValueError, match="strictly increasing"):
+        DynamicScene(
+            room=room,
+            sources=Source.from_positions([[1.0, 1.0]]),
+            mics=MicrophoneArray.from_positions([[2.0, 1.0]]),
+            src_traj=[[[1.0, 1.0]], [[1.2, 1.0]]],
+            mic_traj=[[[2.0, 1.0]], [[2.0, 1.0]]],
+            timestamps=[0.0, 0.0],
+        )

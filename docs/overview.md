@@ -7,6 +7,8 @@
 - Acoustic parameters via `beta` or `t60` (Sabine), optional diffuse tail via `tdiff`.
 - Dynamic convolution via `torchrir.signal.DynamicConvolver` (`trajectory` or `hop` modes).
 - Explicit scene models via `torchrir.models.StaticScene` and `torchrir.models.DynamicScene`.
+- Scene-oriented simulation via `torchrir.sim.simulate(scene, config)` returning
+  an `RIRResult` with resolved settings.
 - CPU/CUDA/MPS execution with optional `torch.compile` acceleration for ISM accumulation
   (when enabled; MPS disables LUT).
 - Standard array geometries (linear, circular, polyhedron, binaural, Eigenmike)
@@ -16,7 +18,8 @@
   invalid-input handling.
 - Plotting utilities for static/dynamic scenes and GIF animation.
 - Metadata export helpers for time axis, DOA, array attributes, and trajectories (JSON-ready).
-- Explicit audio metadata I/O container via `torchrir.io.AudioData` (`load_audio_data` / `save_audio_data`).
+- Channel-preserving audio metadata I/O via `torchrir.io.AudioData`
+  (`load_audio_data` / `save_audio_data`).
 - Explicit split between WAV-only and backend-format audio I/O:
     - wav-only: `torchrir.io.load_wav` / `save_wav` / `info_wav`
     - backend-supported formats: `torchrir.io.load_audio` / `save_audio` / `info_audio`
@@ -60,17 +63,25 @@ device, dtype = DeviceSpec(device="auto").resolve()
 - `torchrir.models.Scene` is deprecated; use `StaticScene`/`DynamicScene`.
 - `DynamicScene` normalizes tensor-like trajectories to tensors during initialization.
 - `Scene.validate()` does not re-emit deprecation warnings.
-- `ISMSimulator` raises `ValueError` if `max_order` or `tmax` conflicts with the provided `SimulationConfig`.
+- `SimulationConfig` is the single source of simulation settings. Legacy
+  `ISMSimulator` constructor settings raise `ValueError` when they conflict.
 - `torchrir.load`/`save` and `torchrir.io.load`/`save`/`info` are deprecated aliases.
-- `torchrir.sim.simulate_rir`/`torchrir.sim.simulate_dynamic_rir` require `max_order`
-  (or `torchrir.config.SimulationConfig.max_order`) and either `nsample` or `tmax`.
+- `torchrir.sim.simulate` requires `SimulationConfig.max_order` and exactly one
+  of `nsample` or `tmax`.
+- `simulate_rir` and `simulate_dynamic_rir` remain Tensor-level compatibility
+  APIs. Passing individual simulation settings is deprecated until 1.0.
 - Non-`omni` directivity requires orientation; mismatched shapes raise `ValueError`.
 - `beta` must have 4 (2D) or 6 (3D) elements; invalid sizes raise `ValueError`.
 - `simulate_dynamic_rir` requires `src_traj` and `mic_traj` to have matching time steps.
+- Audio tensors are `(samples,)` for mono and channel-first
+  `(channels, samples)` for multichannel data.
 - `torchrir.signal.DynamicConvolver` with 3D dynamic RIR input (`(T, n_mic, rir_len)`) is treated as single-source only; multi-source dynamic convolution must use 4D RIR input (`(T, n_src, n_mic, rir_len)`).
-- Dynamic simulation currently loops per time step; very long trajectories can be slow.
+- Dynamic simulation batches trajectory frames, but memory and compute still grow with
+  the frame, source, microphone, and image counts.
 - MPS disables the sinc LUT path (falls back to direct sinc), which can be slower and slightly different numerically.
 - HPF requires SciPy and currently applies filtering via CPU-domain processing, which can add host/device transfer overhead on CUDA/MPS runs.
+- Very short RIRs may be too short for zero-phase HPF padding; increase the RIR
+  length or disable the high-pass filter.
 - Deterministic mode is best-effort; some backends may still be non-deterministic.
 - YAML configs require `PyYAML`; otherwise a `ModuleNotFoundError` is raised.
 - Downloading CMU ARCTIC requires network access when `download=True`; local

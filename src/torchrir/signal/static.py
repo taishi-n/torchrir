@@ -25,6 +25,14 @@ def fft_convolve(signal: Tensor, rir: Tensor) -> Tensor:
     """
     if signal.ndim != 1 or rir.ndim != 1:
         raise ValueError("fft_convolve expects 1D tensors")
+    if signal.numel() == 0 or rir.numel() == 0:
+        raise ValueError("signal and rir must be non-empty")
+    if not signal.is_floating_point() or not rir.is_floating_point():
+        raise TypeError("signal and rir must use real floating-point dtypes")
+    if signal.device != rir.device:
+        raise ValueError("signal and rir must be on the same device")
+    if signal.dtype != rir.dtype:
+        raise ValueError("signal and rir must use the same dtype")
     n = signal.numel() + rir.numel() - 1
     fft_len = 1 << (n - 1).bit_length()
     sig_f = torch.fft.rfft(signal, n=fft_len)
@@ -51,6 +59,15 @@ def convolve_rir(signal: Tensor, rirs: Tensor) -> Tensor:
     signal = _ensure_signal(signal)
     rirs = _ensure_static_rirs(rirs)
     n_src, n_mic, rir_len = rirs.shape
+
+    if signal.numel() == 0 or rir_len == 0:
+        raise ValueError("signal and rirs must be non-empty")
+    if not signal.is_floating_point() or not rirs.is_floating_point():
+        raise TypeError("signal and rirs must use real floating-point dtypes")
+    if signal.device != rirs.device:
+        raise ValueError("signal and rirs must be on the same device")
+    if signal.dtype != rirs.dtype:
+        raise ValueError("signal and rirs must use the same dtype")
 
     if signal.shape[0] not in (1, n_src):
         raise ValueError("signal source count does not match rirs")

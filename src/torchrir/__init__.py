@@ -18,7 +18,9 @@ from .models import (
 )
 
 
-def load(path: Path, *, backend: str | None = None, format: str | None = None) -> Tuple[Tensor, int]:
+def load(
+    path: Path, *, backend: str | None = None, format: str | None = None
+) -> Tuple[Tensor, int]:
     """Deprecated top-level loader. Use `torchrir.io.load_wav`/`torchrir.io.load_audio`."""
 
     warnings.warn(
@@ -57,6 +59,7 @@ def save(
         peak=peak,
         subtype=subtype,
     )
+
 
 __all__ = [
     "DynamicScene",

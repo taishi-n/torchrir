@@ -6,7 +6,7 @@ and simulator interfaces for ISM plus placeholder ray-tracing/FDTD backends.
 
 from .ism import simulate_dynamic_rir, simulate_rir
 from .directivity import directivity_gain, split_directivity
-from .simulators import ISMSimulator, RIRSimulator
+from .simulators import ISMSimulator, RIRSimulator, simulate
 
 __all__ = [
     "ISMSimulator",
@@ -14,5 +14,6 @@ __all__ = [
     "directivity_gain",
     "simulate_dynamic_rir",
     "simulate_rir",
+    "simulate",
     "split_directivity",
 ]

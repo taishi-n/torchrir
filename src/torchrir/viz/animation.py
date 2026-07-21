@@ -9,7 +9,6 @@ import subprocess
 from typing import Optional, Sequence
 
 import numpy as np
-import soundfile as sf
 import torch
 
 from .utils import (
@@ -304,6 +303,12 @@ def _add_stereo_audio_to_mp4(
     mixture_path: Path,
     audio_channels: tuple[int, int] = (0, 1),
 ) -> None:
+    try:
+        import soundfile as sf
+    except ImportError as exc:
+        raise ImportError(
+            "Audio muxing requires the 'audio' extra: pip install torchrir[audio]"
+        ) from exc
     if not video_path.exists():
         return
     if not mixture_path.exists():

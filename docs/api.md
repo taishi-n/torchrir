@@ -44,6 +44,9 @@ notice. Prefer top-level `torchrir` and documented submodules for stable use.
 
 ::: torchrir.config
 
+`SimulationConfig` contains requested values. Scene-oriented simulation stores
+the fully resolved `ResolvedSimulationConfig` in `RIRResult.config`.
+
 ### `torchrir.util`
 
 ::: torchrir.util

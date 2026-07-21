@@ -9,8 +9,21 @@ If you find bugs or have feature requests, please open an issue.
 Contributions are welcome.
 
 ## Installation
+
+TorchRIR supports Python 3.11, 3.12, and 3.13.
+
 ```bash
 pip install torchrir
+```
+
+Install only the optional features you use:
+
+```bash
+pip install "torchrir[audio]"       # SoundFile-backed audio I/O
+pip install "torchrir[viz]"         # plots, GIFs, and MP4 rendering
+pip install "torchrir[datasets]"    # dataset loaders and builders
+pip install "torchrir[oobss]"       # oobss integration
+pip install "torchrir[all]"         # all optional features
 ```
 
 ## Library Comparison
@@ -95,15 +108,17 @@ For detailed notes and equations, see
 ## Core API Overview
 - Geometry: `Room`, `Source`, `MicrophoneArray`
 - Scene models: `StaticScene`, `DynamicScene` (`Scene` is deprecated)
-- Static RIR: `torchrir.sim.simulate_rir`
-- Dynamic RIR: `torchrir.sim.simulate_dynamic_rir`
-- Simulator object: `torchrir.sim.ISMSimulator(max_order=..., tmax=... | nsample=...)`
+- Scene-oriented simulation: `torchrir.sim.simulate(scene, config)`
+- Tensor-level compatibility APIs: `torchrir.sim.simulate_rir` and
+  `torchrir.sim.simulate_dynamic_rir`
+- Simulator backend: `torchrir.sim.ISMSimulator()`
 - Dynamic convolution: `torchrir.signal.DynamicConvolver`
 - Audio I/O:
   - wav-specific: `torchrir.io.load_wav`, `torchrir.io.save_wav`, `torchrir.io.info_wav`
   - backend-supported formats: `torchrir.io.load_audio`, `torchrir.io.save_audio`, `torchrir.io.info_audio`
   - metadata-preserving: `torchrir.io.AudioData`, `torchrir.io.load_audio_data`
-- Metadata export: `torchrir.io.build_metadata`, `torchrir.io.save_metadata_json`
+- Metadata export: `torchrir.io.build_result_metadata`,
+  `torchrir.io.save_result_metadata`
 
 ## Module Layout (for contributors)
 - `torchrir.sim`: simulation backends (ISM implementation lives under `torchrir.sim.ism`)
@@ -122,23 +137,77 @@ For detailed notes and equations, see
 - `DynamicScene` accepts tensor-like trajectories (e.g., lists) and normalizes them to tensors internally.
 - `Scene` remains as a backward-compatibility wrapper and emits `DeprecationWarning`.
 - `Scene.validate()` performs validation without emitting additional deprecation warnings.
-- `ISMSimulator` fails fast when `max_order` or `tmax` conflicts with the provided `SimulationConfig`.
+- `SimulationConfig` is the single owner of simulation settings.
+- `ISMSimulator` constructor settings are deprecated and remain available until 1.0.
+- `RIRResult.config` records the resolved sample count, duration, device, dtype, and directivity.
 - Model dataclasses are frozen, but tensor payloads remain mutable (shallow immutability).
 - `torchrir.load` / `torchrir.save` and `torchrir.io.load` / `save` / `info` are deprecated compatibility aliases.
 
 ```python
-from torchrir import MicrophoneArray, Room, Source
-from torchrir.sim import simulate_rir
+from torchrir import MicrophoneArray, Room, Source, StaticScene
+from torchrir.config import SimulationConfig
+from torchrir.sim import simulate
 from torchrir.signal import DynamicConvolver
 
 room = Room.shoebox(size=[6.0, 4.0, 3.0], fs=16000, beta=[0.9] * 6)
 sources = Source.from_positions([[1.0, 2.0, 1.5]])
 mics = MicrophoneArray.from_positions([[2.0, 2.0, 1.5]])
 
-rir = simulate_rir(room=room, sources=sources, mics=mics, max_order=6, tmax=0.3)
-# For dynamic scenes, compute rirs with torchrir.sim.simulate_dynamic_rir and convolve:
-# y = DynamicConvolver(mode="trajectory").convolve(signal, rirs)
+scene = StaticScene(room=room, sources=sources, mics=mics)
+result = simulate(scene, SimulationConfig(max_order=6, tmax=0.3))
+rir = result.rirs
+# DynamicConvolver also accepts a dynamic RIRResult directly:
+# y = DynamicConvolver().convolve(signal, dynamic_result)
 ```
+
+## Specification
+
+### Geometry and scenes
+
+- Room, source, microphone, and trajectory coordinates are real floating-point
+  tensors. Integer inputs are promoted to PyTorch's default floating dtype.
+- Room coordinates are 2D or 3D. Source and microphone coordinates must lie in
+  the inclusive range `[0, room.size]`.
+- Static positions have shape `(entities, dimensions)`.
+- Dynamic trajectories have shape `(frames, entities, dimensions)`. A 2D
+  `(frames, dimensions)` trajectory is accepted for one entity.
+- `DynamicScene.sources.positions` and `mics.positions` equal the first frame of
+  their respective trajectories.
+- Dynamic timestamps, when present, are finite seconds, begin at zero, are
+  strictly increasing, and match the trajectory frame count.
+- Entity orientation is constant over a dynamic trajectory in 0.9. Time-varying
+  orientation is not yet supported.
+
+### Simulation
+
+- `SimulationConfig` owns all simulation settings. Exactly one of `tmax` and
+  `nsample` is required when a simulation is executed.
+- Static RIR tensors have shape `(sources, microphones, samples)`.
+- Dynamic RIR tensors have shape `(frames, sources, microphones, samples)`.
+- `torchrir.sim.simulate` returns `RIRResult`; its config is a
+  `ResolvedSimulationConfig` containing the effective settings.
+- Explicitly supplied device and dtype values must not conflict with config
+  values. Silent precedence is not used.
+
+### Signal and audio shapes
+
+- Signals use `(samples,)` for mono and `(channels, samples)` for multichannel
+  data.
+- Static convolution RIRs use `(sources, microphones, samples)`; dynamic
+  convolution RIRs add the leading frame dimension.
+- Signal and RIR tensors must share device and dtype.
+- `AudioData` preserves every channel. Its save API does not normalize unless
+  `normalize=True` is requested.
+- Legacy tuple loaders continue to return channel 0 for multichannel files and
+  emit a warning directing callers to `load_audio_data`.
+
+### Compatibility policy
+
+- `Scene`, top-level `load`/`save`, process-global audio backend selection,
+  `ISMSimulator` constructor settings, and per-argument simulation settings are
+  deprecated in 0.9 and scheduled for removal in 1.0.
+- Deprecated APIs remain compatibility wrappers throughout the 0.9 release
+  series and reject conflicting values instead of silently selecting one.
 
 For detailed documentation:
 [Read the Docs](https://torchrir.readthedocs.io/en/latest/)

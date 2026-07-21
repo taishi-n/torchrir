@@ -12,7 +12,9 @@ def safe_extractall(tar: tarfile.TarFile, dest: Path) -> None:
     root = dest.resolve()
     for member in tar.getmembers():
         if member.issym() or member.islnk():
-            raise ValueError(f"archive contains links, which are not allowed: {member.name}")
+            raise ValueError(
+                f"archive contains links, which are not allowed: {member.name}"
+            )
 
         target = (root / member.name).resolve()
         if os.path.commonpath([str(root), str(target)]) != str(root):

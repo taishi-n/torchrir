@@ -7,7 +7,7 @@ from typing import Optional, Tuple
 import torch
 from torch import Tensor
 
-from ...util.tensor import as_tensor
+from ...util.tensor import as_float_tensor
 
 
 def _image_source_indices(
@@ -19,7 +19,12 @@ def _image_source_indices(
 ) -> Tensor:
     """Generate image source index vectors up to the given order."""
     if nb_img is not None:
-        nb = as_tensor(nb_img, device=device, dtype=torch.int64)
+        nb_raw = as_float_tensor(nb_img, device=device, name="nb_img").reshape(-1)
+        if not torch.all(torch.isfinite(nb_raw)):
+            raise ValueError("nb_img must contain finite values")
+        if torch.any(nb_raw < 0) or torch.any(nb_raw != torch.floor(nb_raw)):
+            raise ValueError("nb_img must contain non-negative integers")
+        nb = nb_raw.to(dtype=torch.int64)
         if nb.numel() != dim:
             raise ValueError("nb_img must match room dimension")
         ranges = [torch.arange(-n, n + 1, device=device, dtype=torch.int64) for n in nb]

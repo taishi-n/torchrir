@@ -172,8 +172,15 @@ For licensing and redistribution guidance, see
 
 ## Dynamic CMU ARCTIC builder (oobss-compatible)
 
-`build_dynamic_cmu_arctic_dataset(...)` generates dynamic scenes in the layout
+`build_dynamic_cmu_arctic_dataset(...)` remains the compatibility function and
+generates dynamic scenes in the layout
 expected by `oobss` loader type `torchrir_dynamic`.
+
+New code can use `DynamicCmuArcticBuildConfig` with
+`build_dynamic_cmu_arctic(config)`. The returned `DynamicDatasetBuildResult`
+contains the output root, sample rate, microphone count, and scene paths.
+Builds are staged in a sibling temporary directory; an existing dataset is
+replaced only after every scene has completed successfully.
 
 ### Python API
 

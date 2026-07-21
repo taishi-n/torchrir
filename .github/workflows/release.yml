@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
-      - run: uv sync --all-groups
+      - run: uv sync --all-groups --all-extras
       - run: uv run git-cliff -o CHANGELOG.md
       - run: uv run mkdocs build --strict
       - uses: actions/upload-pages-artifact@v3

@@ -29,7 +29,11 @@ from .collate import CollateBatch, collate_dataset_items
 from .librispeech import LibriSpeechDataset, LibriSpeechSentence
 
 from .cmu_arctic import CmuArcticDataset, CmuArcticSentence, cmu_arctic_speakers
-from .dynamic_cmu_arctic import build_dynamic_cmu_arctic_dataset
+from .dynamic_builder import DynamicCmuArcticBuildConfig, DynamicDatasetBuildResult
+from .dynamic_cmu_arctic import (
+    build_dynamic_cmu_arctic,
+    build_dynamic_cmu_arctic_dataset,
+)
 
 __all__ = [
     "BaseDataset",
@@ -43,6 +47,7 @@ __all__ = [
     "collate_dataset_items",
     "cmu_arctic_speakers",
     "build_dynamic_cmu_arctic_dataset",
+    "build_dynamic_cmu_arctic",
     "attribution_for",
     "SentenceLike",
     "load_dataset_sources",
@@ -50,4 +55,6 @@ __all__ = [
     "save",
     "LibriSpeechDataset",
     "LibriSpeechSentence",
+    "DynamicCmuArcticBuildConfig",
+    "DynamicDatasetBuildResult",
 ]

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """Sample: build a small dynamic dataset with CMU ARCTIC or LibriSpeech.
 
 This example mirrors the high-level idea in Cross3D: generate many dynamic
@@ -33,26 +31,17 @@ Notes:
     - Reference outputs are per-source, RIR-convolved signals (premix).
 """
 
+from __future__ import annotations
+
 import argparse
 import random
-import sys
 from pathlib import Path
 from typing import List, Optional
 
 import torch
 
-try:
-    from torchrir import MicrophoneArray, Room, Source
-    from torchrir.logging import LoggingConfig, get_logger, setup_logging
-except ModuleNotFoundError:  # allow running without installation
-    ROOT = Path(__file__).resolve().parents[1]
-    sys.path.insert(0, str(ROOT / "src"))
-    from torchrir import MicrophoneArray, Room, Source
-    from torchrir.logging import LoggingConfig, get_logger, setup_logging
-
-EXAMPLES_DIR = Path(__file__).resolve().parent
-if str(EXAMPLES_DIR) not in sys.path:
-    sys.path.insert(0, str(EXAMPLES_DIR))
+from torchrir import DynamicScene, MicrophoneArray, Room, Source
+from torchrir.config import SimulationConfig
 from torchrir.datasets import (
     CmuArcticDataset,
     LibriSpeechDataset,
@@ -61,9 +50,10 @@ from torchrir.datasets import (
     load_dataset_sources,
 )
 from torchrir.geometry import arrays, sampling, trajectories
-from torchrir.io import save_attribution_file, save_scene_audio, save_scene_metadata
+from torchrir.io import save_attribution_file, save_result_metadata, save_scene_audio
+from torchrir.logging import LoggingConfig, get_logger, setup_logging
 from torchrir.signal import DynamicConvolver
-from torchrir.sim import simulate_dynamic_rir
+from torchrir.sim import simulate
 from torchrir.util import add_output_args, resolve_device
 from torchrir.viz import save_scene_gifs, save_scene_plots
 
@@ -391,16 +381,20 @@ def main() -> None:
             )
 
         # ISM simulation + dynamic convolution.
-        rirs = simulate_dynamic_rir(
+        scene = DynamicScene(
             room=room,
+            sources=sources,
+            mics=mics,
             src_traj=src_traj,
             mic_traj=mic_traj,
-            max_order=args.order,
-            tmax=args.tmax,
-            device=device,
         )
+        result = simulate(
+            scene,
+            SimulationConfig(max_order=args.order, tmax=args.tmax, device=device),
+        )
+        rirs = result.rirs
         convolver = DynamicConvolver(mode="trajectory")
-        y = convolver.convolve(signals, rirs)
+        y = convolver.convolve(signals, result)
 
         # Save per-source reference audio before mixing.
         reference_audio = []
@@ -433,15 +427,10 @@ def main() -> None:
             audio_name=f"scene_{idx:03d}.wav",
             logger=logger,
         )
-        save_scene_metadata(
+        save_result_metadata(
             out_dir=args.out_dir,
             metadata_name=f"scene_{idx:03d}_metadata.json",
-            room=room,
-            sources=sources,
-            mics=mics,
-            rirs=rirs,
-            src_traj=src_traj,
-            mic_traj=mic_traj,
+            result=result,
             signal_len=signals.shape[1],
             source_info=info,
             extra={

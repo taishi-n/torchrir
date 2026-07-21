@@ -9,12 +9,13 @@ from .acoustics import (
 from .cli import add_output_args
 from .device import DeviceSpec, infer_device_dtype, resolve_device
 from .orientation import normalize_orientation, orientation_to_unit
-from .tensor import as_tensor, ensure_dim, extend_size
+from .tensor import as_float_tensor, as_tensor, ensure_dim, extend_size
 
 __all__ = [
     "DeviceSpec",
     "add_output_args",
     "as_tensor",
+    "as_float_tensor",
     "attenuation_db_to_time_sabine",
     "ensure_dim",
     "estimate_beta_from_t60",

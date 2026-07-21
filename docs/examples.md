@@ -304,9 +304,9 @@ uv run python examples/build_dynamic_dataset.py \
 The example is implemented in `examples/build_dynamic_dataset.py` and uses:
 
 - `torchrir.datasets.load_dataset_sources` to build fixed-length signals from multiple utterances.
-- `torchrir.sim.simulate_dynamic_rir` to generate the dynamic RIR sequence.
+- `torchrir.sim.simulate` with a `DynamicScene` to generate an `RIRResult`.
 - `torchrir.signal.DynamicConvolver(mode="trajectory")` to produce the final mixture.
-- `save_scene_audio` + `save_scene_metadata` to store scene metadata (kept as separate calls).
+- `save_scene_audio` + `save_result_metadata` to store audio and result metadata.
   Metadata includes a `reference_audio` list describing the saved `scene_k_refXX.wav` files
   (each entry corresponds to a single source convolved with its dynamic RIR), plus
   `dataset_license` and `modifications` fields for attribution tracking.

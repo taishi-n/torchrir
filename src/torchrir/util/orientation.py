@@ -7,9 +7,12 @@ from torch import Tensor
 
 
 def normalize_orientation(orientation: Tensor, *, eps: float = 1e-8) -> Tensor:
-    """Normalize orientation vectors with numerical stability."""
+    """Normalize non-zero orientation vectors."""
     norm = torch.linalg.norm(orientation, dim=-1, keepdim=True)
-    norm = torch.clamp(norm, min=eps)
+    if torch.any(~torch.isfinite(norm)):
+        raise ValueError("orientation must contain finite values")
+    if torch.any(norm <= eps):
+        raise ValueError("orientation vectors must be non-zero")
     return orientation / norm
 
 

@@ -2,15 +2,15 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, fields, is_dataclass
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Mapping, Optional
 
 import json
 import torch
 from torch import Tensor
 
-from ..models import MicrophoneArray, Room, Source
+from ..models import DynamicScene, MicrophoneArray, RIRResult, Room, Source
 
 
 @dataclass(frozen=True)
@@ -135,6 +135,40 @@ def build_metadata(
     return metadata
 
 
+def build_result_metadata(
+    result: RIRResult,
+    *,
+    signal_len: int | None = None,
+    source_info: Any = None,
+    extra: Mapping[str, Any] | None = None,
+) -> Dict[str, Any]:
+    """Build metadata from a scene-oriented simulation result."""
+
+    scene = result.scene
+    if not hasattr(scene, "room"):
+        raise TypeError("result.scene must expose room, sources, and mics")
+    src_traj = scene.src_traj if isinstance(scene, DynamicScene) else None
+    mic_traj = scene.mic_traj if isinstance(scene, DynamicScene) else None
+    metadata = build_metadata(
+        room=scene.room,
+        sources=scene.sources,
+        mics=scene.mics,
+        rirs=result.rirs,
+        src_traj=src_traj,
+        mic_traj=mic_traj,
+        timestamps=result.timestamps,
+        signal_len=signal_len,
+        source_info=source_info,
+        extra=dict(extra) if extra is not None else None,
+    )
+    metadata["simulation"] = {
+        "backend": result.backend,
+        "config": _to_serializable(result.config),
+        "seed": result.seed,
+    }
+    return metadata
+
+
 def save_metadata_json(path: Path, metadata: Dict[str, Any]) -> None:
     """Save metadata as JSON to the given path.
 
@@ -211,9 +245,16 @@ def _to_serializable(value: Any) -> Any:
         return None
     if torch.is_tensor(value):
         return value.detach().cpu().tolist()
+    if isinstance(value, (torch.device, torch.dtype)):
+        return str(value)
     if isinstance(value, Path):
         return str(value)
-    if isinstance(value, dict):
+    if is_dataclass(value) and not isinstance(value, type):
+        return {
+            item.name: _to_serializable(getattr(value, item.name))
+            for item in fields(value)
+        }
+    if isinstance(value, Mapping):
         return {k: _to_serializable(v) for k, v in value.items()}
     if isinstance(value, (list, tuple)):
         return [_to_serializable(v) for v in value]

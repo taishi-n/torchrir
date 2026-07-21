@@ -1,5 +1,7 @@
-import torch
+from typing import Any, cast
+
 import pytest
+import torch
 
 from torchrir import MicrophoneArray, Room, Source
 from torchrir.config import SimulationConfig
@@ -151,6 +153,20 @@ def test_simulate_dynamic_rir_accepts_nb_img():
     assert rirs.shape == (2, 1, 1, 256)
 
 
+def test_simulation_rejects_fractional_nb_img() -> None:
+    room = Room.shoebox(size=[5.0, 4.0, 3.0], fs=16000, beta=[0.9] * 6)
+    with pytest.raises(ValueError, match="non-negative integers"):
+        simulate_rir(
+            room=room,
+            sources=Source.from_positions([[1.0, 1.0, 1.0]]),
+            mics=MicrophoneArray.from_positions([[2.0, 1.0, 1.0]]),
+            max_order=0,
+            nb_img=cast(Any, (0.5, 0, 0)),
+            nsample=32,
+            config=SimulationConfig(rir_hpf_enable=False),
+        )
+
+
 def test_simulate_rir_hpf_changes_output_when_enabled():
     pytest.importorskip("scipy.signal")
 
@@ -182,3 +198,16 @@ def test_simulate_rir_hpf_changes_output_when_enabled():
 
     assert rir_no_hpf.shape == rir_hpf.shape
     assert not torch.allclose(rir_no_hpf, rir_hpf)
+
+
+def test_simulate_rir_reports_short_hpf_input_clearly() -> None:
+    pytest.importorskip("scipy.signal")
+    room = Room.shoebox(size=[5.0, 4.0, 3.0], fs=16000)
+    with pytest.raises(ValueError, match="too short"):
+        simulate_rir(
+            room=room,
+            sources=Source.from_positions([[1.0, 1.0, 1.0]]),
+            mics=MicrophoneArray.from_positions([[2.0, 1.0, 1.0]]),
+            max_order=0,
+            nsample=4,
+        )

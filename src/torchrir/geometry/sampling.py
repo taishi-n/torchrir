@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import random
+import math
 from typing import List
 
 import torch
 from torch import Tensor
+
+from ..util.tensor import as_float_tensor
 
 
 def sample_positions(
@@ -15,8 +18,14 @@ def sample_positions(
     room_size: Tensor,
     rng: random.Random,
     margin: float = 0.5,
+    device: torch.device | str | None = None,
+    dtype: torch.dtype | None = None,
 ) -> Tensor:
     """Sample random positions within a room with a safety margin."""
+    room_size = as_float_tensor(
+        room_size, device=device, dtype=dtype, name="room_size"
+    ).reshape(-1)
+    _validate_sampling_bounds(num=num, room_size=room_size, margin=margin)
     dim = room_size.numel()
     low = [margin] * dim
     high = [float(room_size[i].item()) - margin for i in range(dim)]
@@ -24,7 +33,9 @@ def sample_positions(
     for _ in range(num):
         point = [rng.uniform(low[i], high[i]) for i in range(dim)]
         coords.append(point)
-    return torch.tensor(coords, dtype=torch.float32)
+    if not coords:
+        return torch.empty((0, dim), device=room_size.device, dtype=room_size.dtype)
+    return torch.tensor(coords, device=room_size.device, dtype=room_size.dtype)
 
 
 def sample_positions_with_z_range(
@@ -34,18 +45,32 @@ def sample_positions_with_z_range(
     rng: random.Random,
     z_range: tuple[float, float] = (1.5, 1.8),
     margin: float = 0.5,
+    device: torch.device | str | None = None,
+    dtype: torch.dtype | None = None,
 ) -> Tensor:
     """Sample random positions with an explicit z-range constraint."""
-    positions = sample_positions(num=num, room_size=room_size, rng=rng, margin=margin)
+    room_size = as_float_tensor(
+        room_size, device=device, dtype=dtype, name="room_size"
+    ).reshape(-1)
+    positions = sample_positions(
+        num=num,
+        room_size=room_size,
+        rng=rng,
+        margin=margin,
+        device=room_size.device,
+        dtype=room_size.dtype,
+    )
     if room_size.numel() < 3:
         return positions
     z_min, z_max = z_range
     z_low = max(margin, float(z_min))
     z_high = min(float(room_size[2].item()) - margin, float(z_max))
     if z_high <= z_low:
-        return positions
+        raise ValueError("z_range has no feasible values inside the room margin")
     z_vals = [rng.uniform(z_low, z_high) for _ in range(num)]
-    positions[:, 2] = torch.tensor(z_vals, dtype=positions.dtype)
+    positions[:, 2] = torch.tensor(
+        z_vals, device=positions.device, dtype=positions.dtype
+    )
     return positions
 
 
@@ -59,12 +84,26 @@ def sample_positions_min_distance(
     z_range: tuple[float, float] | None = (1.5, 1.8),
     margin: float = 0.5,
     max_attempts: int = 1000,
+    device: torch.device | str | None = None,
+    dtype: torch.dtype | None = None,
 ) -> Tensor:
     """Sample random positions with a minimum distance from a center point."""
+    room_size = as_float_tensor(
+        room_size, device=device, dtype=dtype, name="room_size"
+    ).reshape(-1)
+    _validate_sampling_bounds(num=num, room_size=room_size, margin=margin)
+    if not math.isfinite(min_distance) or min_distance < 0:
+        raise ValueError("min_distance must be non-negative")
+    if max_attempts <= 0:
+        raise ValueError("max_attempts must be positive")
     dim = room_size.numel()
-    center = center.to(dtype=torch.float32).reshape(-1)
+    center = as_float_tensor(
+        center, device=room_size.device, dtype=room_size.dtype, name="center"
+    ).reshape(-1)
     if center.numel() != dim:
         raise ValueError("center dimension must match room_size.")
+    if not torch.all(torch.isfinite(center)):
+        raise ValueError("center must contain finite values")
     low = [margin] * dim
     high = [float(room_size[i].item()) - margin for i in range(dim)]
     coords: List[List[float]] = []
@@ -76,20 +115,44 @@ def sample_positions_min_distance(
             z_min, z_max = z_range
             z_low = max(margin, float(z_min))
             z_high = min(float(room_size[2].item()) - margin, float(z_max))
-            if z_high > z_low:
-                point[2] = rng.uniform(z_low, z_high)
-        dist = torch.linalg.norm(torch.tensor(point) - center).item()
+            if not math.isfinite(z_low) or not math.isfinite(z_high) or z_high <= z_low:
+                raise ValueError(
+                    "z_range has no feasible values inside the room margin"
+                )
+            point[2] = rng.uniform(z_low, z_high)
+        point_t = torch.tensor(point, device=center.device, dtype=center.dtype)
+        dist = torch.linalg.vector_norm(point_t - center).item()
         if dist >= min_distance:
             coords.append(point)
     if len(coords) < num:
         raise RuntimeError("failed to sample positions with requested minimum distance")
-    return torch.tensor(coords, dtype=torch.float32)
+    if not coords:
+        return torch.empty((0, dim), device=room_size.device, dtype=room_size.dtype)
+    return torch.tensor(coords, device=room_size.device, dtype=room_size.dtype)
 
 
 def clamp_positions(
     positions: Tensor, room_size: Tensor, margin: float = 0.1
 ) -> Tensor:
     """Clamp positions to remain inside the room with a margin."""
+    if not math.isfinite(margin) or margin < 0:
+        raise ValueError("margin must be non-negative")
+    room_size = room_size.to(device=positions.device, dtype=positions.dtype)
+    if torch.any(room_size <= 2 * margin):
+        raise ValueError("margin leaves no feasible space inside the room")
     min_v = torch.full_like(room_size, margin)
     max_v = room_size - margin
     return torch.max(torch.min(positions, max_v), min_v)
+
+
+def _validate_sampling_bounds(*, num: int, room_size: Tensor, margin: float) -> None:
+    if num < 0:
+        raise ValueError("num must be non-negative")
+    if room_size.ndim != 1 or room_size.numel() not in (2, 3):
+        raise ValueError("room_size must be a 1D tensor of length 2 or 3")
+    if not torch.all(torch.isfinite(room_size)) or torch.any(room_size <= 0):
+        raise ValueError("room_size must contain finite positive values")
+    if not math.isfinite(margin) or margin < 0:
+        raise ValueError("margin must be non-negative")
+    if torch.any(room_size <= 2 * margin):
+        raise ValueError("margin leaves no feasible sampling range")

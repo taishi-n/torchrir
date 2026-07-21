@@ -3,28 +3,28 @@
 from __future__ import annotations
 
 from typing import Optional, Tuple
+import warnings
 
 import torch
 from torch import Tensor
 
 from ...config import SimulationConfig
-from ..directivity import split_directivity
 from ...models import MicrophoneArray, Room, Source
-from ...util.orientation import orientation_to_unit
 from .accumulate import _accumulate_rir_batch
+from .context import prepare_ism_context, prepare_source_directions
 from .contributions import (
     _compute_image_contributions_batch,
     _compute_image_contributions_time_batch,
 )
 from .diffuse import _apply_diffuse_tail
-from .helpers import _resolve_beta, _validate_beta
 from .hpf import apply_rir_hpf
-from .images import _image_source_indices, _reflection_coefficients
 from .prepare import _prepare_dynamic_tensors, _prepare_static_tensors
 from .validate import (
     _resolve_config,
     _validate_dynamic_args,
+    _validate_config_for_room,
     _validate_pos_shapes,
+    _validate_positions_in_room,
     _validate_static_args,
     _validate_traj_shapes,
 )
@@ -35,25 +35,43 @@ def simulate_rir(
     room: Room,
     sources: Source | Tensor,
     mics: MicrophoneArray | Tensor,
-    max_order: int | None,
+    max_order: int | None = None,
     nb_img: Optional[Tensor | Tuple[int, ...]] = None,
     nsample: Optional[int] = None,
     tmax: Optional[float] = None,
     tdiff: Optional[float] = None,
-    directivity: str | tuple[str, str] | None = "omni",
-    orientation: Optional[Tensor | tuple[Tensor, Tensor]] = None,
+    directivity: str | tuple[str, str] | None = None,
+    orientation: Optional[Tensor | tuple[Optional[Tensor], Optional[Tensor]]] = None,
     config: Optional[SimulationConfig] = None,
     device: Optional[torch.device | str] = None,
     dtype: Optional[torch.dtype] = None,
 ) -> Tensor:
     """Simulate a static RIR using the image source method."""
-    cfg, device, max_order, tmax, directivity = _resolve_config(
+    _warn_legacy_settings(
+        max_order, nb_img, nsample, tmax, tdiff, directivity, device, dtype
+    )
+    (
+        cfg,
+        device,
+        max_order,
+        nsample,
+        tmax,
+        tdiff,
+        directivity,
+        dtype,
+        nb_img,
+    ) = _resolve_config(
         config=config,
         device=device,
         max_order=max_order,
+        nsample=nsample,
         tmax=tmax,
+        tdiff=tdiff,
         directivity=directivity,
+        dtype=dtype,
+        nb_img=nb_img,
     )
+    _validate_config_for_room(cfg, room)
     nsample = _validate_static_args(
         room=room, nsample=nsample, tmax=tmax, max_order=max_order
     )
@@ -75,43 +93,38 @@ def simulate_rir(
         dtype=dtype,
     )
     _validate_pos_shapes(src_pos, mic_pos, dim)
+    _validate_positions_in_room(src_pos, room_size, name="source positions")
+    _validate_positions_in_room(mic_pos, room_size, name="microphone positions")
 
-    beta = _resolve_beta(room, room_size, device=device, dtype=dtype)
-    beta = _validate_beta(beta, dim)
-
-    n_vec = _image_source_indices(max_order, dim, device=device, nb_img=nb_img)
-    refl = _reflection_coefficients(n_vec, beta)
-
-    src_pattern, mic_pattern = split_directivity(directivity)
-    mic_dir = None
-    if mic_pattern != "omni":
-        if mic_ori is None:
-            raise ValueError("mic orientation required for non-omni directivity")
-        mic_dir = orientation_to_unit(mic_ori, dim)
+    context = prepare_ism_context(
+        room=room,
+        room_size=room_size,
+        dim=dim,
+        device=device,
+        dtype=dtype,
+        max_order=max_order,
+        nb_img=nb_img,
+        directivity=directivity,
+        microphone_orientation=mic_ori,
+        config=cfg,
+    )
 
     n_src = src_pos.shape[0]
     n_mic = mic_pos.shape[0]
     rir = torch.zeros((n_src, n_mic, nsample), device=device, dtype=dtype)
-    fdl = cfg.frac_delay_length
-    fdl2 = (fdl - 1) // 2
-    img_chunk = cfg.image_chunk_size
+    fdl2 = context.fractional_delay_half_length
+    img_chunk = context.image_chunk_size
     if img_chunk <= 0:
-        img_chunk = n_vec.shape[0]
+        img_chunk = context.image_indices.shape[0]
 
-    src_dirs = None
-    if src_pattern != "omni":
-        if src_ori is None:
-            raise ValueError("source orientation required for non-omni directivity")
-        src_dirs = orientation_to_unit(src_ori, dim)
-        if src_dirs.ndim == 1:
-            src_dirs = src_dirs.unsqueeze(0).repeat(n_src, 1)
-        if src_dirs.ndim != 2 or src_dirs.shape[0] != n_src:
-            raise ValueError("source orientation must match number of sources")
+    src_dirs = prepare_source_directions(
+        src_ori, pattern=context.source_pattern, dim=dim, count=n_src
+    )
 
-    for start in range(0, n_vec.shape[0], img_chunk):
-        end = min(start + img_chunk, n_vec.shape[0])
-        n_vec_chunk = n_vec[start:end]
-        refl_chunk = refl[start:end]
+    for start in range(0, context.image_indices.shape[0], img_chunk):
+        end = min(start + img_chunk, context.image_indices.shape[0])
+        n_vec_chunk = context.image_indices[start:end]
+        refl_chunk = context.reflection_coefficients[start:end]
         sample_chunk, attenuation_chunk = _compute_image_contributions_batch(
             src_pos,
             mic_pos,
@@ -120,15 +133,20 @@ def simulate_rir(
             refl_chunk,
             room,
             fdl2,
-            src_pattern=src_pattern,
-            mic_pattern=mic_pattern,
+            src_pattern=context.source_pattern,
+            mic_pattern=context.microphone_pattern,
             src_dirs=src_dirs,
-            mic_dir=mic_dir,
+            mic_dir=context.microphone_directions,
         )
         _accumulate_rir_batch(rir, sample_chunk, attenuation_chunk, cfg)
 
-    if tdiff is not None and tmax is not None and tdiff < tmax:
-        rir = _apply_diffuse_tail(rir, room, beta, tdiff, tmax, seed=cfg.seed)
+    duration = nsample / room.fs
+    if tdiff is not None:
+        if tdiff >= duration:
+            raise ValueError("tdiff must be smaller than the RIR duration")
+        rir = _apply_diffuse_tail(
+            rir, room, context.beta, tdiff, duration, seed=cfg.seed
+        )
     rir = apply_rir_hpf(rir, room.fs, cfg)
     return rir
 
@@ -138,24 +156,43 @@ def simulate_dynamic_rir(
     room: Room,
     src_traj: Tensor,
     mic_traj: Tensor,
-    max_order: int | None,
+    max_order: int | None = None,
     nb_img: Optional[Tensor | Tuple[int, ...]] = None,
     nsample: Optional[int] = None,
     tmax: Optional[float] = None,
-    directivity: str | tuple[str, str] | None = "omni",
-    orientation: Optional[Tensor | tuple[Tensor, Tensor]] = None,
+    tdiff: Optional[float] = None,
+    directivity: str | tuple[str, str] | None = None,
+    orientation: Optional[Tensor | tuple[Optional[Tensor], Optional[Tensor]]] = None,
     config: Optional[SimulationConfig] = None,
     device: Optional[torch.device | str] = None,
     dtype: Optional[torch.dtype] = None,
 ) -> Tensor:
     """Simulate time-varying RIRs for source/mic trajectories."""
-    cfg, device, max_order, tmax, directivity = _resolve_config(
+    _warn_legacy_settings(
+        max_order, nb_img, nsample, tmax, tdiff, directivity, device, dtype
+    )
+    (
+        cfg,
+        device,
+        max_order,
+        nsample,
+        tmax,
+        tdiff,
+        directivity,
+        dtype,
+        nb_img,
+    ) = _resolve_config(
         config=config,
         device=device,
         max_order=max_order,
+        nsample=nsample,
         tmax=tmax,
+        tdiff=tdiff,
         directivity=directivity,
+        dtype=dtype,
+        nb_img=nb_img,
     )
+    _validate_config_for_room(cfg, room)
     nsample = _validate_dynamic_args(
         room=room, nsample=nsample, tmax=tmax, max_order=max_order
     )
@@ -177,44 +214,40 @@ def simulate_dynamic_rir(
         dtype=dtype,
     )
     _validate_traj_shapes(src_traj, mic_traj, dim)
+    _validate_positions_in_room(src_traj, room_size, name="src_traj")
+    _validate_positions_in_room(mic_traj, room_size, name="mic_traj")
 
-    beta = _resolve_beta(room, room_size, device=device, dtype=dtype)
-    beta = _validate_beta(beta, dim)
-    n_vec = _image_source_indices(max_order, dim, device=device, nb_img=nb_img)
-    refl = _reflection_coefficients(n_vec, beta)
-
-    src_pattern, mic_pattern = split_directivity(directivity)
-    mic_dir = None
-    if mic_pattern != "omni":
-        if mic_ori is None:
-            raise ValueError("mic orientation required for non-omni directivity")
-        mic_dir = orientation_to_unit(mic_ori, dim)
+    context = prepare_ism_context(
+        room=room,
+        room_size=room_size,
+        dim=dim,
+        device=device,
+        dtype=dtype,
+        max_order=max_order,
+        nb_img=nb_img,
+        directivity=directivity,
+        microphone_orientation=mic_ori,
+        config=cfg,
+    )
 
     n_src = src_traj.shape[1]
     n_mic = mic_traj.shape[1]
     rirs = torch.zeros(
         (src_traj.shape[0], n_src, n_mic, nsample), device=device, dtype=dtype
     )
-    fdl = cfg.frac_delay_length
-    fdl2 = (fdl - 1) // 2
-    img_chunk = cfg.image_chunk_size
+    fdl2 = context.fractional_delay_half_length
+    img_chunk = context.image_chunk_size
     if img_chunk <= 0:
-        img_chunk = n_vec.shape[0]
+        img_chunk = context.image_indices.shape[0]
 
-    src_dirs = None
-    if src_pattern != "omni":
-        if src_ori is None:
-            raise ValueError("source orientation required for non-omni directivity")
-        src_dirs = orientation_to_unit(src_ori, dim)
-        if src_dirs.ndim == 1:
-            src_dirs = src_dirs.unsqueeze(0).repeat(n_src, 1)
-        if src_dirs.ndim != 2 or src_dirs.shape[0] != n_src:
-            raise ValueError("source orientation must match number of sources")
+    src_dirs = prepare_source_directions(
+        src_ori, pattern=context.source_pattern, dim=dim, count=n_src
+    )
 
-    for start in range(0, n_vec.shape[0], img_chunk):
-        end = min(start + img_chunk, n_vec.shape[0])
-        n_vec_chunk = n_vec[start:end]
-        refl_chunk = refl[start:end]
+    for start in range(0, context.image_indices.shape[0], img_chunk):
+        end = min(start + img_chunk, context.image_indices.shape[0])
+        n_vec_chunk = context.image_indices[start:end]
+        refl_chunk = context.reflection_coefficients[start:end]
         sample_chunk, attenuation_chunk = _compute_image_contributions_time_batch(
             src_traj,
             mic_traj,
@@ -223,10 +256,10 @@ def simulate_dynamic_rir(
             refl_chunk,
             room,
             fdl2,
-            src_pattern=src_pattern,
-            mic_pattern=mic_pattern,
+            src_pattern=context.source_pattern,
+            mic_pattern=context.microphone_pattern,
             src_dirs=src_dirs,
-            mic_dir=mic_dir,
+            mic_dir=context.microphone_directions,
         )
         t_steps = src_traj.shape[0]
         sample_flat = sample_chunk.reshape(t_steps * n_src, n_mic, -1)
@@ -234,5 +267,22 @@ def simulate_dynamic_rir(
         rir_flat = rirs.view(t_steps * n_src, n_mic, nsample)
         _accumulate_rir_batch(rir_flat, sample_flat, attenuation_flat, cfg)
 
+    duration = nsample / room.fs
+    if tdiff is not None:
+        if tdiff >= duration:
+            raise ValueError("tdiff must be smaller than the RIR duration")
+        rirs = _apply_diffuse_tail(
+            rirs, room, context.beta, tdiff, duration, seed=cfg.seed
+        )
     rirs = apply_rir_hpf(rirs, room.fs, cfg)
     return rirs
+
+
+def _warn_legacy_settings(*values: object) -> None:
+    if any(value is not None for value in values):
+        warnings.warn(
+            "Passing simulation settings as individual arguments is deprecated "
+            "and will be removed in TorchRIR 1.0. Use SimulationConfig.",
+            DeprecationWarning,
+            stacklevel=3,
+        )

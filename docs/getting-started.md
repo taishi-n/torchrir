@@ -11,8 +11,10 @@ All code blocks on this page are sourced from `examples/getting_started.py`.
 
 ## Install
 
+Use Python 3.11, 3.12, or 3.13.
+
 ```bash
-pip install torchrir
+pip install "torchrir[audio,viz,datasets]"
 ```
 
 ## 0) Common Setup (Dataset + Geometry Constraints)

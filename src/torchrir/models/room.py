@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
+import math
 from typing import Optional, Sequence
 
 import torch
 from torch import Tensor
 
-from ..util.tensor import as_tensor, ensure_dim
+from ..util.tensor import as_float_tensor, ensure_dim
 
 
 @dataclass(frozen=True)
@@ -29,22 +30,24 @@ class Room:
 
     def __post_init__(self) -> None:
         """Validate room size and reflection parameters."""
-        size = ensure_dim(self.size)
+        size = ensure_dim(as_float_tensor(self.size, name="room size"))
         if not torch.all(torch.isfinite(size)):
             raise ValueError("room size must contain finite values")
         if torch.any(size <= 0):
             raise ValueError("room size must be strictly positive")
         object.__setattr__(self, "size", size)
-        if self.fs <= 0:
+        if not math.isfinite(self.fs) or self.fs <= 0:
             raise ValueError("fs must be positive")
-        if self.c <= 0:
+        if not math.isfinite(self.c) or self.c <= 0:
             raise ValueError("c must be positive")
         if self.beta is not None and self.t60 is not None:
             raise ValueError("beta and t60 are mutually exclusive")
-        if self.t60 is not None and self.t60 <= 0:
+        if self.t60 is not None and (not math.isfinite(self.t60) or self.t60 <= 0):
             raise ValueError("t60 must be positive")
         if self.beta is not None:
-            beta = as_tensor(self.beta, dtype=size.dtype).view(-1)
+            beta = as_float_tensor(
+                self.beta, device=size.device, dtype=size.dtype, name="beta"
+            ).view(-1)
             expected = 4 if size.numel() == 2 else 6
             if beta.numel() != expected:
                 raise ValueError(
@@ -78,11 +81,11 @@ class Room:
             room = Room.shoebox(size=[6.0, 4.0, 3.0], fs=16000, beta=[0.9] * 6)
             ```
         """
-        size_t = as_tensor(size, device=device, dtype=dtype)
+        size_t = as_float_tensor(size, device=device, dtype=dtype, name="room size")
         size_t = ensure_dim(size_t)
         beta_t = None
         if beta is not None:
-            beta_t = as_tensor(beta, device=device, dtype=dtype)
+            beta_t = as_float_tensor(beta, device=device, dtype=dtype, name="beta")
         return Room(size=size_t, fs=fs, c=c, beta=beta_t, t60=t60)
 
 
@@ -103,7 +106,12 @@ class Source:
         pos = _normalize_entity_positions(self.positions, name="source")
         object.__setattr__(self, "positions", pos)
         ori = _normalize_entity_orientation(
-            self.orientation, n_entities=pos.shape[0], dim=pos.shape[1], name="source"
+            self.orientation,
+            n_entities=pos.shape[0],
+            dim=pos.shape[1],
+            name="source",
+            device=pos.device,
+            dtype=pos.dtype,
         )
         if ori is not None:
             object.__setattr__(self, "orientation", ori)
@@ -122,10 +130,14 @@ class Source:
         dtype: Optional[torch.dtype] = None,
     ) -> "Source":
         """Convert positions/orientation to tensors and build a Source."""
-        pos = as_tensor(positions, device=device, dtype=dtype)
+        pos = as_float_tensor(
+            positions, device=device, dtype=dtype, name="source positions"
+        )
         ori = None
         if orientation is not None:
-            ori = as_tensor(orientation, device=device, dtype=dtype)
+            ori = as_float_tensor(
+                orientation, device=device, dtype=dtype, name="source orientation"
+            )
         return cls(pos, ori)
 
 
@@ -146,7 +158,12 @@ class MicrophoneArray:
         pos = _normalize_entity_positions(self.positions, name="mic")
         object.__setattr__(self, "positions", pos)
         ori = _normalize_entity_orientation(
-            self.orientation, n_entities=pos.shape[0], dim=pos.shape[1], name="mic"
+            self.orientation,
+            n_entities=pos.shape[0],
+            dim=pos.shape[1],
+            name="mic",
+            device=pos.device,
+            dtype=pos.dtype,
         )
         if ori is not None:
             object.__setattr__(self, "orientation", ori)
@@ -165,10 +182,17 @@ class MicrophoneArray:
         dtype: Optional[torch.dtype] = None,
     ) -> "MicrophoneArray":
         """Convert positions/orientation to tensors and build a MicrophoneArray."""
-        pos = as_tensor(positions, device=device, dtype=dtype)
+        pos = as_float_tensor(
+            positions, device=device, dtype=dtype, name="microphone positions"
+        )
         ori = None
         if orientation is not None:
-            ori = as_tensor(orientation, device=device, dtype=dtype)
+            ori = as_float_tensor(
+                orientation,
+                device=device,
+                dtype=dtype,
+                name="microphone orientation",
+            )
         return cls(pos, ori)
 
 
@@ -178,11 +202,17 @@ def _validate_orientation(
     if not torch.all(torch.isfinite(orientation)):
         raise ValueError(f"{name} orientation must contain finite values")
 
+    def require_nonzero_vectors(vectors: Tensor) -> None:
+        if torch.any(torch.linalg.vector_norm(vectors, dim=-1) <= 1.0e-8):
+            raise ValueError(f"{name} orientation vectors must be non-zero")
+
     if dim == 2:
         if orientation.ndim == 0:
             return
         if orientation.ndim == 1:
             if orientation.numel() in (1, 2, n_entities):
+                if orientation.numel() == 2:
+                    require_nonzero_vectors(orientation)
                 return
             raise ValueError(
                 f"{name} orientation for 2D must be angle, 2D vector, or per-entity angles"
@@ -192,12 +222,16 @@ def _validate_orientation(
                 raise ValueError(
                     f"{name} orientation for 2D must have shape (n, 1) or (n, 2)"
                 )
+            if orientation.shape[1] == 2:
+                require_nonzero_vectors(orientation)
             return
         raise ValueError(f"{name} orientation for 2D has unsupported shape")
 
     if dim == 3:
         if orientation.ndim == 1:
             if orientation.numel() in (2, 3):
+                if orientation.numel() == 3:
+                    require_nonzero_vectors(orientation)
                 return
             raise ValueError(
                 f"{name} orientation for 3D must be a 3D vector or (azimuth, elevation)"
@@ -207,16 +241,20 @@ def _validate_orientation(
                 raise ValueError(
                     f"{name} orientation for 3D must have shape (n, 2) or (n, 3)"
                 )
+            if orientation.shape[1] == 3:
+                require_nonzero_vectors(orientation)
             return
         raise ValueError(f"{name} orientation for 3D has unsupported shape")
 
 
 def _normalize_entity_positions(positions: Tensor, *, name: str) -> Tensor:
-    pos = as_tensor(positions)
+    pos = as_float_tensor(positions, name=f"{name} positions")
     if pos.ndim == 1:
         pos = pos.unsqueeze(0)
     if pos.ndim != 2 or pos.shape[1] not in (2, 3):
         raise ValueError(f"{name} positions must have shape (n, 2) or (n, 3)")
+    if pos.shape[0] == 0:
+        raise ValueError(f"{name} positions must contain at least one entity")
     if not torch.all(torch.isfinite(pos)):
         raise ValueError(f"{name} positions must contain finite values")
     return pos
@@ -228,9 +266,16 @@ def _normalize_entity_orientation(
     n_entities: int,
     dim: int,
     name: str,
+    device: torch.device,
+    dtype: torch.dtype,
 ) -> Optional[Tensor]:
     if orientation is None:
         return None
-    ori = as_tensor(orientation)
+    ori = as_float_tensor(
+        orientation,
+        device=device,
+        dtype=dtype,
+        name=f"{name} orientation",
+    )
     _validate_orientation(ori, n_entities=n_entities, dim=dim, name=name)
     return ori

@@ -7,6 +7,8 @@ import torch
 
 import torchrir
 from torchrir.io import (
+    AudioData,
+    AudioInfo,
     get_audio_backend,
     info,
     info_audio,
@@ -149,3 +151,29 @@ def test_top_level_load_save_are_deprecated(tmp_path: Path) -> None:
         loaded, loaded_fs = torchrir.load(path)
     assert loaded_fs == fs
     assert loaded.ndim == 1
+
+
+@pytest.mark.parametrize("channels", [2, 32, 64])
+def test_audio_data_preserves_channel_first_audio(
+    tmp_path: Path, channels: int
+) -> None:
+    fs = 8000
+    audio = torch.linspace(-0.25, 0.25, 128).repeat(channels, 1)
+    path = tmp_path / f"channels_{channels}.wav"
+    save_audio_data(path, AudioData(audio=audio, sample_rate=fs))
+    loaded = load_audio_data(path)
+    assert loaded.audio.shape == (channels, 128)
+    assert torch.allclose(loaded.audio, audio, atol=5e-5, rtol=5e-5)
+
+
+def test_audio_data_save_does_not_normalize_by_default(tmp_path: Path) -> None:
+    audio = torch.full((64,), 0.25)
+    path = tmp_path / "not_normalized.wav"
+    save_audio_data(path, AudioData(audio=audio, sample_rate=8000))
+    loaded = load_audio_data(path)
+    assert torch.max(torch.abs(loaded.audio)).item() == pytest.approx(0.25, abs=5e-5)
+
+
+def test_audio_public_exports_are_complete() -> None:
+    assert AudioInfo.__name__ in torchrir.io.__all__
+    assert "save_attribution_file" in torchrir.io.__all__

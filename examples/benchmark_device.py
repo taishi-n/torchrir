@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """CPU vs GPU benchmark for RIR simulation and dynamic convolution.
 
 This script measures average per-run latency for:
@@ -10,23 +8,18 @@ It prints average milliseconds and speedup ratios. Use --dynamic to benchmark
 trajectory-mode RIRs and convolution.
 """
 
+from __future__ import annotations
+
 import argparse
-import sys
 import time
-from pathlib import Path
 
 import torch
 
-try:
-    from torchrir import MicrophoneArray, Room, Source
-    from torchrir.logging import LoggingConfig, get_logger, setup_logging
-except ModuleNotFoundError:  # allow running without installation
-    ROOT = Path(__file__).resolve().parents[1]
-    sys.path.insert(0, str(ROOT / "src"))
-    from torchrir import MicrophoneArray, Room, Source
-    from torchrir.logging import LoggingConfig, get_logger, setup_logging
+from torchrir import DynamicScene, MicrophoneArray, Room, Source, StaticScene
+from torchrir.config import SimulationConfig
+from torchrir.logging import LoggingConfig, get_logger, setup_logging
 from torchrir.signal import DynamicConvolver
-from torchrir.sim import simulate_dynamic_rir, simulate_rir
+from torchrir.sim import simulate
 from torchrir.util import resolve_device
 
 
@@ -39,11 +32,11 @@ def _bench_once(device: torch.device, repeats: int) -> float:
         for y in (1.5, 2.5, 3.5, 4.5):
             mic_grid.append([x, y, 1.2])
     mics = MicrophoneArray.from_positions(mic_grid)
+    scene = StaticScene(room=room, sources=sources, mics=mics)
+    config = SimulationConfig(max_order=12, tmax=0.8, device=device)
 
     # Warmup
-    simulate_rir(
-        room=room, sources=sources, mics=mics, max_order=12, tmax=0.8, device=device
-    )
+    simulate(scene, config)
     if device.type == "cuda":
         torch.cuda.synchronize()
     if device.type == "mps":
@@ -51,9 +44,7 @@ def _bench_once(device: torch.device, repeats: int) -> float:
 
     start = time.perf_counter()
     for _ in range(repeats):
-        simulate_rir(
-            room=room, sources=sources, mics=mics, max_order=12, tmax=0.8, device=device
-        )
+        simulate(scene, config)
     if device.type == "cuda":
         torch.cuda.synchronize()
     if device.type == "mps":
@@ -73,23 +64,21 @@ def _bench_dynamic(device: torch.device, repeats: int) -> float:
     mics = MicrophoneArray.from_positions(mic_grid)
     steps = 24
     src_traj = sources.positions.unsqueeze(0).repeat(steps, 1, 1)
-    mic_start = torch.tensor([2.0, 1.0, 1.2])
-    mic_end = torch.tensor([4.0, 3.0, 1.2])
-    mic_traj = torch.stack(
-        [mic_start + (mic_end - mic_start) * t / (steps - 1) for t in range(steps)],
-        dim=0,
-    ).unsqueeze(1)
+    displacement_end = torch.tensor([0.5, 0.5, 0.0])
+    displacement = torch.linspace(0.0, 1.0, steps)[:, None] * displacement_end
+    mic_traj = mics.positions.unsqueeze(0) + displacement[:, None, :]
     signal = torch.randn(1, 16000, device=device)
-
-    rirs = simulate_dynamic_rir(
+    scene = DynamicScene(
         room=room,
+        sources=sources,
+        mics=mics,
         src_traj=src_traj,
         mic_traj=mic_traj,
-        max_order=10,
-        tmax=0.8,
-        device=device,
     )
-    DynamicConvolver(mode="trajectory").convolve(signal, rirs)
+    config = SimulationConfig(max_order=10, tmax=0.8, device=device)
+
+    result = simulate(scene, config)
+    DynamicConvolver(mode="trajectory").convolve(signal, result)
     if device.type == "cuda":
         torch.cuda.synchronize()
     if device.type == "mps":
@@ -97,15 +86,8 @@ def _bench_dynamic(device: torch.device, repeats: int) -> float:
 
     start = time.perf_counter()
     for _ in range(repeats):
-        rirs = simulate_dynamic_rir(
-            room=room,
-            src_traj=src_traj,
-            mic_traj=mic_traj,
-            max_order=10,
-            tmax=0.8,
-            device=device,
-        )
-        DynamicConvolver(mode="trajectory").convolve(signal, rirs)
+        result = simulate(scene, config)
+        DynamicConvolver(mode="trajectory").convolve(signal, result)
     if device.type == "cuda":
         torch.cuda.synchronize()
     if device.type == "mps":

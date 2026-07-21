@@ -39,7 +39,8 @@ def _design_hpf_sos(fs: float, fc: float, kwargs: dict[str, Any]) -> np.ndarray:
 
 def apply_rir_hpf(rir: Tensor, fs: float, cfg: SimulationConfig) -> Tensor:
     """Apply pyroomacoustics-style IIR high-pass filtering to RIRs."""
-    if not cfg.rir_hpf_enable:
+    hpf = cfg.high_pass
+    if not hpf.enabled:
         return rir
 
     try:
@@ -50,8 +51,16 @@ def apply_rir_hpf(rir: Tensor, fs: float, cfg: SimulationConfig) -> Tensor:
             "Install scipy or disable the HPF."
         ) from exc
 
-    sos = _design_hpf_sos(fs, cfg.rir_hpf_fc, cfg.rir_hpf_kwargs)
+    sos = _design_hpf_sos(fs, hpf.cutoff_hz, hpf.as_scipy_kwargs())
     rir_np = rir.detach().cpu().to(torch.float64).numpy()
-    filtered = sosfiltfilt(sos, rir_np, axis=-1)
+    try:
+        filtered = sosfiltfilt(sos, rir_np, axis=-1)
+    except ValueError as exc:
+        if "padlen" not in str(exc):
+            raise
+        raise ValueError(
+            "RIR sample count is too short for the configured high-pass filter; "
+            "increase nsample/tmax or disable the RIR high-pass filter"
+        ) from exc
     filtered = np.ascontiguousarray(filtered)
     return torch.as_tensor(filtered, device=rir.device, dtype=rir.dtype)

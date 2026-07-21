@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Any, Optional, Tuple
 import warnings
 
 import torch
@@ -18,6 +18,16 @@ class AudioData:
     sample_rate: int
     format: Optional[str] = None
     subtype: Optional[str] = None
+
+    def __post_init__(self) -> None:
+        if self.audio.ndim not in (1, 2):
+            raise ValueError(
+                "AudioData.audio must have shape (samples,) or (channels, samples)"
+            )
+        if self.audio.shape[-1] == 0:
+            raise ValueError("AudioData.audio must contain at least one sample")
+        if self.sample_rate <= 0:
+            raise ValueError("AudioData.sample_rate must be positive")
 
 
 @dataclass(frozen=True)
@@ -33,20 +43,14 @@ class AudioInfo:
 
 
 def _load_audio_data(path: Path, *, caller: str) -> AudioData:
-    """Load an audio file and return explicit audio + metadata."""
-    import soundfile as sf
+    """Load an audio file while preserving all channels."""
+    sf = _soundfile()
 
     info = sf.info(str(path))
     audio, sample_rate = sf.read(str(path), dtype="float32", always_2d=True)
-    audio_t = torch.from_numpy(audio)
-    if audio_t.shape[1] > 1:
-        warnings.warn(
-            f"{caller} received {audio_t.shape[1]} channels; using channel 0 only.",
-            RuntimeWarning,
-        )
-        audio_t = audio_t[:, 0]
-    else:
-        audio_t = audio_t.squeeze(1)
+    audio_t = torch.from_numpy(audio).transpose(0, 1).contiguous()
+    if audio_t.shape[0] == 1:
+        audio_t = audio_t.squeeze(0)
     return AudioData(
         audio=audio_t,
         sample_rate=sample_rate,
@@ -58,7 +62,16 @@ def _load_audio_data(path: Path, *, caller: str) -> AudioData:
 def _load_audio(path: Path, *, caller: str) -> Tuple[torch.Tensor, int]:
     """Load an audio file and return mono audio and sample rate."""
     data = _load_audio_data(path, caller=caller)
-    return data.audio, data.sample_rate
+    audio = data.audio
+    if audio.ndim == 2:
+        warnings.warn(
+            f"{caller} received {audio.shape[0]} channels; using channel 0 only. "
+            "Use load_audio_data() to preserve all channels.",
+            RuntimeWarning,
+            stacklevel=3,
+        )
+        audio = audio[0]
+    return audio, data.sample_rate
 
 
 def load_audio_data(path: Path) -> AudioData:
@@ -101,13 +114,23 @@ def _save_audio(
     audio: torch.Tensor,
     sample_rate: int,
     *,
-    normalize: bool = True,
+    normalize: bool = False,
     peak: float = 1.0,
     subtype: str | None = None,
 ) -> None:
     """Save a mono or multi-channel audio file to disk."""
-    import soundfile as sf
+    sf = _soundfile()
 
+    if audio.ndim not in (1, 2):
+        raise ValueError(
+            "audio must have shape (samples,) or channel-first (channels, samples)"
+        )
+    if audio.shape[-1] == 0:
+        raise ValueError("audio must contain at least one sample")
+    if sample_rate <= 0:
+        raise ValueError("sample_rate must be positive")
+    if not torch.all(torch.isfinite(audio)):
+        raise ValueError("audio must contain finite values")
     audio = audio.detach().cpu().to(torch.float32)
     if normalize:
         if peak <= 0:
@@ -115,7 +138,7 @@ def _save_audio(
         max_val = float(audio.abs().max().item()) if audio.numel() else 0.0
         if max_val > 0:
             audio = audio / max_val * peak
-    if audio.ndim == 2 and audio.shape[0] <= 8:
+    if audio.ndim == 2:
         audio = audio.transpose(0, 1)
     if subtype is None:
         # Backward-compatible fallback for tensors that carry custom attrs.
@@ -188,7 +211,7 @@ def save_audio_data(
     path: Path,
     data: AudioData,
     *,
-    normalize: bool = True,
+    normalize: bool = False,
     peak: float = 1.0,
     subtype: str | None = None,
 ) -> None:
@@ -205,7 +228,7 @@ def save_audio_data(
 
 def info_audio(path: Path) -> AudioInfo:
     """Return metadata for an audio file (wav/flac/other supported by soundfile)."""
-    import soundfile as sf
+    sf = _soundfile()
 
     info = sf.info(str(path))
     return AudioInfo(
@@ -216,3 +239,13 @@ def info_audio(path: Path) -> AudioInfo:
         subtype=info.subtype,
         duration=float(info.duration),
     )
+
+
+def _soundfile() -> Any:
+    try:
+        import soundfile
+    except ImportError as exc:
+        raise ImportError(
+            "Audio I/O requires the 'audio' extra: pip install torchrir[audio]"
+        ) from exc
+    return soundfile

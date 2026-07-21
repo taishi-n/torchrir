@@ -3,8 +3,7 @@ name: ci
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
+    branches: [main]
     paths:
       - ".github/workflows/ci.yml"
       - "pyproject.toml"
@@ -12,10 +11,11 @@ on:
       - "src/**"
       - "tests/**"
       - "docs/**"
+      - "examples/**"
+      - "mkdocs.yml"
       - "README.md"
   pull_request:
-    branches:
-      - main
+    branches: [main]
     paths:
       - ".github/workflows/ci.yml"
       - "pyproject.toml"
@@ -23,30 +23,45 @@ on:
       - "src/**"
       - "tests/**"
       - "docs/**"
+      - "examples/**"
+      - "mkdocs.yml"
       - "README.md"
 
 jobs:
-  lint-type-test:
-    name: Lint + Type + Tests (CPU)
+  test:
+    name: Tests (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --group test --extra audio --extra viz
+      - run: uv run pytest -q
 
+  quality:
+    name: Lint, type, docs, comparisons, and wheel
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-
       - uses: astral-sh/setup-uv@v5
-
-      - name: Install dependencies
-        run: uv sync --all-groups
-
-      - name: Ruff
-        run: uv run ruff check src tests docs
-
-      - name: Ty
-        run: uv run ty check
-
-      - name: Pytest
-        run: uv run pytest -q
+      - run: uv sync --all-groups --all-extras
+      - run: uv run ruff format --check .
+      - run: uv run ruff check .
+      - run: uv run ty check
+      - run: uv run pytest -q tests/test_compare_pyroomacoustics.py
+      - run: uv run mkdocs build --strict
+      - run: uv build
+      - run: uv venv /tmp/torchrir-wheel-smoke
+      - run: uv pip install --python /tmp/torchrir-wheel-smoke/bin/python dist/*.whl
+      - run: /tmp/torchrir-wheel-smoke/bin/python -c "import torchrir; from torchrir.sim import simulate"

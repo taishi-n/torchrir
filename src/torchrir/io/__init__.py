@@ -18,8 +18,13 @@ from .audio import (
     load_audio_data,
     save_audio_data,
 )
-from .metadata import build_metadata, save_metadata_json
-from .outputs import save_attribution_file, save_scene_audio, save_scene_metadata
+from .metadata import build_metadata, build_result_metadata, save_metadata_json
+from .outputs import (
+    save_attribution_file,
+    save_result_metadata,
+    save_scene_audio,
+    save_scene_metadata,
+)
 
 
 @dataclass(frozen=True)
@@ -78,12 +83,21 @@ def get_audio_backend() -> str:
 
 
 def set_audio_backend(name: str) -> None:
-    """Set the default audio backend."""
+    """Set the process-wide default audio backend.
+
+    Deprecated: pass ``backend=`` to each I/O call instead.
+    """
 
     if name not in _AUDIO_BACKENDS:
         raise ValueError(
             f"Unknown audio backend '{name}'. Available: {sorted(_AUDIO_BACKENDS)}"
         )
+    warnings.warn(
+        "set_audio_backend() is deprecated and will be removed in TorchRIR 1.0; "
+        "pass backend= to each I/O call.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     global _DEFAULT_AUDIO_BACKEND
     _DEFAULT_AUDIO_BACKEND = name
 
@@ -283,6 +297,7 @@ __all__ = [
     "AudioData",
     "AudioInfo",
     "build_metadata",
+    "build_result_metadata",
     "get_audio_backend",
     "info",
     "info_audio",
@@ -299,30 +314,7 @@ __all__ = [
     "save_metadata_json",
     "save_scene_audio",
     "save_scene_metadata",
-    "save_wav",
-    "set_audio_backend",
-]
-
-
-__all__ = [
-    "AudioData",
-    "AudioBackend",
-    "build_metadata",
-    "get_audio_backend",
-    "info",
-    "info_audio",
-    "info_wav",
-    "list_audio_backends",
-    "load",
-    "load_audio",
-    "load_audio_data",
-    "load_wav",
-    "save_scene_audio",
-    "save_scene_metadata",
-    "save_audio",
-    "save_audio_data",
-    "save_metadata_json",
-    "save",
+    "save_result_metadata",
     "save_wav",
     "set_audio_backend",
 ]

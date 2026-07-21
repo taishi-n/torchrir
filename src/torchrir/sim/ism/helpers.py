@@ -10,12 +10,12 @@ from torch import Tensor
 from ...models import MicrophoneArray, Room, Source
 from ...util.acoustics import estimate_beta_from_t60
 from ...util.orientation import normalize_orientation, orientation_to_unit
-from ...util.tensor import as_tensor
+from ...util.tensor import as_float_tensor
 
 
 def _prepare_entities(
     entities: Source | MicrophoneArray | Tensor,
-    orientation: Optional[Tensor | tuple[Tensor, Tensor]],
+    orientation: Optional[Tensor | tuple[Optional[Tensor], Optional[Tensor]]],
     *,
     which: str,
     device: Optional[torch.device | str],
@@ -35,9 +35,11 @@ def _prepare_entities(
             ori = orientation[0] if which == "source" else orientation[1]
         else:
             ori = orientation
-    pos = as_tensor(pos, device=device, dtype=dtype)
+    pos = as_float_tensor(pos, device=device, dtype=dtype, name=f"{which} positions")
     if ori is not None:
-        ori = as_tensor(ori, device=device, dtype=dtype)
+        ori = as_float_tensor(
+            ori, device=device, dtype=dtype, name=f"{which} orientation"
+        )
     return pos, ori
 
 
@@ -46,7 +48,9 @@ def _resolve_beta(
 ) -> Tensor:
     """Resolve reflection coefficients from beta/t60/defaults."""
     if room.beta is not None:
-        return as_tensor(room.beta, device=device, dtype=dtype)
+        return as_float_tensor(
+            room.beta, device=device, dtype=dtype, name="reflection coefficients"
+        )
     if room.t60 is not None:
         return estimate_beta_from_t60(room_size, room.t60, device=device, dtype=dtype)
     dim = room_size.numel()

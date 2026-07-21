@@ -9,11 +9,10 @@ import logging
 
 from torch import Tensor
 
-from .audio import save
-from .metadata import build_metadata, save_metadata_json
+from .metadata import build_metadata, build_result_metadata, save_metadata_json
 
 if TYPE_CHECKING:
-    from ..models import MicrophoneArray, Room, Source
+    from ..models import MicrophoneArray, RIRResult, Room, Source
 
 
 def save_scene_audio(
@@ -25,9 +24,11 @@ def save_scene_audio(
     logger: Optional[logging.Logger] = None,
 ) -> Path:
     """Save scene audio to the output directory."""
+    from . import save_wav
+
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / audio_name
-    save(out_path, audio, fs)
+    save_wav(out_path, audio, fs)
     if logger is not None:
         logger.info("saved: %s", out_path)
     return out_path
@@ -112,6 +113,31 @@ def save_scene_metadata(
     save_metadata_json(meta_path, metadata)
     if logger is not None:
         logger.info("saved: %s", meta_path)
+    return metadata
+
+
+def save_result_metadata(
+    *,
+    out_dir: Path,
+    result: "RIRResult",
+    metadata_name: str = "metadata.json",
+    signal_len: Optional[int] = None,
+    source_info: Optional[Any] = None,
+    extra: Optional[dict[str, Any]] = None,
+    logger: Optional[logging.Logger] = None,
+) -> dict[str, Any]:
+    """Build and save metadata from an RIRResult."""
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    metadata = build_result_metadata(
+        result,
+        signal_len=signal_len,
+        source_info=source_info,
+        extra=extra,
+    )
+    save_metadata_json(out_dir / metadata_name, metadata)
+    if logger is not None:
+        logger.info("saved: %s", out_dir / metadata_name)
     return metadata
 
 

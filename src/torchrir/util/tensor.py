@@ -11,7 +11,14 @@ from .device import resolve_device
 
 
 def as_tensor(
-    value: Tensor | Iterable[float] | Iterable[Iterable[float]] | float | int,
+    value: (
+        Tensor
+        | Iterable[float]
+        | Iterable[Iterable[float]]
+        | Iterable[Iterable[Iterable[float]]]
+        | float
+        | int
+    ),
     *,
     device: Optional[torch.device | str] = None,
     dtype: Optional[torch.dtype] = None,
@@ -27,6 +34,37 @@ def as_tensor(
             out = out.to(dtype)
         return out
     return torch.as_tensor(value, device=device, dtype=dtype)
+
+
+def as_float_tensor(
+    value: (
+        Tensor
+        | Iterable[float]
+        | Iterable[Iterable[float]]
+        | Iterable[Iterable[Iterable[float]]]
+        | float
+        | int
+    ),
+    *,
+    device: Optional[torch.device | str] = None,
+    dtype: Optional[torch.dtype] = None,
+    name: str = "value",
+) -> Tensor:
+    """Convert numeric input to a real floating-point tensor.
+
+    Integer inputs are promoted to PyTorch's default floating dtype when no
+    dtype is requested. Explicit non-floating and complex dtypes are rejected
+    because the geometry and acoustic kernels require real floating values.
+    """
+
+    out = as_tensor(value, device=device, dtype=dtype)
+    if out.is_complex():
+        raise TypeError(f"{name} must use a real floating-point dtype")
+    if not out.is_floating_point():
+        if dtype is not None:
+            raise TypeError(f"{name} dtype must be floating-point")
+        out = out.to(dtype=torch.get_default_dtype())
+    return out
 
 
 def ensure_dim(size: Tensor) -> Tensor:

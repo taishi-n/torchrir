@@ -16,23 +16,26 @@ by ``oobss.experiments.dataset.create_loader({"type": "torchrir_dynamic", ...})`
 from __future__ import annotations
 
 import argparse
+from dataclasses import fields
 import json
 import logging
 from pathlib import Path
 import random
 import shutil
+import tempfile
 from typing import Sequence
 
 import numpy as np
-import soundfile as sf
 import torch
 
 from .cmu_arctic import CmuArcticDataset
+from .dynamic_builder import DynamicCmuArcticBuildConfig, DynamicDatasetBuildResult
+from ..config import SimulationConfig
 from ..geometry import polyhedron_array
-from ..io import save_scene_metadata
-from ..models import MicrophoneArray, Room, Source
+from ..io import save_result_metadata
+from ..models import DynamicScene, MicrophoneArray, Room, Source
 from ..signal import DynamicConvolver
-from ..sim import simulate_dynamic_rir
+from ..sim import simulate
 from ..viz import save_scene_layout_images, save_scene_videos
 
 LOGGER = logging.getLogger(__name__)
@@ -449,6 +452,7 @@ def build_dynamic_cmu_arctic_dataset(
     mic_center: Sequence[float] | np.ndarray = (4.0, 3.0, 1.5),
     octa_edge_m: float = 1.0,
     source_margin: Sequence[float] | np.ndarray = (0.5, 0.5, 0.3),
+    min_source_distance_m: float = 1.8,
     trajectory_steps: int = 1024,
     rir_samples: int = 4096,
     rt60: float = 0.3,
@@ -471,7 +475,155 @@ def build_dynamic_cmu_arctic_dataset(
     annotate_source_indices: bool = True,
     logger: logging.Logger | None = None,
 ) -> tuple[int, int]:
-    """Build a dynamic CMU ARCTIC dataset with oobss-compatible layout."""
+    """Build a dataset through a staging directory and replace atomically."""
+
+    dataset_root = Path(dataset_root)
+    if dataset_root.exists() and not overwrite:
+        raise FileExistsError(
+            f"Dataset root already exists: {dataset_root}. Use overwrite=True."
+        )
+    dataset_root.parent.mkdir(parents=True, exist_ok=True)
+    staging_parent = Path(
+        tempfile.mkdtemp(prefix=f".{dataset_root.name}.tmp-", dir=dataset_root.parent)
+    )
+    staging_root = staging_parent / "dataset"
+    try:
+        result = _build_dynamic_cmu_arctic_dataset_in_place(
+            cmu_root=cmu_root,
+            dataset_root=staging_root,
+            speakers=speakers,
+            n_scenes=n_scenes,
+            n_sources=n_sources,
+            n_moving_sources=n_moving_sources,
+            duration_sec=duration_sec,
+            room_size=room_size,
+            mic_center=mic_center,
+            octa_edge_m=octa_edge_m,
+            source_margin=source_margin,
+            min_source_distance_m=min_source_distance_m,
+            trajectory_steps=trajectory_steps,
+            rir_samples=rir_samples,
+            rt60=rt60,
+            sound_speed=sound_speed,
+            max_order=max_order,
+            seed=seed,
+            download_cmu=download_cmu,
+            randomize_mic_center=randomize_mic_center,
+            move_start_ratio=move_start_ratio,
+            move_end_ratio=move_end_ratio,
+            moving_speed_min=moving_speed_min,
+            moving_speed_max=moving_speed_max,
+            save_layout_mp4=save_layout_mp4,
+            save_layout_mp4_3d=save_layout_mp4_3d,
+            layout_video_fps=layout_video_fps,
+            layout_video_mux_audio=layout_video_mux_audio,
+            save_layout_images=save_layout_images,
+            save_layout_images_3d=save_layout_images_3d,
+            annotate_source_indices=annotate_source_indices,
+            logger=logger,
+        )
+        _commit_staged_dataset(staging_root, dataset_root, overwrite=overwrite)
+        return result
+    finally:
+        if staging_parent.exists():
+            shutil.rmtree(staging_parent)
+
+
+def build_dynamic_cmu_arctic(
+    config: DynamicCmuArcticBuildConfig,
+    *,
+    logger: logging.Logger | None = None,
+) -> DynamicDatasetBuildResult:
+    """Build a dataset from an explicit config and return artifact metadata."""
+
+    sample_rate, n_mics = build_dynamic_cmu_arctic_dataset(
+        **{item.name: getattr(config, item.name) for item in fields(config)},
+        logger=logger,
+    )
+    scene_dirs = tuple(
+        config.dataset_root / f"scene_{index:04d}" for index in range(config.n_scenes)
+    )
+    return DynamicDatasetBuildResult(
+        dataset_root=config.dataset_root,
+        sample_rate=sample_rate,
+        n_mics=n_mics,
+        n_scenes=config.n_scenes,
+        scene_dirs=scene_dirs,
+    )
+
+
+def _commit_staged_dataset(
+    staging_root: Path, dataset_root: Path, *, overwrite: bool
+) -> None:
+    if not dataset_root.exists():
+        staging_root.rename(dataset_root)
+        return
+    if not overwrite:
+        raise FileExistsError(f"Dataset root already exists: {dataset_root}")
+
+    backup_parent = Path(
+        tempfile.mkdtemp(
+            prefix=f".{dataset_root.name}.backup-", dir=dataset_root.parent
+        )
+    )
+    backup_root = backup_parent / "dataset"
+    dataset_root.rename(backup_root)
+    try:
+        staging_root.rename(dataset_root)
+    except BaseException:
+        if not dataset_root.exists() and backup_root.exists():
+            backup_root.rename(dataset_root)
+        raise
+    else:
+        shutil.rmtree(backup_root)
+    finally:
+        if backup_parent.exists():
+            shutil.rmtree(backup_parent)
+
+
+def _build_dynamic_cmu_arctic_dataset_in_place(
+    *,
+    cmu_root: Path,
+    dataset_root: Path = Path("outputs/cmu_arctic_torchrir_dynamic_dataset"),
+    speakers: Sequence[str] = DEFAULT_SPEAKERS,
+    n_scenes: int = 10,
+    n_sources: int = 3,
+    n_moving_sources: int = 1,
+    duration_sec: float = 20.0,
+    room_size: Sequence[float] | np.ndarray = (8.0, 6.0, 3.0),
+    mic_center: Sequence[float] | np.ndarray = (4.0, 3.0, 1.5),
+    octa_edge_m: float = 1.0,
+    source_margin: Sequence[float] | np.ndarray = (0.5, 0.5, 0.3),
+    min_source_distance_m: float = 1.8,
+    trajectory_steps: int = 1024,
+    rir_samples: int = 4096,
+    rt60: float = 0.3,
+    sound_speed: float = 343.0,
+    max_order: int = 6,
+    seed: int = 42,
+    download_cmu: bool = False,
+    randomize_mic_center: bool = True,
+    move_start_ratio: float = 0.35,
+    move_end_ratio: float = 0.65,
+    moving_speed_min: float = 0.3,
+    moving_speed_max: float = 0.8,
+    save_layout_mp4: bool = True,
+    save_layout_mp4_3d: bool = True,
+    layout_video_fps: float | None = None,
+    layout_video_mux_audio: bool = True,
+    save_layout_images: bool = True,
+    save_layout_images_3d: bool = True,
+    annotate_source_indices: bool = True,
+    logger: logging.Logger | None = None,
+) -> tuple[int, int]:
+    """Build a dynamic CMU ARCTIC dataset in a new staging directory."""
+    try:
+        import soundfile as sf
+    except ImportError as exc:
+        raise ImportError(
+            "Dataset building requires the 'datasets' extra: "
+            "pip install torchrir[datasets]"
+        ) from exc
     log = LOGGER if logger is None else logger
     room_size_arr = _as_triplet(room_size, name="room_size")
     mic_center_arr = _as_triplet(mic_center, name="mic_center")
@@ -496,17 +648,40 @@ def build_dynamic_cmu_arctic_dataset(
         raise ValueError("duration_sec must be > 0")
     if rir_samples <= 0:
         raise ValueError("rir_samples must be > 0")
+    if not speakers_list:
+        raise ValueError("speakers must not be empty")
+    if np.any(~np.isfinite(room_size_arr)) or np.any(room_size_arr <= 0):
+        raise ValueError("room_size must contain finite positive values")
+    if np.any(source_margin_arr < 0) or np.any(2 * source_margin_arr >= room_size_arr):
+        raise ValueError("source_margin leaves no feasible room area")
+    if not randomize_mic_center and (
+        np.any(mic_center_arr < 0) or np.any(mic_center_arr > room_size_arr)
+    ):
+        raise ValueError("mic_center must lie within room bounds")
+    if octa_edge_m <= 0:
+        raise ValueError("octa_edge_m must be > 0")
+    if rt60 <= 0:
+        raise ValueError("rt60 must be > 0")
+    if sound_speed <= 0:
+        raise ValueError("sound_speed must be > 0")
+    if max_order < 0:
+        raise ValueError("max_order must be non-negative")
+    if seed < 0:
+        raise ValueError("seed must be non-negative")
+    if not (0.0 <= move_start_ratio < move_end_ratio <= 1.0):
+        raise ValueError(
+            "motion ratios must satisfy 0 <= move_start_ratio < move_end_ratio <= 1"
+        )
+    if moving_speed_min <= 0 or moving_speed_max < moving_speed_min:
+        raise ValueError(
+            "moving speeds must satisfy 0 < moving_speed_min <= moving_speed_max"
+        )
 
-    min_source_distance_m = 1.8
+    if min_source_distance_m <= 0:
+        raise ValueError("min_source_distance_m must be > 0")
     move_start_sec = float(duration_sec) * move_start_ratio
     move_end_sec = float(duration_sec) * move_end_ratio
 
-    if dataset_root.exists():
-        if not overwrite:
-            raise FileExistsError(
-                f"Dataset root already exists: {dataset_root}. Use overwrite=True."
-            )
-        shutil.rmtree(dataset_root)
     dataset_root.mkdir(parents=True, exist_ok=True)
 
     rng = np.random.default_rng(seed)
@@ -639,14 +814,29 @@ def build_dynamic_cmu_arctic_dataset(
 
         src_traj = torch.tensor(src_traj_np, dtype=torch.float64)
         mic_traj = torch.tensor(mic_traj_np, dtype=torch.float64)
-
-        rirs = simulate_dynamic_rir(
+        sources = Source.from_positions(starts.tolist(), dtype=torch.float64)
+        timestamps = (
+            torch.arange(trajectory_steps, dtype=torch.float64)
+            * (target_samples / trajectory_steps)
+            / sample_rate
+        )
+        scene = DynamicScene(
             room=room,
+            sources=sources,
+            mics=mics,
             src_traj=src_traj,
             mic_traj=mic_traj,
-            max_order=max_order,
-            nsample=rir_samples,
+            timestamps=timestamps,
         )
+        rir_result = simulate(
+            scene,
+            SimulationConfig(
+                max_order=max_order,
+                nsample=rir_samples,
+                dtype=torch.float64,
+            ),
+        )
+        rirs = rir_result.rirs
 
         stems: list[np.ndarray] = []
         for src_idx in range(n_sources):
@@ -664,7 +854,6 @@ def build_dynamic_cmu_arctic_dataset(
         mixture_path = scene_dir / "mixture.wav"
         sf.write(mixture_path, mix, sample_rate)
 
-        sources = Source.from_positions(starts.tolist(), dtype=torch.float64)
         layout_annotation_lines = _build_layout_annotation_lines(
             scene_id=scene_id,
             move_start_sec=move_start_sec,
@@ -706,15 +895,10 @@ def build_dynamic_cmu_arctic_dataset(
                 annotation_lines=layout_annotation_lines,
             )
 
-        save_scene_metadata(
+        save_result_metadata(
             out_dir=scene_dir,
             metadata_name="metadata.json",
-            room=room,
-            sources=sources,
-            mics=mics,
-            rirs=rirs,
-            src_traj=src_traj,
-            mic_traj=mic_traj,
+            result=rir_result,
             signal_len=target_samples,
             source_info=source_info,
             extra={
@@ -812,6 +996,7 @@ def _parse_args() -> argparse.Namespace:
     parser.set_defaults(randomize_mic_center=True)
     parser.add_argument("--octa-edge-m", type=float, default=1.0)
     parser.add_argument("--source-margin", type=str, default="0.5,0.5,0.3")
+    parser.add_argument("--min-source-distance-m", type=float, default=1.8)
     parser.add_argument("--trajectory-steps", type=int, default=1024)
     parser.add_argument("--rir-samples", type=int, default=4096)
     parser.add_argument("--rt60", type=float, default=0.3)
@@ -913,6 +1098,7 @@ def main() -> None:
         mic_center=mic_center,
         octa_edge_m=float(args.octa_edge_m),
         source_margin=source_margin,
+        min_source_distance_m=float(args.min_source_distance_m),
         trajectory_steps=int(args.trajectory_steps),
         rir_samples=int(args.rir_samples),
         rt60=float(args.rt60),
