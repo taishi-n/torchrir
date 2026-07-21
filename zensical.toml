@@ -1,0 +1,61 @@
+[project]
+site_name = "TorchRIR"
+site_url = "https://taishi.org/torchrir/"
+site_description = "PyTorch-based room impulse response (RIR) simulation toolkit"
+repo_url = "https://github.com/taishi-n/torchrir"
+repo_name = "taishi-n/torchrir"
+docs_dir = "docs"
+site_dir = "site"
+use_directory_urls = false
+nav = [
+  { "Home" = "index.md" },
+  { "Getting started" = "getting-started.md" },
+  { "Overview" = "overview.md" },
+  { "Migration to 0.9" = "migration-0.9.md" },
+  { "Datasets" = "datasets.md" },
+  { "Examples" = "examples.md" },
+  { "Library Comparisons" = "comparisons.md" },
+  { "Changelog" = "changelog.md" },
+  { "API" = "api.md" },
+]
+extra_javascript = [
+  "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js",
+]
+
+[project.theme]
+variant = "modern"
+features = [
+  "navigation.tabs",
+  "navigation.sections",
+  "navigation.top",
+  "navigation.footer",
+  "content.code.copy",
+  "search.highlight",
+]
+
+[project.plugins.mkdocstrings.handlers.python]
+paths = ["src"]
+
+[project.plugins.mkdocstrings.handlers.python.options]
+members = true
+inherited_members = true
+show_source = true
+show_root_heading = true
+show_root_toc_entry = true
+separate_signature = true
+
+[project.markdown_extensions.admonition]
+[project.markdown_extensions.attr_list]
+[project.markdown_extensions.tables]
+[project.markdown_extensions.def_list]
+[project.markdown_extensions.md_in_html]
+[project.markdown_extensions.pymdownx.details]
+[project.markdown_extensions.pymdownx.superfences]
+[project.markdown_extensions.pymdownx.inlinehilite]
+[project.markdown_extensions.pymdownx.highlight]
+
+[project.markdown_extensions.pymdownx.arithmatex]
+generic = true
+
+[project.markdown_extensions.pymdownx.snippets]
+base_path = [".", "docs"]

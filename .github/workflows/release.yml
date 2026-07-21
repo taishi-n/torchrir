@@ -6,26 +6,6 @@ on:
       - "v*"
 
 jobs:
-  docs:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
-      - run: uv sync --all-groups --all-extras
-      - run: uv run git-cliff -o CHANGELOG.md
-      - run: uv run mkdocs build --strict
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: site
-          name: docs-site
-      - uses: actions/deploy-pages@v4
-        with:
-          artifact_name: docs-site
-
   pypi:
     runs-on: ubuntu-latest
     permissions:

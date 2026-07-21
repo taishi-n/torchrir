@@ -44,7 +44,7 @@ pip install "torchrir[all]"         # all optional features
 Legend: `✅` native support, `🟡` manual setup, `🚧` candidate (not yet implemented), `❌` unavailable
 
 For detailed notes and equations, see
-[Read the Docs: Library Comparisons](https://torchrir.readthedocs.io/en/latest/comparisons.html).
+[Documentation: Library Comparisons](https://taishi.org/torchrir/comparisons.html).
 
 ## CUDA CI (GitHub Actions)
 - CUDA tests run in `.github/workflows/cuda-ci.yml` on a self-hosted runner with labels:
@@ -103,7 +103,7 @@ For detailed notes and equations, see
   )
   ```
 - Full dataset usage details, expected directory layout, and invalid-input handling:
-  [Read the Docs: Datasets](https://torchrir.readthedocs.io/en/latest/datasets.html)
+  [Documentation: Datasets](https://taishi.org/torchrir/datasets.html)
 
 ## Core API Overview
 - Geometry: `Room`, `Source`, `MicrophoneArray`
@@ -210,7 +210,23 @@ rir = result.rirs
   series and reject conflicting values instead of silently selecting one.
 
 For detailed documentation:
-[Read the Docs](https://torchrir.readthedocs.io/en/latest/)
+[Documentation](https://taishi.org/torchrir/)
+
+## Documentation Development
+
+The documentation site is configured in [`zensical.toml`](zensical.toml) and
+built with [Zensical](https://zensical.org/).
+
+```bash
+uv sync --group docs
+uv run zensical serve
+```
+
+Before submitting documentation changes, run the same strict build used by CI:
+
+```bash
+uv run zensical build --strict
+```
 
 ## Future Work
 - Advanced room geometry pipeline beyond shoebox rooms (e.g., irregular polygons/meshes and boundary handling).  

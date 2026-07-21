@@ -16,7 +16,7 @@
   - `uv sync` to create/update the virtual environment
   - `uv run pytest` to run tests
   - `uv build` / `uv publish` for releases (must still support `pip install torchrir`)
-  - `uv run --group docs mkdocs build --strict` to build docs locally
+  - `uv run --group docs zensical build --strict` to build docs locally
   - `uv run ruff format .` for formatting
   - `uv run ty check` for type checking
 - `uv.lock` is committed. Update it **only** when `pyproject.toml` changes.
