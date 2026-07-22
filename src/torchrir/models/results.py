@@ -2,19 +2,17 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Optional, TYPE_CHECKING
+from dataclasses import dataclass, field
 
 import torch
 from torch import Tensor
 
-from .scene import DynamicScene, Scene, SceneLike
+from ..config import ResolvedSimulationConfig
+from ..util._dtypes import validate_supported_float_tensor
+from .scene import DynamicScene, StaticScene
 
-if TYPE_CHECKING:
-    from ..config import ResolvedSimulationConfig, SimulationConfig
 
-
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True, eq=False)
 class RIRResult:
     """Container for RIRs with metadata.
 
@@ -30,24 +28,68 @@ class RIRResult:
     """
 
     rirs: Tensor
-    scene: SceneLike
-    config: "SimulationConfig | ResolvedSimulationConfig"
-    timestamps: Optional[Tensor] = None
-    seed: Optional[int] = None
-    backend: str = "ism"
+    scene: StaticScene | DynamicScene
+    config: ResolvedSimulationConfig
+    _scene_tensor_ids: tuple[int, ...] = field(
+        init=False,
+        repr=False,
+        compare=False,
+    )
+    _scene_tensor_snapshots: tuple[Tensor, ...] = field(
+        init=False,
+        repr=False,
+        compare=False,
+    )
 
     def __post_init__(self) -> None:
-        is_dynamic = isinstance(self.scene, DynamicScene) or (
-            isinstance(self.scene, Scene) and self.scene.is_dynamic()
+        self._validate_invariants()
+        tensors = _scene_tensors(self.scene)
+        object.__setattr__(self, "_scene_tensor_ids", tuple(map(id, tensors)))
+        object.__setattr__(
+            self,
+            "_scene_tensor_snapshots",
+            tuple(tensor.detach().clone() for tensor in tensors),
         )
+
+    def validate(self) -> None:
+        """Revalidate this shallow-immutable result at a consumer boundary."""
+
+        self._validate_invariants()
+        current_tensors = _scene_tensors(self.scene)
+        modified = len(current_tensors) != len(self._scene_tensor_ids)
+        if not modified:
+            for current, identity, snapshot in zip(
+                current_tensors,
+                self._scene_tensor_ids,
+                self._scene_tensor_snapshots,
+                strict=True,
+            ):
+                if id(current) != identity or not torch.equal(current, snapshot):
+                    modified = True
+                    break
+        if modified:
+            raise ValueError(
+                "scene tensors were modified after this RIRResult was created"
+            )
+
+    def _validate_invariants(self) -> None:
+        if not isinstance(self.scene, (StaticScene, DynamicScene)):
+            raise TypeError("scene must be StaticScene or DynamicScene")
+        self.scene.validate()
+        if not isinstance(self.config, ResolvedSimulationConfig):
+            raise TypeError("config must be ResolvedSimulationConfig")
+        if not torch.is_tensor(self.rirs):
+            raise TypeError("rirs must be a Tensor")
+        is_dynamic = isinstance(self.scene, DynamicScene)
         expected_ndim = 4 if is_dynamic else 3
         if self.rirs.ndim != expected_ndim:
             raise ValueError(
                 f"rirs must be {expected_ndim}D for {type(self.scene).__name__}, "
                 f"got shape {tuple(self.rirs.shape)}"
             )
-        if not self.rirs.is_floating_point():
-            raise TypeError("rirs must use a real floating-point dtype")
+        validate_supported_float_tensor(self.rirs, name="rirs")
+        if not torch.all(torch.isfinite(self.rirs)):
+            raise ValueError("rirs must contain finite values")
         n_sources = int(self.scene.sources.positions.shape[0])
         n_mics = int(self.scene.mics.positions.shape[0])
         source_axis = 1 if is_dynamic else 0
@@ -64,33 +106,51 @@ class RIRResult:
             )
         if self.rirs.shape[-1] == 0:
             raise ValueError("rirs must contain at least one sample")
+        if self.rirs.shape[-1] != self.config.nsample:
+            raise ValueError(
+                f"rirs has {self.rirs.shape[-1]} samples, but config resolves "
+                f"to {self.config.nsample}"
+            )
+        if self.scene.room.fs != self.config.fs:
+            raise ValueError(
+                f"scene sampling rate {self.scene.room.fs} conflicts with "
+                f"config sampling rate {self.config.fs}"
+            )
+        if self.config.nb_img is not None and len(self.config.nb_img) != int(
+            self.scene.room.size.numel()
+        ):
+            raise ValueError("config nb_img dimension conflicts with the scene room")
+        if self.rirs.device != self.config.device:
+            raise ValueError(
+                f"rirs device {self.rirs.device} conflicts with config device "
+                f"{self.config.device}"
+            )
+        if self.rirs.dtype != self.config.dtype:
+            raise ValueError(
+                f"rirs dtype {self.rirs.dtype} conflicts with config dtype "
+                f"{self.config.dtype}"
+            )
         if is_dynamic:
-            if isinstance(self.scene, DynamicScene):
-                time_steps = int(self.scene.src_traj.shape[0])
-            else:
-                assert isinstance(self.scene, Scene)
-                assert self.scene.src_traj is not None
-                time_steps = int(self.scene.src_traj.shape[0])
+            assert isinstance(self.scene, DynamicScene)
+            time_steps = int(self.scene.src_traj.shape[0])
             if self.rirs.shape[0] != time_steps:
                 raise ValueError(
                     f"rirs has {self.rirs.shape[0]} frames, but scene has {time_steps}"
                 )
-        if not self.backend:
-            raise ValueError("backend must be non-empty")
-        timestamps = self.timestamps
-        if timestamps is None and isinstance(self.scene, DynamicScene):
-            timestamps = self.scene.timestamps
-            object.__setattr__(self, "timestamps", timestamps)
-        if timestamps is not None:
-            if not is_dynamic:
-                raise ValueError("timestamps are only valid for dynamic RIR results")
-            if not torch.is_tensor(timestamps):
-                raise TypeError("timestamps must be a Tensor")
-            if timestamps.ndim != 1 or timestamps.numel() != self.rirs.shape[0]:
-                raise ValueError("timestamps must match the dynamic RIR frame count")
-            if timestamps.is_complex() or not torch.all(torch.isfinite(timestamps)):
-                raise ValueError("timestamps must contain finite real values")
-            if timestamps[0].item() != 0.0:
-                raise ValueError("first timestamp must be 0")
-            if timestamps.numel() > 1 and torch.any(timestamps[1:] <= timestamps[:-1]):
-                raise ValueError("timestamps must be strictly increasing")
+
+
+def _scene_tensors(scene: StaticScene | DynamicScene) -> tuple[Tensor, ...]:
+    tensors = [
+        scene.room.size,
+        scene.sources.positions,
+        scene.mics.positions,
+    ]
+    if scene.room.beta is not None:
+        tensors.append(scene.room.beta)
+    if scene.sources.orientation is not None:
+        tensors.append(scene.sources.orientation)
+    if scene.mics.orientation is not None:
+        tensors.append(scene.mics.orientation)
+    if isinstance(scene, DynamicScene):
+        tensors.extend((scene.src_traj, scene.mic_traj))
+    return tuple(tensors)

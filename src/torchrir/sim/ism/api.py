@@ -1,15 +1,12 @@
-"""ISM API for static and dynamic RIR simulation."""
+"""Private static and dynamic image-source kernels."""
 
 from __future__ import annotations
-
-from typing import Optional, Tuple
-import warnings
 
 import torch
 from torch import Tensor
 
-from ...config import SimulationConfig
-from ...models import MicrophoneArray, Room, Source
+from ...config import ResolvedSimulationConfig
+from ...models import DynamicScene, StaticScene
 from .accumulate import _accumulate_rir_batch
 from .context import prepare_ism_context, prepare_source_directions
 from .contributions import (
@@ -18,271 +15,219 @@ from .contributions import (
 )
 from .diffuse import _apply_diffuse_tail
 from .hpf import apply_rir_hpf
+from .images import _iter_image_source_index_chunks, _reflection_coefficients
 from .prepare import _prepare_dynamic_tensors, _prepare_static_tensors
 from .validate import (
-    _resolve_config,
-    _validate_dynamic_args,
-    _validate_config_for_room,
     _validate_pos_shapes,
     _validate_positions_in_room,
-    _validate_static_args,
+    _validate_source_mic_separation,
     _validate_traj_shapes,
 )
 
 
-def simulate_rir(
-    *,
-    room: Room,
-    sources: Source | Tensor,
-    mics: MicrophoneArray | Tensor,
-    max_order: int | None = None,
-    nb_img: Optional[Tensor | Tuple[int, ...]] = None,
-    nsample: Optional[int] = None,
-    tmax: Optional[float] = None,
-    tdiff: Optional[float] = None,
-    directivity: str | tuple[str, str] | None = None,
-    orientation: Optional[Tensor | tuple[Optional[Tensor], Optional[Tensor]]] = None,
-    config: Optional[SimulationConfig] = None,
-    device: Optional[torch.device | str] = None,
-    dtype: Optional[torch.dtype] = None,
+def _simulate_static_rir(
+    scene: StaticScene,
+    config: ResolvedSimulationConfig,
 ) -> Tensor:
-    """Simulate a static RIR using the image source method."""
-    _warn_legacy_settings(
-        max_order, nb_img, nsample, tmax, tdiff, directivity, device, dtype
-    )
+    """Execute the static ISM kernel for a validated scene."""
+
+    room = scene.room
     (
-        cfg,
-        device,
-        max_order,
-        nsample,
-        tmax,
-        tdiff,
-        directivity,
-        dtype,
-        nb_img,
-    ) = _resolve_config(
-        config=config,
-        device=device,
-        max_order=max_order,
-        nsample=nsample,
-        tmax=tmax,
-        tdiff=tdiff,
-        directivity=directivity,
-        dtype=dtype,
-        nb_img=nb_img,
-    )
-    _validate_config_for_room(cfg, room)
-    nsample = _validate_static_args(
-        room=room, nsample=nsample, tmax=tmax, max_order=max_order
-    )
-    (
-        src_pos,
-        mic_pos,
-        src_ori,
-        mic_ori,
+        source_positions,
+        microphone_positions,
+        source_orientation,
+        microphone_orientation,
         room_size,
-        dim,
-        device,
-        dtype,
+        dimension,
     ) = _prepare_static_tensors(
         room=room,
-        sources=sources,
-        mics=mics,
-        orientation=orientation,
-        device=device,
-        dtype=dtype,
+        sources=scene.sources,
+        microphones=scene.mics,
+        device=config.device,
+        dtype=config.dtype,
     )
-    _validate_pos_shapes(src_pos, mic_pos, dim)
-    _validate_positions_in_room(src_pos, room_size, name="source positions")
-    _validate_positions_in_room(mic_pos, room_size, name="microphone positions")
+    _validate_pos_shapes(source_positions, microphone_positions, dimension)
+    _validate_positions_in_room(source_positions, room_size, name="source positions")
+    _validate_positions_in_room(
+        microphone_positions, room_size, name="microphone positions"
+    )
+    _validate_source_mic_separation(
+        source_positions,
+        microphone_positions,
+        min_distance=config.min_source_mic_distance,
+    )
 
     context = prepare_ism_context(
         room=room,
         room_size=room_size,
-        dim=dim,
-        device=device,
-        dtype=dtype,
-        max_order=max_order,
-        nb_img=nb_img,
-        directivity=directivity,
-        microphone_orientation=mic_ori,
-        config=cfg,
+        dim=dimension,
+        dtype=config.dtype,
+        max_order=config.max_order,
+        nb_img=config.nb_img,
+        source_directivity=scene.sources.directivity,
+        microphone_directivity=scene.mics.directivity,
+        microphone_orientation=microphone_orientation,
+        config=config,
     )
 
-    n_src = src_pos.shape[0]
-    n_mic = mic_pos.shape[0]
-    rir = torch.zeros((n_src, n_mic, nsample), device=device, dtype=dtype)
-    fdl2 = context.fractional_delay_half_length
-    img_chunk = context.image_chunk_size
-    if img_chunk <= 0:
-        img_chunk = context.image_indices.shape[0]
-
-    src_dirs = prepare_source_directions(
-        src_ori, pattern=context.source_pattern, dim=dim, count=n_src
+    n_sources = source_positions.shape[0]
+    n_microphones = microphone_positions.shape[0]
+    rir = torch.zeros(
+        (n_sources, n_microphones, config.nsample),
+        device=config.device,
+        dtype=config.dtype,
+    )
+    source_directions = prepare_source_directions(
+        source_orientation,
+        pattern=context.source_pattern,
+        dim=dimension,
+        count=n_sources,
     )
 
-    for start in range(0, context.image_indices.shape[0], img_chunk):
-        end = min(start + img_chunk, context.image_indices.shape[0])
-        n_vec_chunk = context.image_indices[start:end]
-        refl_chunk = context.reflection_coefficients[start:end]
-        sample_chunk, attenuation_chunk = _compute_image_contributions_batch(
-            src_pos,
-            mic_pos,
+    for image_indices in _iter_image_source_index_chunks(
+        context.max_order,
+        context.dimension,
+        device=config.device,
+        nb_img=context.nb_img,
+        chunk_size=context.image_chunk_size,
+    ):
+        reflection_coefficients = _reflection_coefficients(
+            image_indices,
+            context.beta,
+        )
+        sample, attenuation = _compute_image_contributions_batch(
+            source_positions,
+            microphone_positions,
             room_size,
-            n_vec_chunk,
-            refl_chunk,
+            image_indices,
+            reflection_coefficients,
             room,
-            fdl2,
             src_pattern=context.source_pattern,
             mic_pattern=context.microphone_pattern,
-            src_dirs=src_dirs,
+            src_dirs=source_directions,
             mic_dir=context.microphone_directions,
         )
-        _accumulate_rir_batch(rir, sample_chunk, attenuation_chunk, cfg)
+        _accumulate_rir_batch(rir, sample, attenuation, config)
 
-    duration = nsample / room.fs
-    if tdiff is not None:
-        if tdiff >= duration:
-            raise ValueError("tdiff must be smaller than the RIR duration")
+    if config.tdiff is not None:
         rir = _apply_diffuse_tail(
-            rir, room, context.beta, tdiff, duration, seed=cfg.seed
+            rir,
+            room_size,
+            context.beta,
+            config.tdiff,
+            config.tmax,
+            fs=room.fs,
+            c=room.c,
+            seed=config.seed,
         )
-    rir = apply_rir_hpf(rir, room.fs, cfg)
-    return rir
+    return apply_rir_hpf(rir, room.fs, config.high_pass)
 
 
-def simulate_dynamic_rir(
-    *,
-    room: Room,
-    src_traj: Tensor,
-    mic_traj: Tensor,
-    max_order: int | None = None,
-    nb_img: Optional[Tensor | Tuple[int, ...]] = None,
-    nsample: Optional[int] = None,
-    tmax: Optional[float] = None,
-    tdiff: Optional[float] = None,
-    directivity: str | tuple[str, str] | None = None,
-    orientation: Optional[Tensor | tuple[Optional[Tensor], Optional[Tensor]]] = None,
-    config: Optional[SimulationConfig] = None,
-    device: Optional[torch.device | str] = None,
-    dtype: Optional[torch.dtype] = None,
+def _simulate_dynamic_rir(
+    scene: DynamicScene,
+    config: ResolvedSimulationConfig,
 ) -> Tensor:
-    """Simulate time-varying RIRs for source/mic trajectories."""
-    _warn_legacy_settings(
-        max_order, nb_img, nsample, tmax, tdiff, directivity, device, dtype
-    )
+    """Execute the dynamic ISM kernel for a validated scene."""
+
+    room = scene.room
     (
-        cfg,
-        device,
-        max_order,
-        nsample,
-        tmax,
-        tdiff,
-        directivity,
-        dtype,
-        nb_img,
-    ) = _resolve_config(
-        config=config,
-        device=device,
-        max_order=max_order,
-        nsample=nsample,
-        tmax=tmax,
-        tdiff=tdiff,
-        directivity=directivity,
-        dtype=dtype,
-        nb_img=nb_img,
-    )
-    _validate_config_for_room(cfg, room)
-    nsample = _validate_dynamic_args(
-        room=room, nsample=nsample, tmax=tmax, max_order=max_order
-    )
-    (
-        src_traj,
-        mic_traj,
-        src_ori,
-        mic_ori,
+        source_trajectory,
+        microphone_trajectory,
+        source_orientation,
+        microphone_orientation,
         room_size,
-        dim,
-        device,
-        dtype,
+        dimension,
     ) = _prepare_dynamic_tensors(
         room=room,
-        src_traj=src_traj,
-        mic_traj=mic_traj,
-        orientation=orientation,
-        device=device,
-        dtype=dtype,
+        source_trajectory=scene.src_traj,
+        microphone_trajectory=scene.mic_traj,
+        source_orientation=scene.sources.orientation,
+        microphone_orientation=scene.mics.orientation,
+        device=config.device,
+        dtype=config.dtype,
     )
-    _validate_traj_shapes(src_traj, mic_traj, dim)
-    _validate_positions_in_room(src_traj, room_size, name="src_traj")
-    _validate_positions_in_room(mic_traj, room_size, name="mic_traj")
+    _validate_traj_shapes(source_trajectory, microphone_trajectory, dimension)
+    _validate_positions_in_room(source_trajectory, room_size, name="src_traj")
+    _validate_positions_in_room(microphone_trajectory, room_size, name="mic_traj")
+    _validate_source_mic_separation(
+        source_trajectory,
+        microphone_trajectory,
+        min_distance=config.min_source_mic_distance,
+    )
 
     context = prepare_ism_context(
         room=room,
         room_size=room_size,
-        dim=dim,
-        device=device,
-        dtype=dtype,
-        max_order=max_order,
-        nb_img=nb_img,
-        directivity=directivity,
-        microphone_orientation=mic_ori,
-        config=cfg,
+        dim=dimension,
+        dtype=config.dtype,
+        max_order=config.max_order,
+        nb_img=config.nb_img,
+        source_directivity=scene.sources.directivity,
+        microphone_directivity=scene.mics.directivity,
+        microphone_orientation=microphone_orientation,
+        config=config,
     )
 
-    n_src = src_traj.shape[1]
-    n_mic = mic_traj.shape[1]
+    time_steps, n_sources = source_trajectory.shape[:2]
+    n_microphones = microphone_trajectory.shape[1]
     rirs = torch.zeros(
-        (src_traj.shape[0], n_src, n_mic, nsample), device=device, dtype=dtype
+        (time_steps, n_sources, n_microphones, config.nsample),
+        device=config.device,
+        dtype=config.dtype,
     )
-    fdl2 = context.fractional_delay_half_length
-    img_chunk = context.image_chunk_size
-    if img_chunk <= 0:
-        img_chunk = context.image_indices.shape[0]
-
-    src_dirs = prepare_source_directions(
-        src_ori, pattern=context.source_pattern, dim=dim, count=n_src
+    source_directions = prepare_source_directions(
+        source_orientation,
+        pattern=context.source_pattern,
+        dim=dimension,
+        count=n_sources,
     )
 
-    for start in range(0, context.image_indices.shape[0], img_chunk):
-        end = min(start + img_chunk, context.image_indices.shape[0])
-        n_vec_chunk = context.image_indices[start:end]
-        refl_chunk = context.reflection_coefficients[start:end]
-        sample_chunk, attenuation_chunk = _compute_image_contributions_time_batch(
-            src_traj,
-            mic_traj,
+    for image_indices in _iter_image_source_index_chunks(
+        context.max_order,
+        context.dimension,
+        device=config.device,
+        nb_img=context.nb_img,
+        chunk_size=context.image_chunk_size,
+    ):
+        reflection_coefficients = _reflection_coefficients(
+            image_indices,
+            context.beta,
+        )
+        sample, attenuation = _compute_image_contributions_time_batch(
+            source_trajectory,
+            microphone_trajectory,
             room_size,
-            n_vec_chunk,
-            refl_chunk,
+            image_indices,
+            reflection_coefficients,
             room,
-            fdl2,
             src_pattern=context.source_pattern,
             mic_pattern=context.microphone_pattern,
-            src_dirs=src_dirs,
+            src_dirs=source_directions,
             mic_dir=context.microphone_directions,
         )
-        t_steps = src_traj.shape[0]
-        sample_flat = sample_chunk.reshape(t_steps * n_src, n_mic, -1)
-        attenuation_flat = attenuation_chunk.reshape(t_steps * n_src, n_mic, -1)
-        rir_flat = rirs.view(t_steps * n_src, n_mic, nsample)
-        _accumulate_rir_batch(rir_flat, sample_flat, attenuation_flat, cfg)
+        sample_flat = sample.reshape(time_steps * n_sources, n_microphones, -1)
+        attenuation_flat = attenuation.reshape(
+            time_steps * n_sources, n_microphones, -1
+        )
+        rir_flat = rirs.view(
+            time_steps * n_sources,
+            n_microphones,
+            config.nsample,
+        )
+        _accumulate_rir_batch(rir_flat, sample_flat, attenuation_flat, config)
 
-    duration = nsample / room.fs
-    if tdiff is not None:
-        if tdiff >= duration:
-            raise ValueError("tdiff must be smaller than the RIR duration")
+    if config.tdiff is not None:
         rirs = _apply_diffuse_tail(
-            rirs, room, context.beta, tdiff, duration, seed=cfg.seed
+            rirs,
+            room_size,
+            context.beta,
+            config.tdiff,
+            config.tmax,
+            fs=room.fs,
+            c=room.c,
+            seed=config.seed,
         )
-    rirs = apply_rir_hpf(rirs, room.fs, cfg)
-    return rirs
+    return apply_rir_hpf(rirs, room.fs, config.high_pass)
 
 
-def _warn_legacy_settings(*values: object) -> None:
-    if any(value is not None for value in values):
-        warnings.warn(
-            "Passing simulation settings as individual arguments is deprecated "
-            "and will be removed in TorchRIR 1.0. Use SimulationConfig.",
-            DeprecationWarning,
-            stacklevel=3,
-        )
+__all__: list[str] = []

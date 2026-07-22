@@ -1,66 +1,71 @@
-"""RIR high-pass filtering utilities."""
+"""Optional RIR high-pass filtering."""
 
 from __future__ import annotations
-
-from typing import Any
 
 import numpy as np
 import torch
 from torch import Tensor
 
-from ...config import SimulationConfig
+from ...config import RIRHighPassConfig
 
 
-def _design_hpf_sos(fs: float, fc: float, kwargs: dict[str, Any]) -> np.ndarray:
+def _design_hpf_sos(fs: float, config: RIRHighPassConfig) -> np.ndarray:
     try:
         from scipy.signal import iirfilter
     except ImportError as exc:
         raise ImportError(
-            "scipy is required when rir_hpf_enable=True. "
-            "Install scipy or disable the HPF."
+            "scipy is required when SimulationConfig.high_pass is enabled; "
+            "install it with `pip install torchrir[hpf]`"
         ) from exc
 
-    wc = 2.0 * fc / fs
-    if not 0.0 < wc < 1.0:
-        raise ValueError("rir_hpf_fc must satisfy 0 < rir_hpf_fc < fs/2")
-
-    hpf_kwargs = dict(kwargs)
-    n = int(hpf_kwargs.pop("n", 2))
-    if "type" in hpf_kwargs and "ftype" not in hpf_kwargs:
-        hpf_kwargs["ftype"] = hpf_kwargs.pop("type")
+    normalized_cutoff = 2.0 * config.cutoff_hz / fs
+    if not 0.0 < normalized_cutoff < 1.0:
+        raise ValueError("high-pass cutoff_hz must satisfy 0 < cutoff_hz < fs/2")
     return iirfilter(
-        n,
-        Wn=wc,
+        config.order,
+        Wn=normalized_cutoff,
+        rp=config.passband_ripple_db,
+        rs=config.stopband_attenuation_db,
         btype="highpass",
         output="sos",
-        **hpf_kwargs,
+        ftype=config.filter_family,
     )
 
 
-def apply_rir_hpf(rir: Tensor, fs: float, cfg: SimulationConfig) -> Tensor:
-    """Apply pyroomacoustics-style IIR high-pass filtering to RIRs."""
-    hpf = cfg.high_pass
-    if not hpf.enabled:
+def apply_rir_hpf(
+    rir: Tensor,
+    fs: float,
+    config: RIRHighPassConfig | None,
+) -> Tensor:
+    """Apply an explicitly requested IIR high-pass filter to an RIR tensor."""
+
+    if config is None:
         return rir
 
     try:
-        from scipy.signal import sosfiltfilt
+        from scipy.signal import sosfilt, sosfiltfilt
     except ImportError as exc:
         raise ImportError(
-            "scipy is required when rir_hpf_enable=True. "
-            "Install scipy or disable the HPF."
+            "scipy is required when SimulationConfig.high_pass is enabled; "
+            "install it with `pip install torchrir[hpf]`"
         ) from exc
 
-    sos = _design_hpf_sos(fs, hpf.cutoff_hz, hpf.as_scipy_kwargs())
+    sos = _design_hpf_sos(fs, config)
     rir_np = rir.detach().cpu().to(torch.float64).numpy()
-    try:
-        filtered = sosfiltfilt(sos, rir_np, axis=-1)
-    except ValueError as exc:
-        if "padlen" not in str(exc):
-            raise
-        raise ValueError(
-            "RIR sample count is too short for the configured high-pass filter; "
-            "increase nsample/tmax or disable the RIR high-pass filter"
-        ) from exc
-    filtered = np.ascontiguousarray(filtered)
-    return torch.as_tensor(filtered, device=rir.device, dtype=rir.dtype)
+    if config.phase == "causal":
+        filtered = sosfilt(sos, rir_np, axis=-1)
+    else:
+        try:
+            filtered = sosfiltfilt(sos, rir_np, axis=-1)
+        except ValueError as exc:
+            if "padlen" not in str(exc):
+                raise
+            raise ValueError(
+                "RIR sample count is too short for zero-phase high-pass filtering; "
+                "increase nsample/tmax, select causal phase, or disable high_pass"
+            ) from exc
+    return torch.as_tensor(
+        np.ascontiguousarray(filtered),
+        device=rir.device,
+        dtype=rir.dtype,
+    )

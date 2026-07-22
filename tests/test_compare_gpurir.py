@@ -6,10 +6,10 @@ import numpy as np
 import pytest
 import torch
 
-from torchrir import MicrophoneArray, Room, Source
+from torchrir import DynamicScene, MicrophoneArray, Room, Source, StaticScene
 from torchrir.config import SimulationConfig
-from torchrir.signal import DynamicConvolver
-from torchrir.sim import simulate_dynamic_rir, simulate_rir
+from torchrir.signal import DynamicConvolver, FrameSchedule
+from torchrir.sim import simulate
 
 
 def _import_gpurir() -> Any | None:
@@ -31,7 +31,6 @@ if gpurir is None and os.environ.get("TORCHRIR_REQUIRE_COMPARISON") == "1":
 # Keep this in mind when interpreting direct waveform-L2 comparison results.
 _GPURIR_TO_TORCHRIR_AMP_SCALE = float(4.0 * np.pi)
 _GPURIR_FRACTIONAL_DELAY_LENGTH = 129
-_TORCHRIR_CAUSAL_DELAY = (_GPURIR_FRACTIONAL_DELAY_LENGTH - 1) // 2
 
 
 def _configure_gpurir_for_comparison() -> None:
@@ -127,17 +126,6 @@ def _convert_gpurir_amplitude_to_torchrir(rir: torch.Tensor) -> torch.Tensor:
     return rir * _GPURIR_TO_TORCHRIR_AMP_SCALE
 
 
-def _remove_torchrir_causal_delay(
-    rir: torch.Tensor, *, expected_length: int
-) -> torch.Tensor:
-    """Remove TorchRIR's documented FIR group delay without free alignment."""
-    start = _TORCHRIR_CAUSAL_DELAY
-    end = start + expected_length
-    if rir.shape[-1] < end:
-        raise AssertionError("TorchRIR output is too short for the known FIR delay")
-    return rir[..., start:end]
-
-
 @pytest.mark.comparison
 @pytest.mark.cuda
 @pytest.mark.numerical
@@ -175,30 +163,18 @@ def test_static_direct_path_matches_gpurir_with_explicit_conventions():
     room = Room.shoebox(size=room_dim, fs=fs, beta=beta)
     sources = Source.from_positions([src])
     mics = MicrophoneArray.from_positions([mic])
-    # NOTE:
-    # HPF is disabled here only to isolate core ISM parity against gpuRIR in this test.
-    # This does NOT imply HPF should be disabled in normal usage.
-    # In classic ISM practice, enabling HPF is commonly recommended, and many libraries
-    # (e.g., pyroomacoustics, rir-generator) enable/use HPF in typical workflows.
-    torch_rir = simulate_rir(
-        room=room,
-        sources=sources,
-        mics=mics,
-        config=SimulationConfig(
-            max_order=0,
+    torch_rir = simulate(
+        StaticScene(room=room, sources=sources, mics=mics),
+        SimulationConfig(
             nb_img=torchrir_nb_img,
-            nsample=gpurir_rir.shape[-1] + _TORCHRIR_CAUSAL_DELAY,
-            directivity="omni",
+            nsample=gpurir_rir.shape[-1],
             device="cuda",
-            rir_hpf_enable=False,
             use_lut=False,
             frac_delay_length=_GPURIR_FRACTIONAL_DELAY_LENGTH,
         ),
-    )
+    ).rirs
 
-    actual = _remove_torchrir_causal_delay(
-        torch_rir[0, 0].cpu(), expected_length=gpurir_rir.shape[-1]
-    )
+    actual = torch_rir[0, 0].cpu()
     expected = gpurir_rir[0, 0]
     assert _lag_samples(actual, expected) == 0
     assert int(torch.argmax(torch.abs(actual)).item()) == direct_delay_samples
@@ -254,32 +230,27 @@ def test_dynamic_direct_path_frames_match_gpurir():
     gpurir_rirs = _convert_gpurir_amplitude_to_torchrir(gpurir_rirs)
 
     room = Room.shoebox(size=room_dim, fs=fs, beta=beta)
-    # NOTE:
-    # HPF is disabled here only to isolate core ISM parity against gpuRIR in this test.
-    # This does NOT imply HPF should be disabled in normal usage.
-    # In classic ISM practice, enabling HPF is commonly recommended, and many libraries
-    # (e.g., pyroomacoustics, rir-generator) enable/use HPF in typical workflows.
-    torch_rirs = simulate_dynamic_rir(
+    scene = DynamicScene(
         room=room,
+        sources=Source.from_positions(moving_source_traj_for_torchrir[0]),
+        mics=MicrophoneArray.from_positions(fixed_mic_traj_for_torchrir[0]),
         src_traj=moving_source_traj_for_torchrir,
         mic_traj=fixed_mic_traj_for_torchrir,
-        config=SimulationConfig(
-            max_order=0,
+    )
+    torch_rirs = simulate(
+        scene,
+        SimulationConfig(
             nb_img=torchrir_nb_img,
-            nsample=gpurir_rirs.shape[-1] + _TORCHRIR_CAUSAL_DELAY,
-            directivity="omni",
+            nsample=gpurir_rirs.shape[-1],
             device="cuda",
-            rir_hpf_enable=False,
             use_lut=False,
             frac_delay_length=_GPURIR_FRACTIONAL_DELAY_LENGTH,
         ),
-    )
+    ).rirs
 
     errs: list[float] = []
     for t in range(steps):
-        actual = _remove_torchrir_causal_delay(
-            torch_rirs[t, 0, 0].cpu(), expected_length=gpurir_rirs.shape[-1]
-        )
+        actual = torch_rirs[t, 0, 0].cpu()
         expected = gpurir_rirs[t, 0, 0]
         assert _lag_samples(actual, expected) == 0
         assert int(torch.argmax(torch.abs(actual)).item()) == int(
@@ -293,7 +264,10 @@ def test_dynamic_direct_path_frames_match_gpurir():
 @pytest.mark.comparison
 @pytest.mark.cuda
 @pytest.mark.numerical
-def test_trajectory_convolution_matches_gpurir_for_identical_rirs():
+@pytest.mark.parametrize("custom_timestamps", [False, True])
+def test_trajectory_convolution_matches_gpurir_for_identical_rirs(
+    custom_timestamps: bool,
+) -> None:
     if not torch.cuda.is_available():
         pytest.skip("CUDA not available")
     if gpurir is None:
@@ -302,20 +276,51 @@ def test_trajectory_convolution_matches_gpurir_for_identical_rirs():
 
     steps = 5
     rir_length = 33
-    synthetic_rirs = np.zeros((steps, 1, rir_length), dtype=np.float32)
+    n_mics = 2
+    synthetic_rirs = np.zeros((steps, n_mics, rir_length), dtype=np.float32)
     for step in range(steps):
         synthetic_rirs[step, 0, 2 + step] = 1.0 - 0.1 * step
         synthetic_rirs[step, 0, 20 - step] = -0.25
+        synthetic_rirs[step, 1, 5 + step] = -0.4 + 0.05 * step
+        synthetic_rirs[step, 1, 24 - step] = 0.125
 
     source_signal = np.random.default_rng(123).standard_normal(1024).astype(np.float32)
     gpurir_mod = cast(Any, gpurir)
-    expected_signal = gpurir_mod.simulateTrajectory(source_signal, synthetic_rirs)[:, 0]
+    fs = 8000
+    timestamps = (
+        np.asarray([0.0, 0.013, 0.031, 0.057, 0.091], dtype=np.float64)
+        if custom_timestamps
+        else None
+    )
+    expected_signal = gpurir_mod.simulateTrajectory(
+        source_signal,
+        synthetic_rirs,
+        timestamps=timestamps,
+        fs=fs if timestamps is not None else None,
+    )
     torch_rirs = torch.from_numpy(synthetic_rirs[:, None, :, :]).cuda()
+    schedule = (
+        FrameSchedule.uniform(
+            frame_count=steps,
+            stop_sample=source_signal.size,
+        )
+        if timestamps is None
+        else FrameSchedule.from_seconds(torch.from_numpy(timestamps), sample_rate=fs)
+    )
     actual_signal = (
-        DynamicConvolver()
-        .convolve(torch.from_numpy(source_signal).cuda(), torch_rirs)
+        DynamicConvolver(time_reference="emission")
+        .convolve(
+            torch.from_numpy(source_signal).cuda(),
+            torch_rirs,
+            schedule=schedule,
+        )
         .cpu()
     )
-    expected_signal_t = torch.from_numpy(np.asarray(expected_signal, dtype=np.float32))
-    assert _lag_samples(actual_signal, expected_signal_t) == 0
-    assert _rel_l2(actual_signal, expected_signal_t) < 2e-4
+    expected_signal_t = torch.from_numpy(
+        np.asarray(expected_signal, dtype=np.float32).T.copy()
+    )
+    for microphone in range(n_mics):
+        assert (
+            _lag_samples(actual_signal[microphone], expected_signal_t[microphone]) == 0
+        )
+        assert _rel_l2(actual_signal[microphone], expected_signal_t[microphone]) < 2e-4

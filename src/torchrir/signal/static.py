@@ -5,7 +5,13 @@ from __future__ import annotations
 import torch
 from torch import Tensor
 
-from .internal import _ensure_signal, _ensure_static_rirs
+from .internal import (
+    _ensure_signal,
+    _ensure_static_rirs,
+    _fft_convolve_sources,
+    _fft_work_dtype,
+    _validate_convolution_dtypes,
+)
 
 
 def fft_convolve(signal: Tensor, rir: Tensor) -> Tensor:
@@ -23,22 +29,24 @@ def fft_convolve(signal: Tensor, rir: Tensor) -> Tensor:
         y = fft_convolve(signal, rir)
         ```
     """
+    if not torch.is_tensor(signal) or not torch.is_tensor(rir):
+        raise TypeError("signal and rir must be Tensors")
     if signal.ndim != 1 or rir.ndim != 1:
         raise ValueError("fft_convolve expects 1D tensors")
     if signal.numel() == 0 or rir.numel() == 0:
         raise ValueError("signal and rir must be non-empty")
-    if not signal.is_floating_point() or not rir.is_floating_point():
-        raise TypeError("signal and rir must use real floating-point dtypes")
+    _validate_convolution_dtypes(signal, rir)
     if signal.device != rir.device:
         raise ValueError("signal and rir must be on the same device")
     if signal.dtype != rir.dtype:
         raise ValueError("signal and rir must use the same dtype")
     n = signal.numel() + rir.numel() - 1
     fft_len = 1 << (n - 1).bit_length()
-    sig_f = torch.fft.rfft(signal, n=fft_len)
-    rir_f = torch.fft.rfft(rir, n=fft_len)
+    work_dtype = _fft_work_dtype(signal.dtype)
+    sig_f = torch.fft.rfft(signal.to(dtype=work_dtype), n=fft_len)
+    rir_f = torch.fft.rfft(rir.to(dtype=work_dtype), n=fft_len)
     out = torch.fft.irfft(sig_f * rir_f, n=fft_len)
-    return out[:n]
+    return out[:n].to(dtype=signal.dtype)
 
 
 def convolve_rir(signal: Tensor, rirs: Tensor) -> Tensor:
@@ -46,10 +54,12 @@ def convolve_rir(signal: Tensor, rirs: Tensor) -> Tensor:
 
     Args:
         signal: (n_src, n_samples) or (n_samples,) tensor.
-        rirs: (n_src, n_mic, rir_len) or compatible shape.
+        rirs: ``(rir_len,)``, ``(n_mic, rir_len)``, or
+            ``(n_src, n_mic, rir_len)`` tensor.
 
     Returns:
-        (n_mic, n_samples + rir_len - 1) tensor or 1D for single mic.
+        ``(n_mic, n_samples + rir_len - 1)`` tensor. The microphone axis is
+        retained when there is only one microphone.
 
     Examples:
         ```python
@@ -62,8 +72,9 @@ def convolve_rir(signal: Tensor, rirs: Tensor) -> Tensor:
 
     if signal.numel() == 0 or rir_len == 0:
         raise ValueError("signal and rirs must be non-empty")
-    if not signal.is_floating_point() or not rirs.is_floating_point():
-        raise TypeError("signal and rirs must use real floating-point dtypes")
+    if n_src == 0 or n_mic == 0:
+        raise ValueError("rirs must contain at least one source and microphone")
+    _validate_convolution_dtypes(signal, rirs)
     if signal.device != rirs.device:
         raise ValueError("signal and rirs must be on the same device")
     if signal.dtype != rirs.dtype:
@@ -74,11 +85,4 @@ def convolve_rir(signal: Tensor, rirs: Tensor) -> Tensor:
     if signal.shape[0] == 1 and n_src > 1:
         signal = signal.expand(n_src, -1)
 
-    out_len = signal.shape[1] + rir_len - 1
-    out = torch.zeros((n_mic, out_len), dtype=signal.dtype, device=signal.device)
-
-    for s in range(n_src):
-        for m in range(n_mic):
-            out[m] += fft_convolve(signal[s], rirs[s, m])
-
-    return out.squeeze(0) if n_mic == 1 else out
+    return _fft_convolve_sources(signal, rirs)

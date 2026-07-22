@@ -1,19 +1,9 @@
-"""Simulation engines and configuration for RIR generation.
+"""Scene-oriented image-source simulation and directivity utilities."""
 
-Includes the ISM implementation (in ``torchrir.sim.ism``), directivity helpers,
-and simulator interfaces for ISM plus placeholder ray-tracing/FDTD backends.
-"""
-
-from .ism import simulate_dynamic_rir, simulate_rir
-from .directivity import directivity_gain, split_directivity
-from .simulators import ISMSimulator, RIRSimulator, simulate
+from .directivity import directivity_gain
+from .simulators import simulate
 
 __all__ = [
-    "ISMSimulator",
-    "RIRSimulator",
     "directivity_gain",
-    "simulate_dynamic_rir",
-    "simulate_rir",
     "simulate",
-    "split_directivity",
 ]

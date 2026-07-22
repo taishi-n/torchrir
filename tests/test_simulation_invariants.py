@@ -9,6 +9,7 @@ import torch
 
 from torchrir import DynamicScene, MicrophoneArray, Room, Source, StaticScene
 from torchrir.config import SimulationConfig
+from torchrir.signal import FrameSchedule
 from torchrir.sim import simulate
 
 
@@ -17,7 +18,6 @@ def _config(**updates: object) -> SimulationConfig:
         "max_order": 2,
         "nsample": 512,
         "use_lut": False,
-        "rir_hpf_enable": False,
     }
     values.update(updates)
     return SimulationConfig(**cast(Any, values))
@@ -121,7 +121,7 @@ def test_repeated_dynamic_frames_equal_static_rir() -> None:
         mics=mics,
         src_traj=sources.positions.unsqueeze(0).repeat(3, 1, 1),
         mic_traj=mics.positions.unsqueeze(0).repeat(3, 1, 1),
-        timestamps=[0.0, 0.1, 0.2],
+        schedule=FrameSchedule.from_samples([0, 800, 1600]),
     )
     dynamic = simulate(dynamic_scene, config).rirs
     torch.testing.assert_close(dynamic, static.unsqueeze(0).expand_as(dynamic))
@@ -189,7 +189,11 @@ def test_public_api_flips_source_directivity_for_reflected_paths() -> None:
     )
     scene = StaticScene(
         room=room,
-        sources=Source.from_positions([[5.0, 2.0, 5.0]], orientation=[0.0, 1.0, 0.0]),
+        sources=Source.from_positions(
+            [[5.0, 2.0, 5.0]],
+            orientation=[0.0, 1.0, 0.0],
+            directivity="cardioid",
+        ),
         mics=MicrophoneArray.from_positions([[5.0, 8.0, 5.0]]),
     )
     direct = simulate(
@@ -197,9 +201,7 @@ def test_public_api_flips_source_directivity_for_reflected_paths() -> None:
         SimulationConfig(
             max_order=0,
             nsample=128,
-            directivity=("cardioid", "omni"),
             use_lut=False,
-            rir_hpf_enable=False,
         ),
     ).rirs
     first_order = simulate(
@@ -207,9 +209,7 @@ def test_public_api_flips_source_directivity_for_reflected_paths() -> None:
         SimulationConfig(
             max_order=1,
             nsample=128,
-            directivity=("cardioid", "omni"),
             use_lut=False,
-            rir_hpf_enable=False,
         ),
     ).rirs
     torch.testing.assert_close(first_order, direct, rtol=0, atol=1e-7)
@@ -225,7 +225,6 @@ def test_public_api_flips_source_directivity_for_reflected_paths() -> None:
             max_order=1,
             nsample=128,
             use_lut=False,
-            rir_hpf_enable=False,
         ),
     ).rirs
     assert not torch.allclose(omni, direct)

@@ -1,8 +1,3 @@
-"""Image Source Method (ISM) simulator."""
+"""Private image-source-method implementation."""
 
-from .api import simulate_dynamic_rir, simulate_rir
-
-__all__ = [
-    "simulate_dynamic_rir",
-    "simulate_rir",
-]
+__all__: list[str] = []

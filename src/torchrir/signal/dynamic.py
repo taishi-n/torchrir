@@ -1,215 +1,224 @@
-"""Dynamic convolution utilities.
-
-DynamicConvolver is the public API for time-varying convolution. Lower-level
-helpers live in internal modules and are not part of the stable surface.
-"""
+"""Piecewise time-varying RIR convolution."""
 
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass
-from typing import Optional
+from typing import Literal
 
 import torch
 from torch import Tensor
 
 from ..models import DynamicScene, RIRResult
-from .internal import _ensure_dynamic_rirs, _ensure_signal
-from .static import fft_convolve
+from ..models.schedule import FrameSchedule, _validate_frame_starts
+from ..models.scene import _validate_dynamic_time_reference
+from .internal import (
+    _ensure_dynamic_rirs,
+    _ensure_signal,
+    _fft_convolve_sources_work,
+    _fft_work_dtype,
+    _validate_convolution_dtypes,
+)
 
 
-@dataclass(frozen=True)
+TimeReference = Literal["emission", "observation"]
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
 class DynamicConvolver:
-    """Convolver for time-varying RIRs.
+    """Convolve signals with piecewise time-varying RIRs.
 
-    Examples:
-        ```python
-        convolver = DynamicConvolver(mode="trajectory")
-        y = convolver.convolve(signal, rirs)
-        ```
+    ``time_reference="emission"`` selects an RIR frame from the input sample's
+    emission time. It models moving sources observed by fixed microphones.
+    ``time_reference="observation"`` selects one RIR frame from each output
+    sample's observation time. It models fixed sources observed by moving
+    microphones.
+
+    Frame segmentation is independent of this physical convention and is
+    supplied to each [convolve][torchrir.signal.DynamicConvolver.convolve]
+    call as a [FrameSchedule][torchrir.signal.FrameSchedule]. A dynamic
+    [RIRResult][torchrir.models.RIRResult] whose dynamic scene contains a frame
+    schedule supplies it directly; passing another schedule in that case is
+    rejected.
+
+    Attributes:
+        time_reference: ``"emission"`` or ``"observation"``. There is no
+            implicit default because choosing the wrong reference changes the
+            physical model.
     """
 
-    mode: str = "trajectory"
-    hop: Optional[int] = None
-    timestamps: Optional[Tensor] = None
-    fs: Optional[float] = None
+    time_reference: TimeReference
 
     def __post_init__(self) -> None:
-        if self.mode not in ("trajectory", "hop"):
-            raise ValueError("mode must be 'trajectory' or 'hop'")
-        if self.mode == "hop" and self.hop is None:
-            raise ValueError("hop must be provided for hop mode")
-        if self.mode == "trajectory" and self.hop is not None:
-            raise ValueError("hop is only valid in hop mode")
-        if self.mode == "hop" and self.timestamps is not None:
-            raise ValueError("timestamps are only valid in trajectory mode")
-        if self.hop is not None and self.hop <= 0:
-            raise ValueError("hop must be positive")
-        if self.fs is not None and (not math.isfinite(self.fs) or self.fs <= 0):
-            raise ValueError("fs must be positive")
-        if self.timestamps is not None:
-            _validate_timestamp_values(torch.as_tensor(self.timestamps))
+        if self.time_reference not in ("emission", "observation"):
+            raise ValueError("time_reference must be 'emission' or 'observation'")
 
-    def __call__(self, signal: Tensor, rirs: Tensor | RIRResult) -> Tensor:
-        return self.convolve(signal, rirs)
+    def __call__(
+        self,
+        signal: Tensor,
+        rirs: Tensor | RIRResult,
+        *,
+        schedule: FrameSchedule | None = None,
+    ) -> Tensor:
+        return self.convolve(signal, rirs, schedule=schedule)
 
-    def convolve(self, signal: Tensor, rirs: Tensor | RIRResult) -> Tensor:
-        """Convolve signals with time-varying RIRs.
+    def convolve(
+        self,
+        signal: Tensor,
+        rirs: Tensor | RIRResult,
+        *,
+        schedule: FrameSchedule | None = None,
+    ) -> Tensor:
+        """Convolve dry signals with a dynamic RIR sequence.
 
-        Examples:
-            ```python
-            y = DynamicConvolver(mode="hop", hop=1024).convolve(signal, rirs)
-            ```
+        Args:
+            signal: Dry signal with shape ``(samples,)`` or
+                ``(n_sources, samples)``.
+            rirs: Dynamic RIR tensor with shape ``(frames, rir_samples)``,
+                ``(frames, n_microphones, rir_samples)`` for one source, or
+                ``(frames, n_sources, n_microphones, rir_samples)``. A dynamic
+                [RIRResult][torchrir.models.RIRResult] may be passed instead.
+            schedule: One start sample per RIR frame. It is required for a raw
+                tensor and for an ``RIRResult`` without a frame schedule. It
+                must be omitted when the result's scene already contains one.
+
+        Returns:
+            Tensor with shape ``(n_microphones, output_samples)``, where
+            ``output_samples = signal_samples + rir_samples - 1``. The output
+            keeps the input signal's dtype and device, including for one
+            microphone.
         """
-        timestamps = self.timestamps
-        fs = self.fs
+
+        if schedule is not None and not isinstance(schedule, FrameSchedule):
+            raise TypeError("schedule must be a FrameSchedule")
+
         if isinstance(rirs, RIRResult):
+            rirs.validate()
             if not isinstance(rirs.scene, DynamicScene):
                 raise ValueError("DynamicConvolver requires a dynamic RIRResult")
-            if timestamps is not None and rirs.timestamps is not None:
-                if not torch.equal(
-                    torch.as_tensor(timestamps).cpu(),
-                    torch.as_tensor(rirs.timestamps).cpu(),
-                ):
-                    raise ValueError(
-                        "convolver timestamps conflict with RIRResult timestamps"
-                    )
-            timestamps = timestamps if timestamps is not None else rirs.timestamps
-            result_fs = float(rirs.scene.room.fs)
-            if fs is not None and fs != result_fs:
-                raise ValueError("convolver fs conflicts with RIRResult sample rate")
-            fs = result_fs
-            rirs_tensor = rirs.rirs
-        else:
-            rirs_tensor = rirs
-        if self.mode == "hop":
-            assert self.hop is not None
-            return _convolve_dynamic_hop(signal, rirs_tensor, self.hop)
-        return _convolve_dynamic_trajectory(
-            signal, rirs_tensor, timestamps=timestamps, fs=fs
-        )
-
-
-def _convolve_dynamic_hop(signal: Tensor, rirs: Tensor, hop: int) -> Tensor:
-    signal = _ensure_signal(signal)
-    rirs = _ensure_dynamic_rirs(rirs, signal)
-    signal, rirs = _validate_dynamic_inputs(signal, rirs)
-    return _convolve_dynamic_rir_hop(signal, rirs, hop)
-
-
-def _convolve_dynamic_trajectory(
-    signal: Tensor,
-    rirs: Tensor,
-    *,
-    timestamps: Optional[Tensor],
-    fs: Optional[float],
-) -> Tensor:
-    signal = _ensure_signal(signal)
-    rirs = _ensure_dynamic_rirs(rirs, signal)
-    signal, rirs = _validate_dynamic_inputs(signal, rirs)
-    return _convolve_dynamic_rir_trajectory(signal, rirs, timestamps=timestamps, fs=fs)
-
-
-def _convolve_dynamic_rir_hop(signal: Tensor, rirs: Tensor, hop: int) -> Tensor:
-    """Dynamic convolution using fixed hop-size segments."""
-    t_steps, n_src, n_mic, rir_len = rirs.shape
-
-    frames = math.ceil(signal.shape[1] / hop)
-    if t_steps < frames:
-        raise ValueError(
-            f"dynamic RIR has {t_steps} frames, but hop={hop} requires {frames}"
-        )
-
-    out_len = signal.shape[1] + rir_len - 1
-    out = torch.zeros((n_mic, out_len), dtype=signal.dtype, device=signal.device)
-
-    for t in range(frames):
-        start = t * hop
-        for s in range(n_src):
-            frame = signal[s, start : start + hop]
-            if frame.numel() == 0:
-                continue
-            for m in range(n_mic):
-                seg = fft_convolve(frame, rirs[t, s, m])
-                out[m, start : start + seg.numel()] += seg
-
-    return out.squeeze(0) if n_mic == 1 else out
-
-
-def _convolve_dynamic_rir_trajectory(
-    signal: Tensor,
-    rirs: Tensor,
-    *,
-    timestamps: Tensor | None,
-    fs: float | None,
-) -> Tensor:
-    """Dynamic convolution using variable segments like gpuRIR simulateTrajectory."""
-    n_samples = signal.shape[1]
-    t_steps, n_src, n_mic, rir_len = rirs.shape
-
-    if timestamps is not None:
-        if fs is None:
-            raise ValueError("fs must be provided when timestamps are used")
-        ts = torch.as_tensor(
-            timestamps,
-            device=signal.device,
-            dtype=torch.float32 if signal.device.type == "mps" else torch.float64,
-        )
-        if ts.ndim != 1 or ts.numel() != t_steps:
-            raise ValueError("timestamps must be 1D and match number of RIR steps")
-        _validate_timestamp_values(ts)
-        w_ini = (ts * fs).to(torch.long)
-        if t_steps > 1 and torch.any(w_ini[1:] <= w_ini[:-1]):
-            raise ValueError(
-                "timestamps must map to strictly increasing audio sample indices"
+            _validate_dynamic_time_reference(
+                rirs.scene,
+                time_reference=self.time_reference,
             )
-        if w_ini[-1].item() >= n_samples and t_steps > 1:
-            raise ValueError("last timestamp must be before the end of the signal")
-    else:
-        if t_steps > n_samples:
-            raise ValueError("number of RIR steps cannot exceed signal samples")
-        step_fs = n_samples / t_steps
-        ts_dtype = torch.float32 if signal.device.type == "mps" else torch.float64
-        w_ini = (
-            torch.arange(t_steps, device=signal.device, dtype=ts_dtype) * step_fs
-        ).to(torch.long)
+            if rirs.scene.schedule is not None:
+                if schedule is not None:
+                    raise ValueError(
+                        "schedule must be omitted when DynamicScene contains a schedule"
+                    )
+                schedule = rirs.scene.schedule
+            elif schedule is None:
+                raise ValueError(
+                    "schedule is required when RIRResult has no frame schedule"
+                )
+            rirs_tensor = rirs.rirs
+            if (
+                schedule.conversion_sample_rate is not None
+                and schedule.conversion_sample_rate != float(rirs.scene.room.fs)
+            ):
+                raise ValueError(
+                    "schedule seconds-conversion sample rate "
+                    f"{schedule.conversion_sample_rate:g} conflicts with "
+                    f"RIR sample rate {float(rirs.scene.room.fs):g}"
+                )
+        else:
+            if schedule is None:
+                raise ValueError("schedule is required for raw dynamic RIR tensors")
+            rirs_tensor = rirs
 
-    w_ini = torch.cat(
-        [w_ini, torch.tensor([n_samples], device=signal.device, dtype=torch.long)]
-    )
-    w_len = w_ini[1:] - w_ini[:-1]
-
-    if signal.device.type in ("cuda", "mps"):
-        return _convolve_dynamic_rir_trajectory_batched(
-            signal, rirs, w_ini=w_ini, w_len=w_len
+        signal_tensor = _ensure_signal(signal)
+        rirs_tensor = _ensure_dynamic_rirs(rirs_tensor, signal_tensor)
+        signal_tensor, rirs_tensor = _validate_dynamic_inputs(
+            signal_tensor,
+            rirs_tensor,
+        )
+        starts = _validate_schedule_for_convolution(
+            schedule,
+            frame_count=int(rirs_tensor.shape[0]),
+            signal_samples=int(signal_tensor.shape[1]),
+            rir_samples=int(rirs_tensor.shape[-1]),
+            time_reference=self.time_reference,
         )
 
-    max_len = int(w_len.max().item())
-    segments = torch.zeros(
-        (t_steps, n_src, max_len), dtype=signal.dtype, device=signal.device
-    )
-    for t in range(t_steps):
-        start = int(w_ini[t].item())
-        end = int(w_ini[t + 1].item())
-        if end > start:
-            segments[t, :, : end - start] = signal[:, start:end]
+        if self.time_reference == "emission":
+            return _convolve_emission(signal_tensor, rirs_tensor, starts=starts)
+        return _convolve_observation(signal_tensor, rirs_tensor, starts=starts)
 
+
+def _convolve_emission(signal: Tensor, rirs: Tensor, *, starts: Tensor) -> Tensor:
+    """Select RIR frames from emitted input samples."""
+
+    n_samples = int(signal.shape[1])
+    _, n_src, n_mic, rir_len = rirs.shape
+    boundaries = torch.cat(
+        [starts, torch.tensor([n_samples], dtype=torch.int64, device="cpu")]
+    )
+    lengths = boundaries[1:] - boundaries[:-1]
+
+    return _convolve_emission_batched(
+        signal,
+        rirs,
+        boundaries=boundaries,
+        lengths=lengths,
+    )
+
+
+def _convolve_observation(signal: Tensor, rirs: Tensor, *, starts: Tensor) -> Tensor:
+    """Select one RIR frame for every observed output sample."""
+
+    n_samples = int(signal.shape[1])
+    _, n_src, n_mic, rir_len = rirs.shape
+    out_len = n_samples + rir_len - 1
+    boundaries = torch.cat(
+        [starts, torch.tensor([out_len], dtype=torch.int64, device="cpu")]
+    )
     out = torch.zeros(
-        (n_mic, n_samples + rir_len - 1), dtype=signal.dtype, device=signal.device
+        (n_mic, out_len),
+        dtype=_fft_work_dtype(signal.dtype),
+        device=signal.device,
     )
 
-    for t in range(t_steps):
-        seg_len = int(w_len[t].item())
-        if seg_len == 0:
-            continue
-        start = int(w_ini[t].item())
-        for s in range(n_src):
-            frame = segments[t, s, :seg_len]
-            for m in range(n_mic):
-                conv = fft_convolve(frame, rirs[t, s, m])
-                out[m, start : start + seg_len + rir_len - 1] += conv
+    for frame_index in range(int(rirs.shape[0])):
+        output_start = int(boundaries[frame_index].item())
+        output_end = int(boundaries[frame_index + 1].item())
+        input_start = max(0, output_start - rir_len + 1)
+        input_end = min(n_samples, output_end)
 
-    return out.squeeze(0) if n_mic == 1 else out
+        local_start = output_start - input_start
+        local_end = output_end - input_start
+        convolution = _fft_convolve_sources_work(
+            signal[:, input_start:input_end],
+            rirs[frame_index],
+        )
+        out[:, output_start:output_end] = convolution[:, local_start:local_end]
+    return out.to(dtype=signal.dtype)
+
+
+def _validate_schedule_for_convolution(
+    schedule: FrameSchedule | None,
+    *,
+    frame_count: int,
+    signal_samples: int,
+    rir_samples: int,
+    time_reference: TimeReference,
+) -> Tensor:
+    assert schedule is not None
+    starts = schedule.starts
+    _validate_frame_starts(starts)
+    if starts.numel() != frame_count:
+        raise ValueError(
+            f"schedule has {starts.numel()} frames, but rirs has {frame_count}"
+        )
+    endpoint = (
+        signal_samples
+        if time_reference == "emission"
+        else signal_samples + rir_samples - 1
+    )
+    if starts[-1].item() >= endpoint:
+        timeline = "input" if time_reference == "emission" else "output"
+        raise ValueError(
+            f"last frame start must be before the {timeline} timeline endpoint "
+            f"({endpoint})"
+        )
+    return starts
 
 
 def _validate_dynamic_inputs(signal: Tensor, rirs: Tensor) -> tuple[Tensor, Tensor]:
@@ -217,13 +226,14 @@ def _validate_dynamic_inputs(signal: Tensor, rirs: Tensor) -> tuple[Tensor, Tens
         raise ValueError("signal must contain at least one sample")
     if rirs.shape[0] == 0 or rirs.shape[-1] == 0:
         raise ValueError("rirs must contain at least one frame and one sample")
-    if not signal.is_floating_point() or not rirs.is_floating_point():
-        raise TypeError("signal and rirs must use real floating-point dtypes")
+    if rirs.shape[1] == 0 or rirs.shape[2] == 0:
+        raise ValueError("rirs must contain at least one source and microphone")
+    _validate_convolution_dtypes(signal, rirs)
     if signal.device != rirs.device:
         raise ValueError("signal and rirs must be on the same device")
     if signal.dtype != rirs.dtype:
         raise ValueError("signal and rirs must use the same dtype")
-    n_src = rirs.shape[1]
+    n_src = int(rirs.shape[1])
     if signal.shape[0] == 1 and n_src > 1:
         signal = signal.expand(n_src, -1)
     elif signal.shape[0] != n_src:
@@ -231,69 +241,97 @@ def _validate_dynamic_inputs(signal: Tensor, rirs: Tensor) -> tuple[Tensor, Tens
     return signal, rirs
 
 
-def _validate_timestamp_values(timestamps: Tensor) -> None:
-    if timestamps.ndim != 1 or timestamps.numel() == 0:
-        raise ValueError("timestamps must be a non-empty 1D tensor")
-    if timestamps.is_complex() or not torch.all(torch.isfinite(timestamps)):
-        raise ValueError("timestamps must contain finite real values")
-    if timestamps[0].item() != 0.0:
-        raise ValueError("first timestamp must be 0")
-    if timestamps.numel() > 1 and torch.any(timestamps[1:] <= timestamps[:-1]):
-        raise ValueError("timestamps must be strictly increasing")
-
-
-def _convolve_dynamic_rir_trajectory_batched(
+def _convolve_emission_batched(
     signal: Tensor,
     rirs: Tensor,
     *,
-    w_ini: Tensor,
-    w_len: Tensor,
+    boundaries: Tensor,
+    lengths: Tensor,
     chunk_size: int = 8,
 ) -> Tensor:
-    """GPU-friendly batched trajectory convolution using FFT."""
-    n_samples = signal.shape[1]
-    t_steps, n_src, n_mic, rir_len = rirs.shape
+    """GPU-friendly batched emission-time convolution using FFT."""
+
+    n_samples = int(signal.shape[1])
+    _, n_src, n_mic, rir_len = rirs.shape
+    work_dtype = _fft_work_dtype(signal.dtype)
     out = torch.zeros(
-        (n_mic, n_samples + rir_len - 1), dtype=signal.dtype, device=signal.device
+        (n_mic, n_samples + rir_len - 1),
+        dtype=work_dtype,
+        device=signal.device,
     )
 
-    for t0 in range(0, t_steps, chunk_size):
-        t1 = min(t0 + chunk_size, t_steps)
-        lengths = w_len[t0:t1]
-        max_len = int(lengths.max().item())
-        if max_len == 0:
-            continue
+    for chunk_start, chunk_end in _emission_chunk_ranges(
+        lengths,
+        rir_len=rir_len,
+        max_frames=chunk_size,
+    ):
+        chunk_lengths = lengths[chunk_start:chunk_end]
+        max_len = int(chunk_lengths.max().item())
         segments = torch.zeros(
-            (t1 - t0, n_src, max_len), dtype=signal.dtype, device=signal.device
-        )
-        for idx, t in enumerate(range(t0, t1)):
-            start = int(w_ini[t].item())
-            end = int(w_ini[t + 1].item())
-            if end > start:
-                segments[idx, :, : end - start] = signal[:, start:end]
-
-        conv_len = max_len + rir_len - 1
-        fft_len = 1 << (conv_len - 1).bit_length()
-        seg_f = torch.fft.rfft(segments, n=fft_len, dim=-1)
-        rir_f = torch.fft.rfft(rirs[t0:t1], n=fft_len, dim=-1)
-        conv_out = torch.empty(
-            (t1 - t0, n_src, n_mic, fft_len),
-            dtype=signal.dtype,
+            (chunk_end - chunk_start, n_src, max_len),
+            dtype=work_dtype,
             device=signal.device,
         )
-        conv = torch.fft.irfft(
-            seg_f[:, :, None, :] * rir_f, n=fft_len, dim=-1, out=conv_out
+        for chunk_index, frame_index in enumerate(range(chunk_start, chunk_end)):
+            start = int(boundaries[frame_index].item())
+            end = int(boundaries[frame_index + 1].item())
+            segments[chunk_index, :, : end - start] = signal[:, start:end]
+
+        convolution_len = max_len + rir_len - 1
+        fft_len = 1 << (convolution_len - 1).bit_length()
+        segment_spectrum = torch.fft.rfft(segments, n=fft_len, dim=-1)
+        rir_spectrum = torch.fft.rfft(
+            rirs[chunk_start:chunk_end].to(dtype=work_dtype),
+            n=fft_len,
+            dim=-1,
         )
-        conv = conv[..., :conv_len]
-        conv_sum = conv.sum(dim=1)
+        convolution = torch.fft.irfft(
+            segment_spectrum[:, :, None, :] * rir_spectrum,
+            n=fft_len,
+            dim=-1,
+        )[..., :convolution_len]
+        source_sum = convolution.sum(dim=1)
 
-        for idx, t in enumerate(range(t0, t1)):
-            seg_len = int(lengths[idx].item())
-            if seg_len == 0:
-                continue
-            start = int(w_ini[t].item())
-            out[:, start : start + seg_len + rir_len - 1] += conv_sum[
-                idx, :, : seg_len + rir_len - 1
+        for chunk_index, frame_index in enumerate(range(chunk_start, chunk_end)):
+            segment_len = int(chunk_lengths[chunk_index].item())
+            start = int(boundaries[frame_index].item())
+            selected_len = segment_len + rir_len - 1
+            out[:, start : start + selected_len] += source_sum[
+                chunk_index,
+                :,
+                :selected_len,
             ]
+    return out.to(dtype=signal.dtype)
 
-    return out.squeeze(0) if n_mic == 1 else out
+
+def _emission_chunk_ranges(
+    lengths: Tensor,
+    *,
+    rir_len: int,
+    max_frames: int,
+) -> list[tuple[int, int]]:
+    """Group adjacent frames while bounding padding waste to twofold."""
+
+    ranges: list[tuple[int, int]] = []
+    chunk_start = 0
+    frame_count = int(lengths.numel())
+    while chunk_start < frame_count:
+        chunk_end = chunk_start
+        length_sum = 0
+        maximum_length = 0
+        limit = min(chunk_start + max_frames, frame_count)
+        while chunk_end < limit:
+            frame_length = int(lengths[chunk_end].item())
+            next_count = chunk_end - chunk_start + 1
+            next_sum = length_sum + frame_length
+            next_maximum = max(maximum_length, frame_length)
+            padded = next_count * (next_maximum + rir_len - 1)
+            useful = next_sum + next_count * (rir_len - 1)
+            if next_count > 1 and padded > 2 * useful:
+                break
+            length_sum = next_sum
+            maximum_length = next_maximum
+            chunk_end += 1
+        ranges.append((chunk_start, chunk_end))
+        chunk_start = chunk_end
+    return ranges

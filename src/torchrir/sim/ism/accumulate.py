@@ -7,7 +7,7 @@ from collections.abc import Callable
 import torch
 from torch import Tensor
 
-from ...config import SimulationConfig
+from ...config import ResolvedSimulationConfig
 
 _SINC_LUT_CACHE: dict[tuple[int, int, str, torch.dtype], Tensor] = {}
 _FDL_GRID_CACHE: dict[tuple[int, str, torch.dtype], Tensor] = {}
@@ -18,7 +18,7 @@ _ACCUM_BATCH_COMPILED: dict[tuple[str, torch.dtype, int, int, bool, int], _Accum
 
 
 def _accumulate_rir_batch(
-    rir: Tensor, sample: Tensor, amplitude: Tensor, cfg: SimulationConfig
+    rir: Tensor, sample: Tensor, amplitude: Tensor, cfg: ResolvedSimulationConfig
 ) -> None:
     """Accumulate fractional-delay contributions for all sources/mics."""
     fn = _get_accumulate_fn(cfg, rir.device, amplitude.dtype)
@@ -36,14 +36,22 @@ def _accumulate_rir_batch_impl(
     chunk_size: int,
 ) -> None:
     """Implementation for batch accumulation (optionally compiled)."""
-    idx0 = torch.floor(sample).to(torch.int64)
-    frac = sample - idx0.to(sample.dtype)
+    int64_bound = torch.tensor(
+        float(1 << 63),
+        device=sample.device,
+        dtype=sample.dtype,
+    )
+    sample_is_castable = torch.isfinite(sample) & (torch.abs(sample) < int64_bound)
+    safe_sample = torch.where(sample_is_castable, sample, torch.zeros_like(sample))
+    idx0 = torch.floor(safe_sample).to(torch.int64)
+    frac = safe_sample - idx0.to(sample.dtype)
 
     n_src, n_mic, nsample = rir.shape
     n_sm = n_src * n_mic
     idx0 = idx0.view(n_sm, -1)
     frac = frac.view(n_sm, -1)
     amplitude = amplitude.view(n_sm, -1)
+    sample_is_castable = sample_is_castable.view(n_sm, -1)
 
     fdl2 = (fdl - 1) // 2
 
@@ -65,6 +73,7 @@ def _accumulate_rir_batch_impl(
         idx = idx0[:, start:end]
         amp = amplitude[:, start:end]
         frac_m = frac[:, start:end]
+        castable = sample_is_castable[:, start:end]
 
         if use_lut:
             x_off_frac = (1.0 - frac_m) * lut_gran
@@ -84,18 +93,15 @@ def _accumulate_rir_batch_impl(
 
         contrib = amp[..., None] * filt
         target = idx[..., None] + offsets[None, None, :]
-        valid = (target >= 0) & (target < nsample)
-        if not valid.any():
-            continue
-
-        target = target + sm_offsets
-        target_flat = target[valid].to(torch.int64)
-        values_flat = contrib[valid]
+        valid = castable[..., None] & (target >= 0) & (target < nsample)
+        target = target.clamp(0, nsample - 1) + sm_offsets
+        target_flat = target.reshape(-1).to(torch.int64)
+        values_flat = torch.where(valid, contrib, torch.zeros_like(contrib)).reshape(-1)
         rir_flat.scatter_add_(0, target_flat, values_flat)
 
 
 def _get_accumulate_fn(
-    cfg: SimulationConfig, device: torch.device, dtype: torch.dtype
+    cfg: ResolvedSimulationConfig, device: torch.device, dtype: torch.dtype
 ) -> _AccumFn:
     """Return an accumulation function with config-bound constants."""
     use_lut = cfg.use_lut and device.type != "mps"
