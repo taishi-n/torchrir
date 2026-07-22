@@ -85,8 +85,8 @@ def test_ism_simulator_static():
     sources = Source.from_positions([[1.0, 1.0, 1.0]])
     mics = MicrophoneArray.from_positions([[2.0, 1.5, 1.0]])
     scene = StaticScene(room=room, sources=sources, mics=mics)
-    config = SimulationConfig()
-    result = ISMSimulator(max_order=1, tmax=0.05).simulate(scene, config)
+    config = SimulationConfig(max_order=1, tmax=0.05)
+    result = ISMSimulator().simulate(scene, config)
     assert result.rirs.ndim == 3
 
 
@@ -148,7 +148,8 @@ def test_ism_simulator_rejects_conflicting_config_max_order() -> None:
     mics = MicrophoneArray.from_positions([[2.0, 1.5, 1.0]])
     scene = StaticScene(room=room, sources=sources, mics=mics)
     cfg = SimulationConfig(max_order=2)
-    sim = ISMSimulator(max_order=1, tmax=0.05)
+    with pytest.deprecated_call(match="constructor settings are deprecated"):
+        sim = ISMSimulator(max_order=1, tmax=0.05)
     with pytest.raises(ValueError, match="conflicting 'max_order'"):
         sim.simulate(scene, cfg)
 
@@ -159,7 +160,8 @@ def test_ism_simulator_rejects_conflicting_config_tmax() -> None:
     mics = MicrophoneArray.from_positions([[2.0, 1.5, 1.0]])
     scene = StaticScene(room=room, sources=sources, mics=mics)
     cfg = SimulationConfig(tmax=0.10)
-    sim = ISMSimulator(max_order=1, tmax=0.05)
+    with pytest.deprecated_call(match="constructor settings are deprecated"):
+        sim = ISMSimulator(max_order=1, tmax=0.05)
     with pytest.raises(ValueError, match="conflicting 'tmax'"):
         sim.simulate(scene, cfg)
 

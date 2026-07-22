@@ -1,6 +1,7 @@
 import math
 import warnings
 
+import pytest
 import torch
 
 from torchrir.util import (
@@ -11,20 +12,24 @@ from torchrir.util import (
 )
 
 
-def test_t60_beta_roundtrip_monotonic():
+@pytest.mark.numerical
+@pytest.mark.parametrize("target_t60", [0.2, 0.5, 1.2])
+def test_t60_beta_roundtrip_3d(target_t60: float):
     size = torch.tensor([6.0, 4.0, 3.0])
-    beta = estimate_beta_from_t60(size, 0.5)
+    beta = estimate_beta_from_t60(size, target_t60)
     assert beta.shape == (6,)
     t60 = estimate_t60_from_beta(size, beta)
-    assert 0.1 < t60 < 5.0
+    assert t60 == pytest.approx(target_t60, rel=1e-5)
 
 
-def test_t60_beta_roundtrip_2d():
+@pytest.mark.numerical
+@pytest.mark.parametrize("target_t60", [0.2, 0.5, 1.2])
+def test_t60_beta_roundtrip_2d(target_t60: float):
     size = torch.tensor([6.0, 4.0])
-    beta = estimate_beta_from_t60(size, 0.5)
+    beta = estimate_beta_from_t60(size, target_t60)
     assert beta.shape == (4,)
     t60 = estimate_t60_from_beta(size, beta)
-    assert 0.1 < t60 < 5.0
+    assert t60 == pytest.approx(target_t60, rel=1e-5)
 
 
 def test_t60_from_perfect_reflection():

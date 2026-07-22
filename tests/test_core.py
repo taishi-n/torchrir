@@ -18,9 +18,7 @@ def test_simulate_rir_shape_and_peak():
         room=room,
         sources=sources,
         mics=mics,
-        max_order=0,
-        nsample=nsample,
-        directivity="omni",
+        config=SimulationConfig(max_order=0, nsample=nsample, directivity="omni"),
     )
 
     assert rir.shape == (1, 1, nsample)
@@ -42,9 +40,7 @@ def test_simulate_rir_directivity_requires_orientation():
             room=room,
             sources=sources,
             mics=mics,
-            max_order=0,
-            nsample=256,
-            directivity="cardioid",
+            config=SimulationConfig(max_order=0, nsample=256, directivity="cardioid"),
         )
 
 
@@ -58,10 +54,8 @@ def test_simulate_rir_angle_orientation_2d():
         room=room,
         sources=sources,
         mics=mics,
-        max_order=0,
-        nsample=256,
-        directivity="cardioid",
         orientation=orientation,
+        config=SimulationConfig(max_order=0, nsample=256, directivity="cardioid"),
     )
 
     assert rir.shape == (1, 1, 256)
@@ -90,8 +84,7 @@ def test_simulate_dynamic_rir_shape():
         room=room,
         src_traj=src_traj,
         mic_traj=mic_traj,
-        max_order=0,
-        nsample=nsample,
+        config=SimulationConfig(max_order=0, nsample=nsample),
     )
 
     assert rirs.shape == (3, 1, 1, nsample)
@@ -119,8 +112,7 @@ def test_dynamic_accepts_2d_input():
         room=room,
         src_traj=src_traj,
         mic_traj=mic_traj,
-        max_order=0,
-        nsample=256,
+        config=SimulationConfig(max_order=0, nsample=256),
     )
 
     assert rirs.shape == (3, 1, 1, 256)
@@ -145,9 +137,7 @@ def test_simulate_dynamic_rir_accepts_nb_img():
         room=room,
         src_traj=src_traj,
         mic_traj=mic_traj,
-        max_order=0,
-        nb_img=(0, 0, 0),
-        nsample=256,
+        config=SimulationConfig(max_order=0, nb_img=(0, 0, 0), nsample=256),
     )
 
     assert rirs.shape == (2, 1, 1, 256)
@@ -160,10 +150,12 @@ def test_simulation_rejects_fractional_nb_img() -> None:
             room=room,
             sources=Source.from_positions([[1.0, 1.0, 1.0]]),
             mics=MicrophoneArray.from_positions([[2.0, 1.0, 1.0]]),
-            max_order=0,
-            nb_img=cast(Any, (0.5, 0, 0)),
-            nsample=32,
-            config=SimulationConfig(rir_hpf_enable=False),
+            config=SimulationConfig(
+                max_order=0,
+                nb_img=cast(Any, (0.5, 0, 0)),
+                nsample=32,
+                rir_hpf_enable=False,
+            ),
         )
 
 
@@ -179,17 +171,15 @@ def test_simulate_rir_hpf_changes_output_when_enabled():
         room=room,
         sources=sources,
         mics=mics,
-        max_order=3,
-        nsample=nsample,
-        config=SimulationConfig(rir_hpf_enable=False),
+        config=SimulationConfig(max_order=3, nsample=nsample, rir_hpf_enable=False),
     )
     rir_hpf = simulate_rir(
         room=room,
         sources=sources,
         mics=mics,
-        max_order=3,
-        nsample=nsample,
         config=SimulationConfig(
+            max_order=3,
+            nsample=nsample,
             rir_hpf_enable=True,
             rir_hpf_fc=10.0,
             rir_hpf_kwargs={"n": 2, "rp": 5.0, "rs": 60.0, "type": "butter"},
@@ -198,6 +188,9 @@ def test_simulate_rir_hpf_changes_output_when_enabled():
 
     assert rir_no_hpf.shape == rir_hpf.shape
     assert not torch.allclose(rir_no_hpf, rir_hpf)
+    # The finite RIR and filtfilt boundary extension do not yield an exactly
+    # zero sample mean, but DC must be strongly suppressed.
+    assert abs(rir_hpf.mean().item()) < 0.2 * abs(rir_no_hpf.mean().item())
 
 
 def test_simulate_rir_reports_short_hpf_input_clearly() -> None:
@@ -208,6 +201,5 @@ def test_simulate_rir_reports_short_hpf_input_clearly() -> None:
             room=room,
             sources=Source.from_positions([[1.0, 1.0, 1.0]]),
             mics=MicrophoneArray.from_positions([[2.0, 1.0, 1.0]]),
-            max_order=0,
-            nsample=4,
+            config=SimulationConfig(max_order=0, nsample=4),
         )

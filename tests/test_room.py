@@ -2,6 +2,7 @@ import pytest
 import torch
 
 from torchrir import MicrophoneArray, Room, Source, StaticScene
+from torchrir.config import SimulationConfig
 from torchrir.sim import simulate_rir
 
 
@@ -40,7 +41,12 @@ def test_integer_geometry_is_promoted_to_floating_point() -> None:
     room = Room.shoebox(size=[4, 3, 2], fs=16000, beta=[0.9] * 6)
     sources = Source.from_positions([[1, 1, 1]])
     mics = MicrophoneArray.from_positions([[2, 1, 1]])
-    rir = simulate_rir(room=room, sources=sources, mics=mics, max_order=0, nsample=128)
+    rir = simulate_rir(
+        room=room,
+        sources=sources,
+        mics=mics,
+        config=SimulationConfig(max_order=0, nsample=128),
+    )
     assert room.size.dtype == torch.float32
     assert sources.positions.dtype == torch.float32
     assert rir.dtype == torch.float32

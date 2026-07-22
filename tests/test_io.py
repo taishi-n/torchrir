@@ -80,7 +80,6 @@ def test_audio_backend_registry() -> None:
     backends = list_audio_backends()
     assert "soundfile" in backends
     assert get_audio_backend() in backends
-    set_audio_backend("soundfile")
     with pytest.raises(ValueError, match="Unknown audio backend"):
         set_audio_backend("unknown-backend")
 

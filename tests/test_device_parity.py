@@ -14,10 +14,7 @@ def _compute(device: str, cfg: SimulationConfig) -> torch.Tensor:
         room=room,
         sources=sources,
         mics=mics,
-        max_order=2,
-        tmax=0.05,
-        device=device,
-        config=cfg,
+        config=cfg.replace(max_order=2, tmax=0.05, device=device),
     )
     return rir.detach().cpu()
 
@@ -39,14 +36,13 @@ def _compute_dynamic(device: str, cfg: SimulationConfig) -> torch.Tensor:
         room=room,
         src_traj=src_traj,
         mic_traj=mic_traj,
-        max_order=2,
-        tmax=0.05,
-        device=device,
-        config=cfg,
+        config=cfg.replace(max_order=2, tmax=0.05, device=device),
     )
     return drir.detach().cpu()
 
 
+@pytest.mark.cuda
+@pytest.mark.numerical
 def test_rir_cpu_vs_cuda_close():
     if not torch.cuda.is_available():
         pytest.skip("CUDA not available")
@@ -56,6 +52,8 @@ def test_rir_cpu_vs_cuda_close():
     assert torch.allclose(cpu, gpu, rtol=1e-4, atol=1e-5)
 
 
+@pytest.mark.mps
+@pytest.mark.numerical
 def test_rir_cpu_vs_mps_close():
     if not torch.backends.mps.is_available():
         pytest.skip("MPS not available")
@@ -65,6 +63,8 @@ def test_rir_cpu_vs_mps_close():
     assert torch.allclose(cpu, mps, rtol=1e-3, atol=1e-4)
 
 
+@pytest.mark.cuda
+@pytest.mark.numerical
 def test_dynamic_rir_cpu_vs_cuda_close():
     if not torch.cuda.is_available():
         pytest.skip("CUDA not available")
@@ -74,6 +74,8 @@ def test_dynamic_rir_cpu_vs_cuda_close():
     assert torch.allclose(cpu, gpu, rtol=1e-4, atol=1e-5)
 
 
+@pytest.mark.mps
+@pytest.mark.numerical
 def test_dynamic_rir_cpu_vs_mps_close():
     if not torch.backends.mps.is_available():
         pytest.skip("MPS not available")

@@ -51,8 +51,29 @@ docs = [
   "zensical>=0.0.51",
   "mkdocstrings-python>=2.0.2",
 ]
-test = ["pytest>=9.0.2", "soundfile>=0.13.1"]
+test = ["pytest>=9.0.2", "pytest-cov>=7.0.0", "soundfile>=0.13.1"]
 comparison = ["pyroomacoustics>=0.9.0"]
+
+[tool.pytest.ini_options]
+addopts = "--strict-markers"
+filterwarnings = ["error"]
+markers = [
+  "unit: fast, isolated unit tests",
+  "numerical: numerical correctness and physical invariant tests",
+  "comparison: tests requiring an external reference implementation",
+  "cuda: tests requiring a CUDA device",
+  "mps: tests requiring an Apple MPS device",
+  "slow: tests excluded from the fastest local feedback loop",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["torchrir"]
+
+[tool.coverage.report]
+fail_under = 75
+show_missing = true
+skip_covered = true
 
 [tool.commitizen]
 name = "cz_conventional_commits"

@@ -75,6 +75,78 @@ def test_dynamic_cmu_arctic_builder_expected_files(built_dataset: Path) -> None:
         assert path.exists(), f"missing file: {path}"
 
 
+@pytest.mark.numerical
+def test_dynamic_cmu_arctic_audio_is_consistent(built_dataset: Path) -> None:
+    scene_dir = built_dataset / "scene_0000"
+    mixture, mixture_fs = sf.read(scene_dir / "mixture.wav", always_2d=True)
+    stems = []
+    for source_idx in range(3):
+        stem, stem_fs = sf.read(
+            scene_dir / f"source_{source_idx:02d}.wav", always_2d=True
+        )
+        assert stem_fs == mixture_fs
+        assert stem.shape == mixture.shape
+        stems.append(stem)
+
+    assert mixture_fs == 16000
+    assert mixture.shape == (1600 + 64 - 1, 6)
+    # PCM quantization is applied to each file independently.
+    np.testing.assert_allclose(mixture, np.sum(stems, axis=0), atol=2e-4, rtol=0)
+
+
+@pytest.mark.numerical
+def test_dynamic_cmu_arctic_geometry_stays_within_room(
+    built_dataset: Path,
+) -> None:
+    metadata = json.loads(
+        (built_dataset / "scene_0000" / "metadata.json").read_text(encoding="utf-8")
+    )
+    room_size = np.asarray(metadata["room"]["size"])
+    src_traj = np.asarray(metadata["trajectories"]["sources"])
+    mic_traj = np.asarray(metadata["trajectories"]["mics"])
+    assert np.all(src_traj >= 0.0) and np.all(src_traj <= room_size)
+    assert np.all(mic_traj >= 0.0) and np.all(mic_traj <= room_size)
+    center = np.asarray(metadata["extra"]["mic_center_xyz_m"])
+    distances = np.linalg.norm(src_traj - center, axis=-1)
+    assert np.all(distances >= 1.8 - 1e-9)
+
+
+@pytest.mark.numerical
+def test_dynamic_cmu_arctic_build_is_seed_reproducible(tmp_path: Path) -> None:
+    cmu_root = tmp_path / "cmu"
+    for speaker in ("bdl", "slt", "clb"):
+        _write_fake_cmu_speaker(cmu_root, speaker)
+
+    roots = [tmp_path / "first", tmp_path / "second"]
+    for dataset_root in roots:
+        build_dynamic_cmu_arctic_dataset(
+            cmu_root=cmu_root,
+            dataset_root=dataset_root,
+            speakers=["bdl", "slt", "clb"],
+            n_scenes=1,
+            duration_sec=0.05,
+            trajectory_steps=4,
+            rir_samples=32,
+            max_order=0,
+            seed=123,
+            save_layout_mp4=False,
+            save_layout_images=False,
+        )
+
+    relative_paths = [
+        "mixture.wav",
+        "source_00.wav",
+        "source_01.wav",
+        "source_02.wav",
+        "metadata.json",
+        "source_info.json",
+    ]
+    for relative_path in relative_paths:
+        first = roots[0] / "scene_0000" / relative_path
+        second = roots[1] / "scene_0000" / relative_path
+        assert first.read_bytes() == second.read_bytes()
+
+
 def test_dynamic_cmu_arctic_builder_metadata_source_info_keys(
     built_dataset: Path,
 ) -> None:
