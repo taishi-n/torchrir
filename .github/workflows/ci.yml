@@ -43,7 +43,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - uses: astral-sh/setup-uv@v5
       - run: uv sync --group test --extra audio --extra viz
-      - run: uv run pytest -q
+      - run: uv run pytest -q --cov=torchrir --cov-branch --cov-report=term-missing
 
   quality:
     name: Lint, type, docs, comparisons, and wheel
@@ -59,7 +59,7 @@ jobs:
       - run: uv run ruff format --check .
       - run: uv run ruff check .
       - run: uv run ty check
-      - run: uv run pytest -q tests/test_compare_pyroomacoustics.py
+      - run: TORCHRIR_REQUIRE_COMPARISON=1 uv run pytest -q tests/test_compare_pyroomacoustics.py
       - run: uv run zensical build --strict
       - run: uv build
       - run: uv venv /tmp/torchrir-wheel-smoke

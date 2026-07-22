@@ -94,15 +94,8 @@ jobs:
         run: |
           uv run python -c "import torch, torchrir; print('torch', torch.__version__); print('cuda_available', torch.cuda.is_available()); assert torch.cuda.is_available(), 'CUDA is not available on this runner'"
 
-      - name: Install gpuRIR (optional)
-        id: install-gpurir
-        continue-on-error: true
-        run: uv pip install https://github.com/DavidDiazGuerra/gpuRIR.git
+      - name: Install gpuRIR
+        run: uv pip install "git+https://github.com/DavidDiazGuerra/gpuRIR.git@fd8af43a4a113d3c2c05f0085a0119ecb1f1a484"
 
       - name: Run gpuRIR comparison tests
-        if: steps.install-gpurir.outcome == 'success'
-        run: uv run pytest -q tests/test_compare_gpurir.py
-
-      - name: Skip gpuRIR comparison tests
-        if: steps.install-gpurir.outcome != 'success'
-        run: echo "Skipping gpuRIR comparison tests because gpuRIR installation failed."
+        run: TORCHRIR_REQUIRE_COMPARISON=1 uv run pytest -q tests/test_compare_gpurir.py

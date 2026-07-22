@@ -50,11 +50,14 @@ For detailed notes and equations, see
 - CUDA tests run in `.github/workflows/cuda-ci.yml` on a self-hosted runner with labels:
   `self-hosted`, `linux`, `x64`, `cuda`.
 - The workflow validates installation via `uv sync --group test`, checks `torch.cuda.is_available()`,
-  runs `tests/test_device_parity.py` with `-k cuda`, and then tries to install
-  `gpuRIR` from GitHub.
-- If `gpuRIR` installs successfully, the workflow runs `tests/test_compare_gpurir.py`
-  (static + dynamic RIR comparisons). If installation fails, those comparison tests
-  are skipped without failing the whole CUDA CI job.
+  runs `tests/test_device_parity.py` with `-k cuda`, and installs the pinned
+  `gpuRIR` reference revision.
+- The extended workflow requires `gpuRIR` installation and runs direct-path
+  static/dynamic RIR comparisons plus an isolated `simulateTrajectory`
+  comparison using identical synthetic RIRs. Known normalization, image-count,
+  and fractional-delay conventions are handled explicitly; signals are never
+  freely aligned. Installation failure or a skipped comparison fails that
+  workflow.
 
 ## Examples
 - `examples/static.py`: fixed sources and microphones with configurable mic count (default: binaural).  
@@ -200,6 +203,22 @@ rir = result.rirs
   `normalize=True` is requested.
 - Legacy tuple loaders continue to return channel 0 for multichannel files and
   emit a warning directing callers to `load_audio_data`.
+
+### Numerical verification
+
+- Image-source coordinates, reflection coefficients, path delays, path gains,
+  and fractional-delay accumulation are checked against independent analytic
+  or direct implementations.
+- Reflected source directivity mirrors the source orientation component normal
+  to every wall with an odd reflection count.
+- Static and dynamic convolution are checked against direct NumPy convolution,
+  including segment and timestamp boundaries.
+- pyroomacoustics comparisons cover 2D/3D rooms, orders 0/1/3, asymmetric wall
+  coefficients, and multiple source/microphone pairs. Comparisons use the
+  native sample axis and do not shift or crop RIRs using cross-correlation.
+- Unexpected warnings fail the test suite. Reference, CUDA, MPS, numerical, and
+  slow tests use explicit pytest markers.
+- CI measures branch coverage and requires at least 75% overall coverage.
 
 ### Compatibility policy
 
