@@ -13,6 +13,19 @@ from .helpers import _cos_between
 from .images import _image_positions, _image_positions_batch
 
 
+def _reflected_source_directions(src_dirs: Tensor, n_vec: Tensor) -> Tensor:
+    """Mirror source orientations into each image-source coordinate system.
+
+    Mirroring a source across a wall flips the orientation component normal to
+    that wall.  The image index parity therefore applies the same sign change
+    to the source direction as it does to the source position.
+    """
+    sign = torch.where((n_vec % 2) == 0, 1.0, -1.0).to(
+        device=src_dirs.device, dtype=src_dirs.dtype
+    )
+    return src_dirs[..., None, :] * sign
+
+
 def _compute_image_contributions(
     src: Tensor,
     mic_pos: Tensor,
@@ -40,7 +53,8 @@ def _compute_image_contributions(
     if src_pattern != "omni":
         if src_dir is None:
             raise ValueError("source orientation required for non-omni directivity")
-        cos_theta = _cos_between(vec, src_dir)
+        reflected_src_dir = _reflected_source_directions(src_dir, n_vec)
+        cos_theta = _cos_between(vec, reflected_src_dir)
         gain = gain * directivity_gain(src_pattern, cos_theta)
     if mic_pattern != "omni":
         if mic_dir is None:
@@ -79,8 +93,8 @@ def _compute_image_contributions_batch(
     if src_pattern != "omni":
         if src_dirs is None:
             raise ValueError("source orientation required for non-omni directivity")
-        src_dirs = src_dirs[:, None, None, :]
-        cos_theta = _cos_between(vec, src_dirs)
+        reflected_src_dirs = _reflected_source_directions(src_dirs, n_vec)
+        cos_theta = _cos_between(vec, reflected_src_dirs[:, None, :, :])
         gain = gain * directivity_gain(src_pattern, cos_theta)
     if mic_pattern != "omni":
         if mic_dir is None:
@@ -127,7 +141,8 @@ def _compute_image_contributions_time_batch(
     if src_pattern != "omni":
         if src_dirs is None:
             raise ValueError("source orientation required for non-omni directivity")
-        src_dirs_b = src_dirs[None, :, None, None, :]
+        reflected_src_dirs = _reflected_source_directions(src_dirs, n_vec)
+        src_dirs_b = reflected_src_dirs[None, :, None, :, :]
         cos_theta = _cos_between(vec, src_dirs_b)
         gain = gain * directivity_gain(src_pattern, cos_theta)
     if mic_pattern != "omni":
