@@ -1,10 +1,9 @@
 """Dataset helpers for torchrir.
 
 Includes CMU ARCTIC and LibriSpeech dataset wrappers plus collate utilities for
-DataLoader usage. Experimental dataset stubs live under
-``torchrir.experimental``. Use ``load_dataset_sources`` to build fixed-length
-source signals from random utterances. Dynamic CMU ARCTIC scene generation is
-available via ``build_dynamic_cmu_arctic_dataset``.
+DataLoader usage. Use ``load_dataset_sources`` to build fixed-length source
+signals from random utterances. Dynamic CMU ARCTIC scene generation is
+available via ``build_dynamic_cmu_arctic``.
 
 Examples:
     ```python
@@ -21,19 +20,31 @@ Examples:
     ```
 """
 
+from typing import TYPE_CHECKING, Any
+
 from .base import BaseDataset, DatasetItem, SentenceLike
 from .attribution import DatasetAttribution, attribution_for, default_modification_notes
 from .utils import choose_speakers, load_dataset_sources
-from ..io.audio import load, save
 from .collate import CollateBatch, collate_dataset_items
 from .librispeech import LibriSpeechDataset, LibriSpeechSentence
 
 from .cmu_arctic import CmuArcticDataset, CmuArcticSentence, cmu_arctic_speakers
 from .dynamic_builder import DynamicCmuArcticBuildConfig, DynamicDatasetBuildResult
-from .dynamic_cmu_arctic import (
-    build_dynamic_cmu_arctic,
-    build_dynamic_cmu_arctic_dataset,
-)
+
+if TYPE_CHECKING:
+    from .dynamic_cmu_arctic import build_dynamic_cmu_arctic
+
+
+def __getattr__(name: str) -> Any:
+    """Load the executable dynamic builder only when its API is requested."""
+
+    if name == "build_dynamic_cmu_arctic":
+        from .dynamic_cmu_arctic import build_dynamic_cmu_arctic
+
+        globals()[name] = build_dynamic_cmu_arctic
+        return build_dynamic_cmu_arctic
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 __all__ = [
     "BaseDataset",
@@ -46,13 +57,10 @@ __all__ = [
     "default_modification_notes",
     "collate_dataset_items",
     "cmu_arctic_speakers",
-    "build_dynamic_cmu_arctic_dataset",
     "build_dynamic_cmu_arctic",
     "attribution_for",
     "SentenceLike",
     "load_dataset_sources",
-    "load",
-    "save",
     "LibriSpeechDataset",
     "LibriSpeechSentence",
     "DynamicCmuArcticBuildConfig",
