@@ -1,6 +1,6 @@
 version = 1
 revision = 3
-requires-python = ">=3.11, <3.14"
+requires-python = ">=3.11.4, <3.14"
 resolution-markers = [
     "python_full_version >= '3.12'",
     "python_full_version < '3.12'",
@@ -282,11 +282,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/41/9f/39c7c9245efc583beddf89a87683574e663ed93637f3afb6cd7b88405676/coverage-7.15.2-cp313-cp313-win_amd64.whl", hash = "sha256:26c3b04a6377fd7c09800921fa934e3a17c0020439cd59df73e73ae1d4b6a78c", size = 224190, upload-time = "2026-07-15T18:55:10.789Z" },
     { url = "https://files.pythonhosted.org/packages/c7/de/3a2883cf8a213659280ef4b403059e17a9acaeb7fc7fd4105e1226ff2e6d/coverage-7.15.2-cp313-cp313-win_arm64.whl", hash = "sha256:3ed010aa1b69cda8e827aabfca9866216c980e2dca82ab9a78c5f83689964c8b", size = 223583, upload-time = "2026-07-15T18:55:12.678Z" },
     { url = "https://files.pythonhosted.org/packages/ec/82/32e3bd191d498e64f6f911ad55d14006a0861e54869d2d32452326399e65/coverage-7.15.2-py3-none-any.whl", hash = "sha256:eb6bcae8d1a9d305351ecb108232441d11c5cfe9de840a04388ba5d2db8d735c", size = 213375, upload-time = "2026-07-15T18:56:17.305Z" },
-]
-
-[package.optional-dependencies]
-toml = [
-    { name = "tomli", marker = "python_full_version <= '3.11'" },
 ]
 
 [[package]]
@@ -1234,7 +1229,7 @@ name = "pytest-cov"
 version = "7.1.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "coverage", extra = ["toml"] },
+    { name = "coverage" },
     { name = "pluggy" },
     { name = "pytest" },
 ]
@@ -1566,10 +1561,9 @@ wheels = [
 [[package]]
 name = "torchrir"
 version = "0.9.2"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "numpy" },
-    { name = "scipy" },
     { name = "torch" },
 ]
 
@@ -1578,17 +1572,25 @@ all = [
     { name = "matplotlib" },
     { name = "oobss" },
     { name = "pillow" },
+    { name = "pyyaml" },
     { name = "scienceplots" },
+    { name = "scipy" },
     { name = "soundfile" },
 ]
 audio = [
     { name = "soundfile" },
+]
+cli = [
+    { name = "pyyaml" },
 ]
 datasets = [
     { name = "matplotlib" },
     { name = "pillow" },
     { name = "scienceplots" },
     { name = "soundfile" },
+]
+hpf = [
+    { name = "scipy" },
 ]
 oobss = [
     { name = "oobss" },
@@ -1618,6 +1620,7 @@ docs = [
 test = [
     { name = "pytest" },
     { name = "pytest-cov" },
+    { name = "scipy" },
     { name = "soundfile" },
 ]
 
@@ -1632,19 +1635,22 @@ requires-dist = [
     { name = "pillow", marker = "extra == 'all'", specifier = ">=11.2.1" },
     { name = "pillow", marker = "extra == 'datasets'", specifier = ">=11.2.1" },
     { name = "pillow", marker = "extra == 'viz'", specifier = ">=11.2.1" },
+    { name = "pyyaml", marker = "extra == 'all'", specifier = ">=6.0.2" },
+    { name = "pyyaml", marker = "extra == 'cli'", specifier = ">=6.0.2" },
     { name = "scienceplots", marker = "extra == 'all'", specifier = ">=2.1.1" },
     { name = "scienceplots", marker = "extra == 'datasets'", specifier = ">=2.1.1" },
     { name = "scienceplots", marker = "extra == 'viz'", specifier = ">=2.1.1" },
-    { name = "scipy", specifier = ">=1.14.0" },
+    { name = "scipy", marker = "extra == 'all'", specifier = ">=1.14.0" },
+    { name = "scipy", marker = "extra == 'hpf'", specifier = ">=1.14.0" },
     { name = "soundfile", marker = "extra == 'all'", specifier = ">=0.13.1" },
     { name = "soundfile", marker = "extra == 'audio'", specifier = ">=0.13.1" },
     { name = "soundfile", marker = "extra == 'datasets'", specifier = ">=0.13.1" },
     { name = "torch", specifier = ">=2.10.0" },
 ]
-provides-extras = ["audio", "viz", "datasets", "oobss", "all"]
+provides-extras = ["audio", "cli", "hpf", "viz", "datasets", "oobss", "all"]
 
 [package.metadata.requires-dev]
-comparison = [{ name = "pyroomacoustics", specifier = ">=0.9.0" }]
+comparison = [{ name = "pyroomacoustics", specifier = "==0.9.0" }]
 dev = [
     { name = "commitizen", specifier = ">=3.29.0" },
     { name = "git-cliff", specifier = ">=2.10.1" },
@@ -1660,6 +1666,7 @@ docs = [
 test = [
     { name = "pytest", specifier = ">=9.0.2" },
     { name = "pytest-cov", specifier = ">=7.0.0" },
+    { name = "scipy", specifier = ">=1.14.0" },
     { name = "soundfile", specifier = ">=0.13.1" },
 ]
 
