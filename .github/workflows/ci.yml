@@ -6,6 +6,7 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/ci.yml"
+      - ".readthedocs.yaml"
       - "CHANGELOG.md"
       - "LICENSE"
       - "MANIFEST.in"
@@ -22,6 +23,7 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/ci.yml"
+      - ".readthedocs.yaml"
       - "CHANGELOG.md"
       - "LICENSE"
       - "MANIFEST.in"

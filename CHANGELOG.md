@@ -443,6 +443,12 @@ the previous default HPF, timestamp-based or implicit dynamic schedules, the
 legacy metadata schema, implicit save normalization, or squeezed mono outputs
 must be regenerated or updated. No compatibility or migration mode is retained.
 
+### Docs
+
+- publish the Zensical documentation from `main` on Read the Docs through an
+  explicit custom build, and remove the GitHub Pages deployment path and the
+  obsolete `taishi.org/torchrir` links
+
 ## v0.9.2 (2026-07-22)
 
 ### Fix

@@ -1,6 +1,6 @@
 [project]
 site_name = "TorchRIR"
-site_url = "https://taishi.org/torchrir/"
+site_url = "https://torchrir.readthedocs.io/en/latest/"
 site_description = "PyTorch-based room impulse response (RIR) simulation toolkit"
 repo_url = "https://github.com/taishi-n/torchrir"
 repo_name = "taishi-n/torchrir"

@@ -42,7 +42,7 @@ all = [
 
 [project.urls]
 Changelog = "https://github.com/taishi-n/torchrir/blob/main/CHANGELOG.md"
-Documentation = "https://taishi.org/torchrir/"
+Documentation = "https://torchrir.readthedocs.io/en/latest/"
 Repository = "https://github.com/taishi-n/torchrir"
 
 [project.scripts]
