@@ -1560,7 +1560,7 @@ wheels = [
 
 [[package]]
 name = "torchrir"
-version = "0.9.2"
+version = "1.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "numpy" },
