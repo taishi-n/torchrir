@@ -27,13 +27,14 @@ from torchrir.config import SimulationConfig
 from torchrir.datasets import (
     CmuArcticDataset,
     attribution_for,
+    cmu_arctic_speakers,
     default_modification_notes,
     load_dataset_sources,
 )
 from torchrir.geometry import arrays, sampling, trajectories
 from torchrir.io import save_attribution_file, save_result_metadata, save_scene_audio
 from torchrir.logging import LoggingConfig, get_logger, setup_logging
-from torchrir.signal import DynamicConvolver
+from torchrir.signal import DynamicConvolver, FrameSchedule
 from torchrir.sim import simulate
 from torchrir.util import add_output_args, resolve_device
 from torchrir.viz import save_scene_gifs, save_scene_plots
@@ -139,13 +140,17 @@ def main() -> None:
     )
 
     # Build dataset factory so each speaker loads from the same root.
-    def dataset_factory(speaker: str | None):
-        spk = speaker or "bdl"
-        return CmuArcticDataset(args.dataset_dir, speaker=spk, download=args.download)
+    def dataset_factory(speaker: str):
+        return CmuArcticDataset(
+            args.dataset_dir,
+            speaker=speaker,
+            download=args.download,
+        )
 
     # Load and concatenate utterances into fixed-length sources.
     signals, fs, info = load_dataset_sources(
         dataset_factory=dataset_factory,
+        speakers=cmu_arctic_speakers(None if args.download else args.dataset_dir),
         num_sources=args.num_sources,
         duration_s=args.duration,
         rng=rng,
@@ -170,6 +175,15 @@ def main() -> None:
         )
     mic_pos = sampling.clamp_positions(mic_pos, room_size)
     steps = max(2, args.steps)
+    schedule = FrameSchedule.uniform(
+        frame_count=steps,
+        stop_sample=signals.shape[-1],
+    )
+    progress = schedule.normalized_progress(
+        stop_sample=signals.shape[-1],
+        dtype=room_size.dtype,
+        device=room_size.device,
+    )
     mic_traj = mic_pos.unsqueeze(0).repeat(steps, 1, 1)
 
     src_start = sampling.sample_positions_min_distance(
@@ -189,7 +203,11 @@ def main() -> None:
     src_traj = torch.stack(
         [
             (
-                trajectories.linear_trajectory(src_start[i], src_end[i], steps)
+                trajectories.linear_trajectory(
+                    src_start[i],
+                    src_end[i],
+                    progress=progress,
+                )
                 if i in moving_indices
                 else src_start[i].unsqueeze(0).repeat(steps, 1)
             )
@@ -201,9 +219,6 @@ def main() -> None:
 
     sources = Source.from_positions(src_start.tolist())
     mics = MicrophoneArray.from_positions(mic_pos.tolist())
-
-    src_traj = src_traj.to(device)
-    mic_traj = mic_traj.to(device)
 
     # Optional plots/GIFs.
     if args.plot:
@@ -239,6 +254,7 @@ def main() -> None:
         mics=mics,
         src_traj=src_traj,
         mic_traj=mic_traj,
+        schedule=schedule,
     )
     result = simulate(
         scene,
@@ -246,13 +262,15 @@ def main() -> None:
     )
     rirs = result.rirs
 
-    convolver = DynamicConvolver(mode="trajectory")
+    convolver = DynamicConvolver(time_reference="emission")
     y_dynamic = convolver.convolve(signals, result)
 
     # Save per-source reference audio (convolved with its own RIR).
     reference_audio = []
     for src_idx in range(args.num_sources):
-        ref = convolver.convolve(signals[src_idx], rirs[:, src_idx : src_idx + 1])
+        ref = convolver.convolve(
+            signals[src_idx], rirs[:, src_idx : src_idx + 1], schedule=schedule
+        )
         ref_name = f"dynamic_src_ref{src_idx + 1:02d}.wav"
         save_scene_audio(
             out_dir=args.out_dir,
@@ -284,6 +302,7 @@ def main() -> None:
         out_dir=args.out_dir,
         metadata_name="dynamic_src_metadata.json",
         result=result,
+        time_reference="emission",
         signal_len=signals.shape[1],
         source_info=info,
         extra={

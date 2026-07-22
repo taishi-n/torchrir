@@ -2,10 +2,10 @@
 
 This script measures average per-run latency for:
 1) Static RIR generation (ISM).
-2) Optional dynamic trajectory simulation + convolution.
+2) Optional moving-microphone simulation + observation-time convolution.
 
 It prints average milliseconds and speedup ratios. Use --dynamic to benchmark
-trajectory-mode RIRs and convolution.
+moving-microphone RIRs and observation-time convolution.
 """
 
 from __future__ import annotations
@@ -17,8 +17,9 @@ import torch
 
 from torchrir import DynamicScene, MicrophoneArray, Room, Source, StaticScene
 from torchrir.config import SimulationConfig
+from torchrir.geometry import linear_trajectory
 from torchrir.logging import LoggingConfig, get_logger, setup_logging
-from torchrir.signal import DynamicConvolver
+from torchrir.signal import DynamicConvolver, FrameSchedule
 from torchrir.sim import simulate
 from torchrir.util import resolve_device
 
@@ -63,22 +64,36 @@ def _bench_dynamic(device: torch.device, repeats: int) -> float:
             mic_grid.append([x, y, 1.2])
     mics = MicrophoneArray.from_positions(mic_grid)
     steps = 24
+    signal = torch.randn(1, 16000, device=device)
+    schedule = FrameSchedule.uniform(
+        frame_count=steps,
+        stop_sample=signal.shape[-1],
+    )
+    progress = schedule.normalized_progress(
+        stop_sample=signal.shape[-1],
+        dtype=mics.positions.dtype,
+        device=mics.positions.device,
+    )
     src_traj = sources.positions.unsqueeze(0).repeat(steps, 1, 1)
     displacement_end = torch.tensor([0.5, 0.5, 0.0])
-    displacement = torch.linspace(0.0, 1.0, steps)[:, None] * displacement_end
+    displacement = linear_trajectory(
+        torch.zeros_like(displacement_end),
+        displacement_end,
+        progress=progress,
+    )
     mic_traj = mics.positions.unsqueeze(0) + displacement[:, None, :]
-    signal = torch.randn(1, 16000, device=device)
     scene = DynamicScene(
         room=room,
         sources=sources,
         mics=mics,
         src_traj=src_traj,
         mic_traj=mic_traj,
+        schedule=schedule,
     )
     config = SimulationConfig(max_order=10, tmax=0.8, device=device)
 
     result = simulate(scene, config)
-    DynamicConvolver(mode="trajectory").convolve(signal, result)
+    DynamicConvolver(time_reference="observation").convolve(signal, result)
     if device.type == "cuda":
         torch.cuda.synchronize()
     if device.type == "mps":
@@ -87,7 +102,7 @@ def _bench_dynamic(device: torch.device, repeats: int) -> float:
     start = time.perf_counter()
     for _ in range(repeats):
         result = simulate(scene, config)
-        DynamicConvolver(mode="trajectory").convolve(signal, result)
+        DynamicConvolver(time_reference="observation").convolve(signal, result)
     if device.type == "cuda":
         torch.cuda.synchronize()
     if device.type == "mps":

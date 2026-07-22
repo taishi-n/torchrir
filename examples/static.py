@@ -29,6 +29,7 @@ from torchrir.config import SimulationConfig
 from torchrir.datasets import (
     CmuArcticDataset,
     attribution_for,
+    cmu_arctic_speakers,
     default_modification_notes,
     load_dataset_sources,
 )
@@ -131,13 +132,17 @@ def main() -> None:
     )
 
     # Build dataset factory so each speaker loads from the same root.
-    def dataset_factory(speaker: str | None):
-        spk = speaker or "bdl"
-        return CmuArcticDataset(args.dataset_dir, speaker=spk, download=args.download)
+    def dataset_factory(speaker: str):
+        return CmuArcticDataset(
+            args.dataset_dir,
+            speaker=speaker,
+            download=args.download,
+        )
 
     # Load and concatenate utterances into fixed-length sources.
     signals, fs, info = load_dataset_sources(
         dataset_factory=dataset_factory,
+        speakers=cmu_arctic_speakers(None if args.download else args.dataset_dir),
         num_sources=args.num_sources,
         duration_s=args.duration,
         rng=rng,

@@ -8,7 +8,7 @@ Key characteristics:
     - Fixed room geometry and fixed binaural microphone layout across scenes.
     - Randomized source positions and motion patterns per scene.
     - Configurable dataset backend (CMU ARCTIC / LibriSpeech).
-    - Dynamic RIR simulation via ISM + trajectory-mode convolution.
+    - Dynamic RIR simulation via ISM + emission-time convolution.
     - Per-scene WAV and JSON metadata outputs.
 
 Outputs (per scene index k):
@@ -27,7 +27,7 @@ Run (LibriSpeech):
 Notes:
     - Use --num-moving-sources to keep some sources fixed.
     - Plotting is opt-in via --plot.
-    - Downloading is automatic if data is missing (can also be requested via --download).
+    - Pass --download to fetch missing dataset archives.
     - Reference outputs are per-source, RIR-convolved signals (premix).
 """
 
@@ -46,13 +46,14 @@ from torchrir.datasets import (
     CmuArcticDataset,
     LibriSpeechDataset,
     attribution_for,
+    cmu_arctic_speakers,
     default_modification_notes,
     load_dataset_sources,
 )
 from torchrir.geometry import arrays, sampling, trajectories
 from torchrir.io import save_attribution_file, save_result_metadata, save_scene_audio
 from torchrir.logging import LoggingConfig, get_logger, setup_logging
-from torchrir.signal import DynamicConvolver
+from torchrir.signal import DynamicConvolver, FrameSchedule
 from torchrir.sim import simulate
 from torchrir.util import add_output_args, resolve_device
 from torchrir.viz import save_scene_gifs, save_scene_plots
@@ -93,27 +94,20 @@ def _dataset_factory(
 ):
     if dataset == "cmu_arctic":
         spk = speaker or "bdl"
-        try:
-            return CmuArcticDataset(root, speaker=spk, download=download)
-        except FileNotFoundError:
-            if download:
-                raise
-            return CmuArcticDataset(root, speaker=spk, download=True)
-    try:
-        return LibriSpeechDataset(
-            root, subset=subset, speaker=speaker, download=download
-        )
-    except FileNotFoundError:
-        if download:
-            raise
-        return LibriSpeechDataset(root, subset=subset, speaker=speaker, download=True)
+        return CmuArcticDataset(root, speaker=spk, download=download)
+    return LibriSpeechDataset(
+        root,
+        subset=subset,
+        speaker=speaker,
+        download=download,
+    )
 
 
 def _random_trajectory(
     *,
     start: torch.Tensor,
     room_size: torch.Tensor,
-    steps: int,
+    progress: torch.Tensor,
     rng: random.Random,
 ) -> tuple[torch.Tensor, str]:
     # Randomize how each source moves so datasets have diverse motion patterns.
@@ -123,7 +117,7 @@ def _random_trajectory(
         end = sampling.sample_positions_with_z_range(
             num=1, room_size=room_size, rng=rng
         ).squeeze(0)
-        traj = trajectories.linear_trajectory(start, end, steps)
+        traj = trajectories.linear_trajectory(start, end, progress=progress)
         return traj, mode
     # Zigzag motion via a random mid point.
     mid = sampling.sample_positions_with_z_range(
@@ -132,10 +126,12 @@ def _random_trajectory(
     end = sampling.sample_positions_with_z_range(
         num=1, room_size=room_size, rng=rng
     ).squeeze(0)
-    split = max(2, steps // 2)
-    first = trajectories.linear_trajectory(start, mid, split)
-    second = trajectories.linear_trajectory(mid, end, steps - split + 1)
-    traj = torch.cat([first[:-1], second], dim=0)
+    first_progress = torch.clamp(progress * 2, max=1)
+    second_progress = torch.clamp((progress - 0.5) * 2, min=0)
+    first = trajectories.linear_trajectory(start, mid, progress=first_progress)
+    second = trajectories.linear_trajectory(mid, end, progress=second_progress)
+    selector = (progress <= 0.5).reshape((-1,) + (1,) * start.ndim)
+    traj = torch.where(selector, first, second)
     return traj, mode
 
 
@@ -145,7 +141,7 @@ def _build_source_trajectories(
     num_moving_sources: int,
     room_size: torch.Tensor,
     mic_center: torch.Tensor,
-    steps: int,
+    progress: torch.Tensor,
     rng: random.Random,
 ) -> tuple[torch.Tensor, List[str], List[int]]:
     # Sample a start for each source, then generate a trajectory per source.
@@ -167,11 +163,11 @@ def _build_source_trajectories(
             traj, mode = _random_trajectory(
                 start=starts[idx],
                 room_size=room_size,
-                steps=steps,
+                progress=progress,
                 rng=rng,
             )
         else:
-            traj = starts[idx].unsqueeze(0).repeat(steps, 1)
+            traj = starts[idx].unsqueeze(0).repeat(progress.numel(), 1)
             mode = "static"
         trajs.append(traj)
         modes.append(mode)
@@ -319,6 +315,16 @@ def main() -> None:
         modifications=modifications,
         logger=logger,
     )
+    if args.dataset == "cmu_arctic":
+        available_speakers = cmu_arctic_speakers()
+    else:
+        available_speakers = _dataset_factory(
+            dataset=args.dataset,
+            root=dataset_root,
+            subset=args.subset,
+            download=args.download,
+            speaker=None,
+        ).list_speakers()
 
     for idx in range(args.num_scenes):
         # Use a per-scene RNG so each scene has independent random motion + sources.
@@ -331,6 +337,7 @@ def main() -> None:
                 download=args.download,
                 speaker=speaker,
             ),
+            speakers=available_speakers,
             num_sources=args.num_sources,
             duration_s=args.duration,
             rng=scene_rng,
@@ -339,16 +346,24 @@ def main() -> None:
 
         # Build random trajectories for each source; mics stay fixed.
         steps = max(2, args.steps)
+        schedule = FrameSchedule.uniform(
+            frame_count=steps,
+            stop_sample=signals.shape[-1],
+        )
+        progress = schedule.normalized_progress(
+            stop_sample=signals.shape[-1],
+            dtype=room_size.dtype,
+            device=room_size.device,
+        )
         src_traj, modes, moving = _build_source_trajectories(
             num_sources=args.num_sources,
             num_moving_sources=args.num_moving_sources,
             room_size=room_size,
             mic_center=mic_center,
-            steps=steps,
+            progress=progress,
             rng=scene_rng,
         )
-        src_traj = src_traj.to(device)
-        mic_traj = mic_pos.unsqueeze(0).repeat(steps, 1, 1).to(device)
+        mic_traj = mic_pos.unsqueeze(0).repeat(steps, 1, 1)
 
         # Use the initial positions for scene bookkeeping (trajectory is used for RIRs).
         sources = Source.from_positions(src_traj[0].tolist())
@@ -387,19 +402,24 @@ def main() -> None:
             mics=mics,
             src_traj=src_traj,
             mic_traj=mic_traj,
+            schedule=schedule,
         )
         result = simulate(
             scene,
             SimulationConfig(max_order=args.order, tmax=args.tmax, device=device),
         )
         rirs = result.rirs
-        convolver = DynamicConvolver(mode="trajectory")
+        convolver = DynamicConvolver(time_reference="emission")
         y = convolver.convolve(signals, result)
 
         # Save per-source reference audio before mixing.
         reference_audio = []
         for src_idx in range(args.num_sources):
-            ref = convolver.convolve(signals[src_idx], rirs[:, src_idx : src_idx + 1])
+            ref = convolver.convolve(
+                signals[src_idx],
+                rirs[:, src_idx : src_idx + 1],
+                schedule=schedule,
+            )
             ref_name = f"scene_{idx:03d}_ref{src_idx + 1:02d}.wav"
             save_scene_audio(
                 out_dir=args.out_dir,
@@ -431,6 +451,7 @@ def main() -> None:
             out_dir=args.out_dir,
             metadata_name=f"scene_{idx:03d}_metadata.json",
             result=result,
+            time_reference="emission",
             signal_len=signals.shape[1],
             source_info=info,
             extra={

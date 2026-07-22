@@ -24,21 +24,21 @@ from torchrir.config import SimulationConfig
 from torchrir.datasets import (
     CmuArcticDataset,
     attribution_for,
+    cmu_arctic_speakers,
     default_modification_notes,
     load_dataset_sources,
 )
 from torchrir.geometry import arrays, sampling, trajectories
 from torchrir.io import save_attribution_file, save_result_metadata, save_scene_audio
 from torchrir.logging import LoggingConfig, get_logger, setup_logging
-from torchrir.signal import DynamicConvolver
+from torchrir.signal import DynamicConvolver, FrameSchedule
 from torchrir.sim import simulate
 from torchrir.util import add_output_args, resolve_device
 from torchrir.viz import save_scene_gifs, save_scene_plots
 
 
-def _dataset_factory(root: Path, download: bool, speaker: str | None):
-    spk = speaker or "bdl"
-    return CmuArcticDataset(root, speaker=spk, download=download)
+def _dataset_factory(root: Path, download: bool, speaker: str):
+    return CmuArcticDataset(root, speaker=speaker, download=download)
 
 
 def _load_config(path: Path) -> Dict[str, Any]:
@@ -88,6 +88,7 @@ def _load_sources(args, rng: random.Random, device: torch.device):
         dataset_factory=lambda speaker: _dataset_factory(
             args.dataset_dir, args.download, speaker
         ),
+        speakers=cmu_arctic_speakers(None if args.download else args.dataset_dir),
         num_sources=args.num_sources,
         duration_s=args.duration,
         rng=rng,
@@ -371,12 +372,21 @@ def _run_dynamic_src(args, rng: random.Random, logger):
     room_size = torch.tensor(args.room, dtype=torch.float32)
 
     steps = max(2, args.steps)
+    schedule = FrameSchedule.uniform(
+        frame_count=steps,
+        stop_sample=signals.shape[-1],
+    )
+    progress = schedule.normalized_progress(
+        stop_sample=signals.shape[-1],
+        dtype=room_size.dtype,
+        device=room_size.device,
+    )
     # Build linear trajectories for each source; mic is fixed.
     mic_center = sampling.sample_positions(num=1, room_size=room_size, rng=rng).squeeze(
         0
     )
     mic_pos = sampling.clamp_positions(arrays.binaural_array(mic_center), room_size)
-    mic_traj = mic_pos.unsqueeze(0).repeat(steps, 1, 1).to(device)
+    mic_traj = mic_pos.unsqueeze(0).repeat(steps, 1, 1)
 
     src_start = sampling.sample_positions_min_distance(
         num=args.num_sources,
@@ -390,12 +400,16 @@ def _run_dynamic_src(args, rng: random.Random, logger):
     )
     src_traj = torch.stack(
         [
-            trajectories.linear_trajectory(src_start[i], src_end[i], steps)
+            trajectories.linear_trajectory(
+                src_start[i],
+                src_end[i],
+                progress=progress,
+            )
             for i in range(args.num_sources)
         ],
         dim=1,
     )
-    src_traj = sampling.clamp_positions(src_traj, room_size).to(device)
+    src_traj = sampling.clamp_positions(src_traj, room_size)
 
     sources = Source.from_positions(src_start.tolist())
     mics = MicrophoneArray.from_positions(mic_pos.tolist())
@@ -429,13 +443,14 @@ def _run_dynamic_src(args, rng: random.Random, logger):
         mics=mics,
         src_traj=src_traj,
         mic_traj=mic_traj,
+        schedule=schedule,
     )
     result = simulate(
         scene,
         SimulationConfig(max_order=args.order, tmax=args.tmax, device=device),
     )
     rirs = result.rirs
-    y = DynamicConvolver(mode="trajectory").convolve(signals, result)
+    y = DynamicConvolver(time_reference="emission").convolve(signals, result)
 
     # Persist outputs.
     save_scene_audio(
@@ -449,6 +464,7 @@ def _run_dynamic_src(args, rng: random.Random, logger):
         out_dir=args.out_dir,
         metadata_name="dynamic_src_binaural_metadata.json",
         result=result,
+        time_reference="emission",
         signal_len=signals.shape[1],
         source_info=info,
         extra={
@@ -480,6 +496,15 @@ def _run_dynamic_mic(args, rng: random.Random, logger):
 
     # Fixed source positions; mic follows a linear path.
     steps = max(2, args.steps)
+    schedule = FrameSchedule.uniform(
+        frame_count=steps,
+        stop_sample=signals.shape[-1],
+    )
+    progress = schedule.normalized_progress(
+        stop_sample=signals.shape[-1],
+        dtype=room_size.dtype,
+        device=room_size.device,
+    )
     mic_center_start = sampling.sample_positions(
         num=1, room_size=room_size, rng=rng
     ).squeeze(0)
@@ -494,14 +519,16 @@ def _run_dynamic_mic(args, rng: random.Random, logger):
         min_distance=1.5,
     )
     mic_center_traj = trajectories.linear_trajectory(
-        mic_center_start, mic_center_end, steps
+        mic_center_start,
+        mic_center_end,
+        progress=progress,
     )
     mic_traj = torch.stack(
         [arrays.binaural_array(center) for center in mic_center_traj], dim=0
     )
-    mic_traj = sampling.clamp_positions(mic_traj, room_size).to(device)
+    mic_traj = sampling.clamp_positions(mic_traj, room_size)
 
-    src_traj = sources_pos.unsqueeze(0).repeat(steps, 1, 1).to(device)
+    src_traj = sources_pos.unsqueeze(0).repeat(steps, 1, 1)
 
     sources = Source.from_positions(sources_pos.tolist())
     mics = MicrophoneArray.from_positions(mic_traj[0].tolist())
@@ -535,13 +562,14 @@ def _run_dynamic_mic(args, rng: random.Random, logger):
         mics=mics,
         src_traj=src_traj,
         mic_traj=mic_traj,
+        schedule=schedule,
     )
     result = simulate(
         scene,
         SimulationConfig(max_order=args.order, tmax=args.tmax, device=device),
     )
     rirs = result.rirs
-    y = DynamicConvolver(mode="trajectory").convolve(signals, result)
+    y = DynamicConvolver(time_reference="observation").convolve(signals, result)
 
     # Persist outputs.
     save_scene_audio(
@@ -555,6 +583,7 @@ def _run_dynamic_mic(args, rng: random.Random, logger):
         out_dir=args.out_dir,
         metadata_name="dynamic_mic_binaural_metadata.json",
         result=result,
+        time_reference="observation",
         signal_len=signals.shape[1],
         source_info=info,
         extra={
