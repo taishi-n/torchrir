@@ -6,6 +6,10 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/ci.yml"
+      - "CHANGELOG.md"
+      - "LICENSE"
+      - "MANIFEST.in"
+      - "NOTICE"
       - "pyproject.toml"
       - "uv.lock"
       - "src/**"
@@ -18,6 +22,10 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/ci.yml"
+      - "CHANGELOG.md"
+      - "LICENSE"
+      - "MANIFEST.in"
+      - "NOTICE"
       - "pyproject.toml"
       - "uv.lock"
       - "src/**"
@@ -35,14 +43,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.12", "3.13"]
+        python-version: ["3.11.4", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
       - uses: astral-sh/setup-uv@v5
-      - run: uv sync --group test --extra audio --extra viz
+      - run: uv sync --locked --group test --extra audio --extra viz
       - run: uv run pytest -q --cov=torchrir --cov-branch --cov-report=term-missing
 
   quality:
@@ -53,15 +61,59 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.11.4"
       - uses: astral-sh/setup-uv@v5
-      - run: uv sync --all-groups --all-extras
+      - run: uv sync --locked --all-groups --all-extras
       - run: uv run ruff format --check .
       - run: uv run ruff check .
       - run: uv run ty check
       - run: TORCHRIR_REQUIRE_COMPARISON=1 uv run pytest -q tests/test_compare_pyroomacoustics.py
+      - name: Compare against rir-generator 0.3.0
+        env:
+          TORCHRIR_REQUIRE_RIR_GENERATOR_COMPARISON: "1"
+        run: uv run --with 'rir-generator==0.3.0' pytest -q tests/test_compare_rir_generator.py
       - run: uv run zensical build --strict
+      - name: Verify API docs expose public symbols only
+        run: >-
+          uv run python -c "from pathlib import Path;
+          text=Path('site/api.html').read_text(encoding='utf-8');
+          forbidden=('_resolve_simulation_config', '_load_audio',
+          '_validate_wav_path', '__all__');
+          assert not any(name in text for name in forbidden), forbidden"
       - run: uv build
+      - name: Verify source and wheel package metadata
+        run: |
+          uv run python - <<'PY'
+          from email.parser import BytesParser
+          from pathlib import Path, PurePosixPath
+          import tarfile
+          import zipfile
+
+          dist = Path("dist")
+          sdists = sorted(dist.glob("*.tar.gz"))
+          wheels = sorted(dist.glob("*.whl"))
+          assert len(sdists) == 1, sdists
+          assert len(wheels) == 1, wheels
+
+          with tarfile.open(sdists[0], mode="r:gz") as archive:
+              changelogs = [
+                  name
+                  for name in archive.getnames()
+                  if len(PurePosixPath(name).parts) == 2
+                  and PurePosixPath(name).name == "CHANGELOG.md"
+              ]
+          assert len(changelogs) == 1, changelogs
+
+          with zipfile.ZipFile(wheels[0]) as archive:
+              metadata_files = [
+                  name
+                  for name in archive.namelist()
+                  if name.endswith(".dist-info/METADATA")
+              ]
+              assert len(metadata_files) == 1, metadata_files
+              metadata = BytesParser().parsebytes(archive.read(metadata_files[0]))
+          assert metadata["License-Expression"] == "Apache-2.0", metadata.items()
+          PY
       - run: uv venv /tmp/torchrir-wheel-smoke
       - run: uv pip install --python /tmp/torchrir-wheel-smoke/bin/python dist/*.whl
       - run: /tmp/torchrir-wheel-smoke/bin/python -c "import torchrir; from torchrir.sim import simulate"
