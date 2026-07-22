@@ -15,23 +15,36 @@ Contributions are welcome.
 pip install torchrir
 ```
 
+Install optional capabilities explicitly: `torchrir[audio]` for SoundFile I/O,
+`torchrir[viz]` for plots/animation, `torchrir[datasets]` for dataset workflows,
+`torchrir[hpf]` for RIR high-pass filtering, and `torchrir[cli]` for YAML example
+CLI configuration. `torchrir[oobss]` adds oobss integration.
+`torchrir[all]` installs every optional Python dependency; MP4 rendering still
+needs a system `ffmpeg`.
+
 ## Overview
 ### Capabilities
 - ISM-based static and dynamic RIR simulation for 2D/3D shoebox rooms.
-- Dynamic convolution via trajectory or hop-based modes.
+- Dynamic convolution with an explicit emission/observation time reference and
+  an exact sample-domain `FrameSchedule` carried by the scene or supplied to a
+  convolution call.
 - Scene visualization (plots, GIFs) and metadata export (JSON).
 - Dataset utilities for building small mixtures from speech corpora.
 
 ### Limitations
-- Ray tracing and FDTD simulators are placeholders.
+- Ray tracing and FDTD are roadmap items and are not exposed as APIs.
 - Deterministic mode is best-effort and backend-dependent.
-- MPS disables the LUT path for fractional delay (slower, minor numerical diffs).
+- RIR simulation supports float32 and float64. Lower-precision geometry is
+  rejected before the ISM kernel; convolution separately supports float16 and
+  bfloat16 through float32 work buffers. MPS rejects float64 and disables the
+  LUT path; CPU disables requested compilation.
 - Experimental status: APIs and outputs may change as the library matures.
 
 ### Supported datasets
 - CMU ARCTIC
 - LibriSpeech
-- Experimental template dataset stub under `torchrir.experimental`
+- Secure local corpus reads, archive handling, and publication require Linux or
+  macOS with the documented POSIX descriptor and atomic-rename primitives.
 - Dataset usage details (options, directory layouts, error handling):
   [Datasets](datasets.md)
 - Dataset attribution and redistribution notes:
@@ -49,13 +62,32 @@ See the detailed overview: [Overview](overview.md).
 
 ### Dynamic room acoustic simulation
 - Use `StaticScene` or `DynamicScene` to make geometry and time axes explicit.
-- Convolve with `torchrir.signal.DynamicConvolver(mode="trajectory")`.
+- Use `DynamicConvolver(time_reference="emission")` for moving sources with
+  fixed microphones.
+- Use `DynamicConvolver(time_reference="observation")` for fixed sources with
+  moving microphones. Attach exact integer starts as `DynamicScene.schedule`
+  to let its `RIRResult` provide them, or omit the scene schedule and pass a
+  call-level `FrameSchedule`. Simultaneous motion is not supported without a
+  retarded-time propagation model.
 
 ### Dataset generation
 - Use `torchrir.datasets.load_dataset_sources` to build fixed-length sources.
 - Use the dataset example scripts to generate per-scene WAV files and metadata.
 - See dataset-specific options and validation behavior:
   [Datasets](datasets.md).
+
+### Audio I/O
+- Use `torchrir.io.load_audio`, `save_audio`, and `info_audio` for formats
+  supported by soundfile.
+- Use the strict `load_wav`, `save_wav`, and `info_wav` entry points when a WAV
+  path is required.
+- Use `AudioData`, `load_audio_data`, and `save_audio_data` to preserve all
+  channels, sample rate, and subtype. The stored format is load metadata; the
+  output path selects the saved file format, and a stored subtype is inherited
+  only when that container is unchanged. Save functions preserve gain by
+  default; a WAV with no subtype uses `FLOAT`, while non-floating subtypes
+  reject out-of-range samples. Use `normalize=True` only when independent peak
+  normalization is intentional.
 
 See runnable examples and command-line usage: [Examples](examples.md).
 

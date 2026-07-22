@@ -2,10 +2,11 @@
 
 ## Project Structure & Module Organization
 - Core library code lives under `src/torchrir/`:
-  - Simulation: `core.py`, `room.py`, `directivity.py`, `config.py`
-  - Dynamic convolution: `dynamic.py`, `signal.py`
-  - Datasets + utilities: `datasets/` (CMU ARCTIC support + template stub)
-  - Plotting + scene helpers: `plotting.py`, `plotting_utils.py`, `scene_utils.py`
+  - Models and configuration: `models/`, `config.py`
+  - Simulation: `sim/` (the image-source kernel lives in `sim/ism/`)
+  - Static and dynamic convolution: `signal/`
+  - Datasets and utilities: `datasets/`, `geometry/`, `util/`
+  - Plotting and output helpers: `viz/`, `io/`
 - Tests live under `tests/` and use `pytest`.
 - Examples live under `examples/` and should import from `torchrir` (no duplicated utilities).
 - Keep large assets out of the repo; use `assets/` only for small static files.
@@ -13,8 +14,8 @@
 ## Build, Test, and Development Commands
 - This repository uses `uv` for local development and publishing.
 - Common commands:
-  - `uv sync` to create/update the virtual environment
-  - `uv run pytest` to run tests
+  - `uv sync --group test` to create/update the test environment
+  - `uv run --group test pytest` to run tests
   - `uv build` / `uv publish` for releases (must still support `pip install torchrir`)
   - `uv run --group docs zensical build --strict` to build docs locally
   - `uv run ruff format .` for formatting
@@ -25,8 +26,9 @@
 - Prefer Python for core implementation, with PyTorch used for computation.
 - Use 4-space indentation and follow PEP 8 naming (snake_case for functions/variables, PascalCase for classes).
 - Suggested naming patterns:
-  - RIR generation: `simulate_rir`, `simulate_dynamic_rir`
-  - Modules: `core.py`, `room.py`, `directivity.py`, `utils.py`
+  - RIR generation: `simulate(scene, config)`
+  - Scene models: `StaticScene`, `DynamicScene`
+  - Modules: `simulators.py`, `dynamic.py`, `room.py`, `directivity.py`
 - Use `SimulationConfig` for simulation parameters; avoid global config state.
 - If you add formatters/linters (e.g., `black`, `ruff`), document exact versions and run commands here.
 

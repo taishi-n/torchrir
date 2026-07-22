@@ -1,5 +1,33 @@
 # Examples
 
+## Choosing a dynamic time reference
+
+| Motion | `time_reference` | RIR frame boundary |
+| --- | --- | --- |
+| Moving source, fixed microphones | `"emission"` | Input/emission time |
+| Fixed sources, moving microphones | `"observation"` | Output/observation time |
+| Moving source and microphones | Not supported | Requires a two-time retarded propagation model |
+
+`DynamicConvolver` requires the time reference explicitly. Frame boundaries are
+a separate `FrameSchedule`: use `uniform`, `fixed_hop`, `from_samples`, or
+`from_seconds`. Attach it as `DynamicScene.schedule` to let the resulting
+`RIRResult` provide it automatically, or omit it from the scene and pass it to
+`convolve(..., schedule=...)`. A schedule made with `from_seconds` must use the
+same sample rate as the room. When an `RIRResult` is supplied, TorchRIR also
+rejects incompatible motion/time-reference combinations and competing scene
+and call-level schedules. A raw RIR tensor has no scene metadata, so those
+checks are unavailable. See
+[Dynamic convolution time conventions](overview.md#dynamic-convolution-time-conventions)
+for the equations and schedule contract.
+
+Every dynamic example creates the schedule before its geometry. It derives
+`progress = schedule.normalized_progress(stop_sample=...)` and passes that
+explicit grid to `linear_trajectory(..., progress=progress)`. Thus geometry
+frame `i` belongs to the exact boundary `schedule.starts[i]`; the nominal path
+endpoint at progress one is not applied one frame early. In observation-time
+examples, the last sampled microphone geometry is held through the convolution
+tail.
+
 ## Static CMU ARCTIC (fixed sources, fixed microphones)
 
 This example mixes multiple CMU ARCTIC utterances using a static ISM RIR and
@@ -44,8 +72,10 @@ Expected outputs:
 
 ## Dynamic CMU ARCTIC (moving sources, fixed microphones)
 
-This example generates moving source trajectories and convolves source signals with dynamic
-RIRs (trajectory mode).
+This example generates moving source trajectories while the microphones remain
+fixed. It uses `time_reference="emission"`: each schedule boundary selects the
+RIR for input samples emitted in that interval, and each segment's convolution
+tail continues into later output intervals.
 
 The script uses `save_scene_plots` and `save_scene_gifs` for visualization output.
 
@@ -85,6 +115,10 @@ Expected outputs:
 ## Dynamic CMU ARCTIC (fixed sources, moving microphones)
 
 This example keeps sources fixed and moves the microphone array along a linear path.
+It uses `DynamicConvolver(time_reference="observation")`, which selects the
+piecewise RIR by output/observation time. The final frame remains active through
+the complete convolution tail. Emission-time overlap-add is not valid for a
+moving receiver.
 
 ### Key arguments
 
@@ -121,6 +155,7 @@ Expected outputs:
 ## Unified CLI (static/dynamic)
 
 The unified CLI wraps the three scenarios above and supports JSON/YAML configuration files.
+JSON uses the core installation. YAML requires `pip install "torchrir[cli]"`.
 
 ### Key arguments
 
@@ -154,19 +189,35 @@ Expected outputs:
 - `ATTRIBUTION.txt`
 - `dynamic_src.gif` (and 3D variant if room is 3D)
 
+```bash
+uv run python examples/cli.py --mode dynamic_mic --gif --steps 24
+```
+
+Expected outputs:
+
+- `dynamic_mic_binaural.wav`
+- `dynamic_mic_binaural_metadata.json`
+- `ATTRIBUTION.txt`
+- `dynamic_mic.gif` (and 3D variant if room is 3D)
+
 ## Benchmark (CPU vs GPU)
 
-This script benchmarks static ISM and, optionally, dynamic trajectory simulation.
+This script benchmarks static ISM and, optionally, a fixed-source, moving-
+microphone simulation with observation-time convolution.
 
 ### Key arguments
 
 - `--repeats`: number of iterations to average.
 - `--gpu`: `cuda`, `mps`, or `auto`.
-- `--dynamic`: benchmark dynamic trajectory path as well.
+- `--dynamic`: benchmark the moving-microphone simulation and observation-time
+  convolution as well.
 
 !!! note
     CUDA paths are validated in CI on CUDA runners. Runtime and numerical behavior
     still depend on your local CUDA/PyTorch environment.
+
+    MP4 output requires a system `ffmpeg`. If audio is muxed into a video, also
+    install `torchrir[audio]`.
 
 ### Example runs
 
@@ -276,7 +327,7 @@ uv run python examples/build_dynamic_dataset.py \
 - `--dataset-dir`: dataset root path.
 - `--out-dir`: output directory for per-scene WAV/JSON/plots/GIFs.
 - `--plot`: enable plotting + GIFs (default: off).
-- `--download`: explicitly request dataset download when files are missing (the script also retries with download enabled after a missing-data error).
+- `--download`: explicitly authorize dataset download when files are missing.
 - `--device`: cpu/cuda/mps/auto.
 
 ### Dataset option validity and error handling
@@ -287,11 +338,10 @@ uv run python examples/build_dynamic_dataset.py \
 - `--dataset-dir` is the dataset root passed to the loader.
   - CMU ARCTIC expects `ARCTIC/cmu_us_<speaker>_arctic/...` under that root.
   - LibriSpeech expects `LibriSpeech/<subset>/<speaker>/<chapter>/...` under that root.
-- `--download` is optional for this script:
-  - If files are missing and `--download` is not set, the script retries once
-    with download enabled.
-  - For strict offline runs, pre-populate `--dataset-dir` and ensure all files
-    exist before execution.
+- Without `--download`, a missing or incomplete dataset raises
+  `FileNotFoundError` and no network request is made. For offline runs,
+  pre-populate `--dataset-dir` with at least one canonical transcript/audio
+  pair per selected speaker.
 - In LibriSpeech mode, malformed utterance IDs passed to `load_audio` (not in
   `speaker-chapter-utterance` format) raise `ValueError`.
 
@@ -305,7 +355,9 @@ The example is implemented in `examples/build_dynamic_dataset.py` and uses:
 
 - `torchrir.datasets.load_dataset_sources` to build fixed-length signals from multiple utterances.
 - `torchrir.sim.simulate` with a `DynamicScene` to generate an `RIRResult`.
-- `torchrir.signal.DynamicConvolver(mode="trajectory")` to produce the final mixture.
+- `torchrir.signal.DynamicConvolver(time_reference="emission")` with one
+  reusable integer-sample `FrameSchedule`, attached to `DynamicScene`, to
+  produce the final mixture.
 - `save_scene_audio` + `save_result_metadata` to store audio and result metadata.
   Metadata includes a `reference_audio` list describing the saved `scene_k_refXX.wav` files
   (each entry corresponds to a single source convolved with its dynamic RIR), plus

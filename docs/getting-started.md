@@ -8,10 +8,17 @@ This page demonstrates an end-to-end workflow with speech signals from CMU ARCTI
 4. Save WAV outputs, layout plots, waveform/spectrogram plots, and a dynamic GIF.
 
 All code blocks on this page are sourced from `examples/getting_started.py`.
+The example fixes simulation to CPU so regenerated documentation assets do not
+depend on which accelerator is present.
+Related browser previews receive one common scale per section and are written
+as PCM16 for broad browser support. Library WAV output otherwise defaults to
+`FLOAT` when no subtype is specified.
 
 ## Install
 
-Use Python 3.11, 3.12, or 3.13.
+Use Python 3.11.4 through 3.13. The patch-level floor provides the
+standard-library archive extraction security filter used by dataset loaders;
+Python 3.14 is not yet supported.
 
 ```bash
 pip install "torchrir[audio,viz,datasets]"
@@ -46,7 +53,20 @@ Source 2 (original):
 Mic mixture (convolved):
 <audio controls preload="none" src="assets/getting-started/static_convolved.wav"></audio>
 
-## 2) Dynamic RIR + Trajectory Convolution + Animation
+## 2) Dynamic RIR + Emission-Time Convolution + Animation
+
+This example moves one source while keeping the microphones fixed, so it uses
+`DynamicConvolver(time_reference="emission")`. Each RIR frame starts at an
+input-time boundary: samples emitted during that interval use the corresponding
+source geometry, and their convolution tails continue beyond the interval. The
+example constructs `FrameSchedule.uniform(...)` explicitly from the signal
+length and RIR frame count. It then derives trajectory progress from the exact
+integer starts with `schedule.normalized_progress(...)`; frame `i` is evaluated
+at `starts[i] / signal_length`, rather than on a separate endpoint-inclusive
+grid. The nominal endpoint is not an RIR frame, so the final sampled geometry
+remains active through the last interval. The schedule is attached to
+`DynamicScene.schedule`, and the result supplies it to `DynamicConvolver`. No
+seconds-domain timestamp round trip is involved.
 
 ```python
 --8<-- "examples/getting_started.py:dynamic"
@@ -69,12 +89,22 @@ Source 2 (original):
 Mic mixture (convolved):
 <audio controls preload="none" src="assets/getting-started/dynamic_convolved.wav"></audio>
 
+For fixed sources and moving microphones, use
+`DynamicConvolver(time_reference="observation")` instead. Its frame boundaries
+apply to output time, may continue after the dry signal ends, and the final
+frame remains active through the convolution tail.
+See [Dynamic convolution time conventions](overview.md#dynamic-convolution-time-conventions)
+for the equations, schedule rules, raw-tensor caveat, and simultaneous-motion
+limitation.
+
 !!! note
     The first dataset download can take time and requires network access.
     GIF generation requires Pillow through Matplotlib's animation writer.
-    `device="auto"` may select `mps` or `cuda`; if you want a warning-free tutorial run, use `device="cpu"`.
+    The checked-in tutorial uses `device="cpu"` for reproducible assets. Change
+    it to `"auto"` when you intentionally want local accelerator selection.
 
 ## Next Steps
 
 - See [Examples](examples.md) for CLI workflows and dataset generation scripts.
+- See the [Changelog](changelog.md) for released behavior changes.
 - See [API documentation](api.md) for all options and full signatures.
