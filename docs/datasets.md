@@ -4,6 +4,10 @@ This page documents the `torchrir.datasets` helpers for CMU ARCTIC and
 LibriSpeech, including accepted options, expected directory structures, and
 error handling for invalid inputs.
 
+For external corpora involving moving sources or microphone arrays, see
+[Related Dynamic Speech and Acoustic Datasets](related-datasets.md). Those
+datasets are research references and are not currently built-in integrations.
+
 ## Scope
 
 Covered APIs:

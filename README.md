@@ -638,6 +638,58 @@ site.
 - Integrated 3D spatial response visualization (e.g., array/directivity beam-pattern rendering).  
   Motivation: [pyroomacoustics#397](https://github.com/LCAV/pyroomacoustics/issues/397)
 
+### Related Dynamic Dataset Integration Plan
+
+The external datasets surveyed in
+[Related Dynamic Speech and Acoustic Datasets](https://torchrir.readthedocs.io/en/latest/related-datasets.html)
+are not currently exposed through `torchrir.datasets`. Future integration work
+should keep corpus download and licensing decisions explicit and should avoid
+redistributing third-party recordings.
+
+Common integration work:
+
+- Define a dynamic multichannel dataset manifest for mixtures, reverberant
+  stems, optional dry or close-talk references, sample rates, microphone-array
+  geometry, source and microphone trajectories, orientations, synchronization,
+  provenance, and license metadata.
+- Add manifest-backed multichannel dataset adapters that preserve channels and
+  expose validated timing and geometry records without forcing every corpus
+  into the current mono `DatasetItem` contract.
+- Add reusable dataset-building controls for resampling, source onset and
+  offset, relative source level, SIR/SNR, background-noise mixing, arbitrary
+  microphone arrays, and straight or piecewise-linear trajectories.
+- Add small synthetic fixtures and schema-validation tests. Full external
+  corpora must remain optional and must not be required by the normal test
+  suite.
+
+Dataset-specific work:
+
+- **SonicSet v2:** parse its audio, stem, trajectory, and JSON layout and map
+  its coordinate conventions into torchrir records. Exact regeneration also
+  depends on irregular mesh geometry, material-dependent propagation,
+  occlusion, and diffraction support.
+- **ASA_20k_4s_nspk2-4:** add an archive/manifest adapter. Reproduction requires
+  multi-corpus source loading, a four-channel tetrahedral array, source
+  onset/offset scheduling, diffuse background noise, and SNR-controlled mixing.
+- **WSJ0-Demand-6ch-Move:** implement the published generation recipe with
+  straight moving-source trajectories, a six-channel circular array, relative
+  speaker-level sampling, and DEMAND noise mixing. WSJ0 and DEMAND access must
+  be supplied and authorized by the user.
+- **LOCATA:** parse multichannel recordings, close-talk references, voice
+  activity, and OptiTrack position/orientation streams. Task 6 simulation also
+  requires simultaneous source and microphone motion plus time-varying
+  orientation.
+- **EasyCom:** synchronize the six-channel array, close-talk references, voice
+  activity, speaker identity, and pose metadata. Faithful simulation further
+  requires simultaneous motion, time-varying orientation, wearable-device
+  occlusion, near-field speech, and hardware response modeling.
+- **RealMAN:** add multichannel FLAC, source-position, direct-path target, and
+  transcript adapters. Multi-talker separation use also needs an explicit
+  mixture and reference-stem construction policy.
+- **trajectoRIR:** map the supplied audio, RIR, coordinate, speed, and array
+  configuration records into torchrir. Add evaluation utilities that compare
+  measured moving-microphone signals with observation-time convolution.
+
 ## Related Libraries
 - [gpuRIR](https://github.com/DavidDiazGuerra/gpuRIR)
 - [Cross3D](https://github.com/DavidDiazGuerra/Cross3D)

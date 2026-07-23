@@ -12,6 +12,7 @@ nav = [
   { "Getting started" = "getting-started.md" },
   { "Overview" = "overview.md" },
   { "Datasets" = "datasets.md" },
+  { "Related Dynamic Datasets" = "related-datasets.md" },
   { "Examples" = "examples.md" },
   { "Library Comparisons" = "comparisons.md" },
   { "Changelog" = "changelog.md" },
