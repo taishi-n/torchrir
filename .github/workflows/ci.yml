@@ -38,6 +38,29 @@ on:
       - "README.md"
 
 jobs:
+  docs:
+    name: Documentation (minimal dependencies)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11.4"
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --locked --only-group docs
+      - run: uv run --locked --only-group docs zensical build --clean --strict
+      - name: Verify generated documentation
+        run: >-
+          uv run --locked --only-group docs python -c "from pathlib import Path;
+          required=(Path('site/index.html'), Path('site/api.html'));
+          assert all(path.is_file() and path.stat().st_size > 0
+          for path in required), required;
+          text=Path('site/api.html').read_text(encoding='utf-8');
+          forbidden=('_resolve_simulation_config', '_load_audio',
+          '_validate_wav_path', '__all__');
+          assert not any(name in text for name in forbidden), forbidden"
+
   test:
     name: Tests (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
@@ -56,7 +79,7 @@ jobs:
       - run: uv run pytest -q --cov=torchrir --cov-branch --cov-report=term-missing
 
   quality:
-    name: Lint, type, docs, comparisons, and wheel
+    name: Lint, type, comparisons, and wheel
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -74,14 +97,6 @@ jobs:
         env:
           TORCHRIR_REQUIRE_RIR_GENERATOR_COMPARISON: "1"
         run: uv run --with 'rir-generator==0.3.0' pytest -q tests/test_compare_rir_generator.py
-      - run: uv run zensical build --strict
-      - name: Verify API docs expose public symbols only
-        run: >-
-          uv run python -c "from pathlib import Path;
-          text=Path('site/api.html').read_text(encoding='utf-8');
-          forbidden=('_resolve_simulation_config', '_load_audio',
-          '_validate_wav_path', '__all__');
-          assert not any(name in text for name in forbidden), forbidden"
       - run: uv build
       - name: Verify source and wheel package metadata
         run: |

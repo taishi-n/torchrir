@@ -6,10 +6,18 @@ build:
     python: "3.11"
   jobs:
     install:
-      - python -m pip install uv
-      - uv sync --locked --group docs
+      - uv sync --locked --only-group docs
     build:
       html:
-        - uv run --locked --group docs zensical build --clean --strict
+        - uv run --locked --only-group docs zensical build --clean --strict
         - mkdir -p "$READTHEDOCS_OUTPUT/html"
         - cp -a site/. "$READTHEDOCS_OUTPUT/html/"
+
+python:
+  install:
+    # Enable Read the Docs' native uv toolchain. The custom install job above
+    # retains strict lockfile checking and excludes project runtime dependencies.
+    - method: uv
+      command: sync
+      groups:
+        - docs

@@ -610,14 +610,14 @@ The documentation site is configured in
 and built with [Zensical](https://zensical.org/).
 
 ```bash
-uv sync --locked --group docs
-uv run zensical serve
+uv sync --locked --only-group docs
+uv run --locked --only-group docs zensical serve
 ```
 
 Before submitting documentation changes, run the same strict build used by CI:
 
 ```bash
-uv run zensical build --strict
+uv run --locked --only-group docs zensical build --clean --strict
 ```
 
 Pushes to `main` are published automatically by Read the Docs using the custom
