@@ -17,7 +17,7 @@ import pytest
 import torch
 
 from torchrir import MicrophoneArray, Room, Source, StaticScene
-from torchrir.config import SimulationConfig
+from torchrir.config import RIRHighPassConfig, SimulationConfig
 from torchrir.signal import fft_convolve
 from torchrir.sim import simulate
 
@@ -55,10 +55,10 @@ _PYROOM_FRACTIONAL_DELAY_OFFSET = (_PYROOM_FRACTIONAL_DELAY - 1) // 2
 
 
 @contextmanager
-def _pyroom_hpf_disabled() -> Iterator[None]:
-    """Disable pyroomacoustics' process-global HPF without leaking state."""
+def _pyroom_hpf(enabled: bool) -> Iterator[None]:
+    """Set pyroomacoustics' process-global HPF without leaking state."""
     previous_rir_hpf_enable = pra.constants.get("rir_hpf_enable")
-    pra.constants.set("rir_hpf_enable", False)
+    pra.constants.set("rir_hpf_enable", enabled)
     try:
         yield
     finally:
@@ -88,8 +88,9 @@ def _pyroom_rirs(
     beta: list[float],
     fs: int,
     max_order: int,
+    hpf_enabled: bool = False,
 ) -> list[list[np.ndarray]]:
-    with _pyroom_hpf_disabled():
+    with _pyroom_hpf(hpf_enabled):
         room = pra.ShoeBox(
             room_size,
             fs=fs,
@@ -134,7 +135,7 @@ def _pyroom_directional_rirs(
     target: str,
 ) -> list[np.ndarray]:
     directivity = _pyroom_analytic_directivity(pattern, target=target)
-    with _pyroom_hpf_disabled():
+    with _pyroom_hpf(False):
         room = pra.ShoeBox(
             _DIRECTIONAL_ROOM_SIZE,
             fs=fs,
@@ -233,6 +234,67 @@ def test_rir_matches_pyroomacoustics_without_free_alignment(
             expected_signal = np.convolve(test_signal.numpy(), expected_rir)
             assert _lag_samples(actual_signal, expected_signal) == 0
             assert _relative_l2(actual_signal, expected_signal) < 2e-3
+
+
+@pytest.mark.comparison
+@pytest.mark.numerical
+def test_zero_phase_hpf_matches_pyroomacoustics_natural_rir_horizons() -> None:
+    fs = 16000
+    room_size = [6.0, 4.0, 3.0]
+    sources = [[1.0, 1.5, 1.2], [2.0, 0.8, 2.0]]
+    microphones = [[3.0, 2.0, 1.2], [5.0, 3.0, 2.3]]
+    beta = [0.2, 0.3, 0.4, 0.5, 0.6, 0.7]
+    max_order = 3
+    reference = _pyroom_rirs(
+        room_size=room_size,
+        sources=sources,
+        microphones=microphones,
+        beta=beta,
+        fs=fs,
+        max_order=max_order,
+        hpf_enabled=True,
+    )
+    nsample = (
+        max(
+            rir.size - _PYROOM_FRACTIONAL_DELAY_OFFSET
+            for per_source in reference
+            for rir in per_source
+        )
+        + 256
+    )
+    actual = simulate(
+        StaticScene(
+            room=Room.shoebox(room_size, fs=fs, beta=beta),
+            sources=Source.from_positions(sources),
+            mics=MicrophoneArray.from_positions(microphones),
+        ),
+        SimulationConfig(
+            max_order=max_order,
+            nsample=nsample,
+            use_lut=True,
+            high_pass=RIRHighPassConfig(),
+        ),
+    ).rirs.cpu()
+
+    for source in range(2):
+        for microphone in range(2):
+            expected = _to_physical_time_axis(
+                reference[source][microphone],
+                nsample=nsample,
+            )
+            assert _lag_samples(actual[source, microphone].numpy(), expected) == 0
+            assert _relative_l2(actual[source, microphone].numpy(), expected) < 2e-3
+            assert (
+                torch.count_nonzero(
+                    actual[
+                        source,
+                        microphone,
+                        reference[source][microphone].size
+                        - _PYROOM_FRACTIONAL_DELAY_OFFSET :,
+                    ]
+                )
+                == 0
+            )
 
 
 @pytest.mark.comparison

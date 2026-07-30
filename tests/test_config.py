@@ -312,6 +312,7 @@ def test_tmax_resolution_rejects_finite_product_overflow_or_int64_excess(
 def test_high_pass_is_explicit_and_disabled_by_default() -> None:
     base = _config()
     assert base.high_pass is None
+    assert RIRHighPassConfig().phase == "zero_phase"
     high_pass = RIRHighPassConfig(
         cutoff_hz=20.0,
         order=3,

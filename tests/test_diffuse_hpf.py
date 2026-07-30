@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import math
 
+import numpy as np
 import pytest
 import torch
 
 from torchrir import Room
 from torchrir.config import RIRHighPassConfig
 from torchrir.sim.ism.diffuse import _apply_diffuse_tail
-from torchrir.sim.ism.hpf import apply_rir_hpf
+from torchrir.sim.ism.hpf import _design_hpf_sos, apply_rir_hpf
 
 
 def _room(*, beta: list[float] | None = None) -> Room:
@@ -313,3 +314,30 @@ def test_zero_phase_hpf_is_an_explicit_phase_choice() -> None:
     )
     torch.testing.assert_close(causal[..., :32], torch.zeros_like(causal[..., :32]))
     assert torch.any(zero_phase[..., :32] != 0)
+
+
+def test_zero_phase_hpf_filters_individual_natural_length_prefixes() -> None:
+    scipy_signal = pytest.importorskip("scipy.signal")
+    rir = torch.zeros((2, 1, 128), dtype=torch.float64)
+    rir[0, 0, 24] = 1.0
+    rir[1, 0, 40] = 1.0
+    lengths = torch.tensor([[64], [96]])
+    config = RIRHighPassConfig()
+
+    actual = apply_rir_hpf(
+        rir,
+        16000.0,
+        config,
+        zero_phase_lengths=lengths,
+    )
+
+    sos = _design_hpf_sos(16000.0, config)
+    expected = np.zeros(rir.shape, dtype=np.float64)
+    for index, length in enumerate((64, 96)):
+        expected[index, 0, :length] = scipy_signal.sosfiltfilt(
+            sos,
+            rir[index, 0, :length].numpy(),
+        )
+    torch.testing.assert_close(actual, torch.from_numpy(expected), rtol=0, atol=0)
+    assert torch.count_nonzero(actual[0, 0, 64:]) == 0
+    assert torch.count_nonzero(actual[1, 0, 96:]) == 0

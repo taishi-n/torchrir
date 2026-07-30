@@ -83,6 +83,16 @@ def _simulate_static_rir(
         dim=dimension,
         count=n_sources,
     )
+    max_arrival_sample = (
+        torch.full(
+            (n_sources, n_microphones),
+            -torch.inf,
+            device=config.device,
+            dtype=config.dtype,
+        )
+        if _needs_pyroom_zero_phase_lengths(config)
+        else None
+    )
 
     for image_indices in _iter_image_source_index_chunks(
         context.max_order,
@@ -107,8 +117,18 @@ def _simulate_static_rir(
             src_dirs=source_directions,
             mic_dir=context.microphone_directions,
         )
+        if max_arrival_sample is not None:
+            max_arrival_sample = torch.maximum(
+                max_arrival_sample,
+                torch.amax(sample, dim=-1),
+            )
         _accumulate_rir_batch(rir, sample, attenuation, config)
 
+    zero_phase_lengths = (
+        _pyroom_zero_phase_lengths(max_arrival_sample, config)
+        if max_arrival_sample is not None
+        else None
+    )
     if config.tdiff is not None:
         rir = _apply_diffuse_tail(
             rir,
@@ -120,7 +140,12 @@ def _simulate_static_rir(
             c=room.c,
             seed=config.seed,
         )
-    return apply_rir_hpf(rir, room.fs, config.high_pass)
+    return apply_rir_hpf(
+        rir,
+        room.fs,
+        config.high_pass,
+        zero_phase_lengths=zero_phase_lengths,
+    )
 
 
 def _simulate_dynamic_rir(
@@ -181,6 +206,16 @@ def _simulate_dynamic_rir(
         dim=dimension,
         count=n_sources,
     )
+    max_arrival_sample = (
+        torch.full(
+            (time_steps, n_sources, n_microphones),
+            -torch.inf,
+            device=config.device,
+            dtype=config.dtype,
+        )
+        if _needs_pyroom_zero_phase_lengths(config)
+        else None
+    )
 
     for image_indices in _iter_image_source_index_chunks(
         context.max_order,
@@ -205,6 +240,11 @@ def _simulate_dynamic_rir(
             src_dirs=source_directions,
             mic_dir=context.microphone_directions,
         )
+        if max_arrival_sample is not None:
+            max_arrival_sample = torch.maximum(
+                max_arrival_sample,
+                torch.amax(sample, dim=-1),
+            )
         sample_flat = sample.reshape(time_steps * n_sources, n_microphones, -1)
         attenuation_flat = attenuation.reshape(
             time_steps * n_sources, n_microphones, -1
@@ -216,6 +256,11 @@ def _simulate_dynamic_rir(
         )
         _accumulate_rir_batch(rir_flat, sample_flat, attenuation_flat, config)
 
+    zero_phase_lengths = (
+        _pyroom_zero_phase_lengths(max_arrival_sample, config)
+        if max_arrival_sample is not None
+        else None
+    )
     if config.tdiff is not None:
         rirs = _apply_diffuse_tail(
             rirs,
@@ -227,7 +272,33 @@ def _simulate_dynamic_rir(
             c=room.c,
             seed=config.seed,
         )
-    return apply_rir_hpf(rirs, room.fs, config.high_pass)
+    return apply_rir_hpf(
+        rirs,
+        room.fs,
+        config.high_pass,
+        zero_phase_lengths=zero_phase_lengths,
+    )
+
+
+def _pyroom_zero_phase_lengths(
+    max_arrival_sample: Tensor,
+    config: ResolvedSimulationConfig,
+) -> Tensor:
+    """Return pyroomacoustics-compatible physical-axis RIR lengths."""
+
+    fractional_delay_half = (config.frac_delay_length - 1) // 2
+    lengths = torch.ceil(max_arrival_sample) + float(fractional_delay_half) + 2.0
+    return torch.clamp(lengths, min=1.0, max=float(config.nsample)).to(torch.int64)
+
+
+def _needs_pyroom_zero_phase_lengths(config: ResolvedSimulationConfig) -> bool:
+    """Return whether simulation must track finite pyroomacoustics RIR horizons."""
+
+    return (
+        config.high_pass is not None
+        and config.high_pass.phase == "zero_phase"
+        and config.tdiff is None
+    )
 
 
 __all__: list[str] = []

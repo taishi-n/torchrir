@@ -70,9 +70,9 @@ class RIRHighPassConfig:
     """Optional IIR high-pass filter applied after RIR generation.
 
     High-pass filtering is opt-in. Use ``SimulationConfig(high_pass=...)`` to
-    enable it. ``phase="causal"`` preserves the physical time origin;
-    ``phase="zero_phase"`` is an explicit forward-backward operation that can
-    introduce pre-ringing and depends on the finite RIR endpoint.
+    enable it. The default ``phase="zero_phase"`` matches pyroomacoustics'
+    forward-backward filtering. ``phase="causal"`` is an explicit alternative
+    that preserves the physical time origin and prefix invariance.
 
     ``filter_family`` accepts ``"bessel"``, ``"butter"``, ``"cheby1"``,
     ``"cheby2"``, or ``"ellip"``. Install ``torchrir[hpf]`` to enable this
@@ -84,7 +84,7 @@ class RIRHighPassConfig:
     passband_ripple_db: float = 5.0
     stopband_attenuation_db: float = 60.0
     filter_family: str = "butter"
-    phase: Literal["causal", "zero_phase"] = "causal"
+    phase: Literal["causal", "zero_phase"] = "zero_phase"
 
     def __post_init__(self) -> None:
         object.__setattr__(

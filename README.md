@@ -362,8 +362,13 @@ y = DynamicConvolver(time_reference="emission").convolve(signal, dynamic_result)
   non-decaying carrier.
 - RIR high-pass filtering is disabled by default, avoiding hidden CPU
   post-processing in accelerator simulations. Enable it explicitly with
-  `high_pass=RIRHighPassConfig(...)`; `phase="causal"` is prefix invariant,
-  while `phase="zero_phase"` is non-causal and depends on the finite endpoint.
+  `high_pass=RIRHighPassConfig(...)`. Its default `phase="zero_phase"` matches
+  pyroomacoustics: each source/microphone RIR is forward-backward filtered only
+  through its natural ISM horizon
+  `min(nsample, ceil(max_arrival_sample) + (frac_delay_length - 1) // 2 + 2)`,
+  then zero-filled to `nsample`. A diffuse tail instead uses the complete
+  requested horizon. Explicit `phase="causal"` is prefix invariant and filters
+  the complete requested RIR.
   Supported filter families are `bessel`, `butter`, `cheby1`, `cheby2`, and
   `ellip`. This optional SciPy post-process detaches autograd and transfers
   accelerator results through CPU memory. Chebyshev-I and elliptic filters

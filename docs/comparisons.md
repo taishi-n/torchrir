@@ -114,7 +114,7 @@ config = SimulationConfig(
         passband_ripple_db=5.0,
         stopband_attenuation_db=60.0,
         filter_family="butter",
-        phase="causal",
+        phase="zero_phase",
     ),
 )
 ```
@@ -138,15 +138,29 @@ rs=\mathrm{stopband\_attenuation\_db},\;
 \right)
 $$
 
-With `phase="causal"`, TorchRIR applies:
+The default `phase="zero_phase"` matches pyroomacoustics and applies:
 
 $$
-y = \mathrm{sosfilt}(\mathrm{SOS}, x)
+y = \mathrm{sosfiltfilt}(\mathrm{SOS}, x_{:N_\mathrm{natural}})
 $$
 
-along the time axis. This has no pre-ringing and is prefix invariant. Selecting
-`phase="zero_phase"` applies `sosfiltfilt` instead. The forward-backward
-result has zero phase but can pre-ring and depends on the finite RIR endpoint.
+where
+
+$$
+N_\mathrm{natural}
+= \min\left(
+N_\mathrm{requested},
+\left\lceil \tau_{\max} f_s \right\rceil
++ \frac{L_\mathrm{FDL}-1}{2} + 2
+\right).
+$$
+
+The filtered prefix is zero-filled to the requested output length. This
+reproduces pyroomacoustics' per-source/microphone finite ISM endpoint without
+exposing its fixed fractional-delay offset. A diffuse tail is filtered through
+the complete requested horizon. The forward-backward result has zero phase but
+can pre-ring. Explicit `phase="causal"` instead applies `sosfilt` to the
+complete requested RIR; it has no pre-ringing and is prefix invariant.
 
 ### `rir-generator`: parameterization and equations
 
@@ -333,7 +347,8 @@ Source lines:
 ### 3) HPF implementation and defaults
 
 - `torchrir`: no HPF by default; a caller may opt in with
-  `SimulationConfig.high_pass`.
+  `SimulationConfig.high_pass`. The default high-pass configuration uses
+  pyroomacoustics-compatible zero-phase filtering and natural ISM horizons.
 - `pyroomacoustics`: has HPF-enabled paths and a process-global setting.
 - `rir-generator`: uses an Allen-Berkley style HPF.
 - `gpuRIR`: does not assume an equivalent built-in HPF path, and project discussion indicates the low-frequency attenuation behavior is an intentional design choice (not just a missing toggle).

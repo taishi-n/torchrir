@@ -36,8 +36,16 @@ def apply_rir_hpf(
     rir: Tensor,
     fs: float,
     config: RIRHighPassConfig | None,
+    *,
+    zero_phase_lengths: Tensor | None = None,
 ) -> Tensor:
-    """Apply an explicitly requested IIR high-pass filter to an RIR tensor."""
+    """Apply an explicitly requested IIR high-pass filter to an RIR tensor.
+
+    ``zero_phase_lengths`` selects the finite prefix filtered independently for
+    every RIR. Samples after each prefix are zero-filled. The simulator supplies
+    pyroomacoustics-compatible natural RIR lengths; direct callers may omit the
+    argument to filter the complete final axis.
+    """
 
     if config is None:
         return rir
@@ -56,7 +64,27 @@ def apply_rir_hpf(
         filtered = sosfilt(sos, rir_np, axis=-1)
     else:
         try:
-            filtered = sosfiltfilt(sos, rir_np, axis=-1)
+            if zero_phase_lengths is None:
+                filtered = sosfiltfilt(sos, rir_np, axis=-1)
+            else:
+                lengths_np = zero_phase_lengths.detach().cpu().to(torch.int64).numpy()
+                if lengths_np.shape != rir_np.shape[:-1]:
+                    raise ValueError(
+                        "zero_phase_lengths must match the RIR leading dimensions"
+                    )
+                if np.any(lengths_np < 1) or np.any(lengths_np > rir_np.shape[-1]):
+                    raise ValueError(
+                        "zero_phase_lengths must lie within the RIR sample axis"
+                    )
+                filtered = np.zeros_like(rir_np)
+                flat_input = rir_np.reshape(-1, rir_np.shape[-1])
+                flat_output = filtered.reshape(-1, filtered.shape[-1])
+                for index, length in enumerate(lengths_np.reshape(-1)):
+                    prefix_length = int(length)
+                    flat_output[index, :prefix_length] = sosfiltfilt(
+                        sos,
+                        flat_input[index, :prefix_length],
+                    )
         except ValueError as exc:
             if "padlen" not in str(exc):
                 raise

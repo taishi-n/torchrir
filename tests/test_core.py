@@ -117,6 +117,49 @@ def test_simulate_dynamic_rir_shape() -> None:
     assert rirs.shape == (3, 1, 1, 512)
 
 
+def test_dynamic_zero_phase_hpf_uses_each_frames_natural_horizon() -> None:
+    pytest.importorskip("scipy.signal")
+    room = Room.shoebox(
+        size=[5.0, 4.0, 3.0],
+        fs=16000,
+        beta=[0.9] * 6,
+        dtype=torch.float64,
+    )
+    source_trajectory = torch.tensor(
+        [[[1.0, 1.0, 1.0]], [[2.0, 1.0, 1.0]]],
+        dtype=torch.float64,
+    )
+    microphone_trajectory = torch.tensor(
+        [[[3.0, 1.0, 1.0]], [[4.0, 1.0, 1.0]]],
+        dtype=torch.float64,
+    )
+    config = SimulationConfig(
+        max_order=2,
+        nsample=1024,
+        use_lut=False,
+        dtype=torch.float64,
+        high_pass=RIRHighPassConfig(),
+    )
+    dynamic = _simulate_dynamic(
+        room,
+        source_trajectory,
+        microphone_trajectory,
+        config,
+    )
+
+    for frame in range(2):
+        static = _simulate_static(
+            room,
+            Source.from_positions(source_trajectory[frame], dtype=torch.float64),
+            MicrophoneArray.from_positions(
+                microphone_trajectory[frame],
+                dtype=torch.float64,
+            ),
+            config,
+        )
+        torch.testing.assert_close(dynamic[frame], static, rtol=0, atol=0)
+
+
 def test_dynamic_accepts_2d_single_entity_trajectory() -> None:
     room = Room.shoebox(size=[5.0, 4.0], fs=8000, beta=[0.9] * 4)
     source = torch.tensor([[1.0, 1.0], [1.5, 1.0], [2.0, 1.0]])
@@ -219,7 +262,7 @@ def test_simulate_rir_hpf_changes_output_when_enabled() -> None:
     )
     assert no_hpf.shape == with_hpf.shape
     assert not torch.allclose(no_hpf, with_hpf)
-    assert abs(with_hpf.mean().item()) < 0.2 * abs(no_hpf.mean().item())
+    assert abs(with_hpf.mean().item()) < 0.25 * abs(no_hpf.mean().item())
 
 
 def test_simulate_rir_reports_short_zero_phase_hpf_input_clearly() -> None:

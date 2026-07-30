@@ -287,15 +287,19 @@ config = SimulationConfig(
         cutoff_hz=10.0,
         order=2,
         filter_family="butter",
-        phase="causal",
+        phase="zero_phase",
     ),
 )
 ```
 
-`phase="causal"` uses a zero initial state, so later RIR samples cannot alter an
-earlier prefix. Explicit `phase="zero_phase"` performs forward-backward filtering. It is useful
-for controlled comparisons with pyroomacoustics-style output, but can pre-ring
-and needs enough samples for padding. `filter_family` accepts `bessel`,
+The default `phase="zero_phase"` performs pyroomacoustics-compatible
+forward-backward filtering. For every source/microphone pair without a diffuse
+tail, TorchRIR filters only through the natural ISM horizon
+`min(nsample, ceil(max_arrival_sample) + (frac_delay_length - 1) // 2 + 2)` and
+zero-fills the remaining requested samples. A diffuse tail uses the complete
+requested horizon. Zero-phase filtering can pre-ring and needs enough samples
+for padding. Explicit `phase="causal"` uses a zero initial state, filters the
+complete requested RIR, and is prefix invariant. `filter_family` accepts `bessel`,
 `butter`, `cheby1`, `cheby2`, or `ellip`. `cheby1` and `ellip` require positive
 `passband_ripple_db`; `cheby2` and `ellip` require positive
 `stopband_attenuation_db`; for `ellip`, attenuation must exceed ripple.
