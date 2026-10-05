@@ -30,6 +30,9 @@ on:
 permissions:
   contents: read
 
+env:
+  UV_PYTHON: "3.11.4"
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: ${{ github.workflow == 'ci' }}
@@ -41,8 +44,6 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.sha }}
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11.4"
@@ -66,8 +67,6 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.sha }}
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11.4"
@@ -80,12 +79,17 @@ jobs:
         run: |
           curl -fsSL https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz -o "$RUNNER_TEMP/actionlint.tar.gz"
           tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP" actionlint
-      - run: '"$RUNNER_TEMP/actionlint"'
+      - name: Validate workflows and shell scripts
+        run: |
+          shellcheck --version
+          "$RUNNER_TEMP/actionlint"
 
   test:
     name: CPU (${{ matrix.os }}, Python ${{ matrix.python }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 25
+    env:
+      UV_PYTHON: ${{ matrix.python }}
     strategy:
       fail-fast: false
       matrix:
@@ -96,13 +100,25 @@ jobs:
           - {os: macos-latest, python: "3.13", coverage: false}
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.sha }}
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
       - uses: astral-sh/setup-uv@v5
       - run: uv sync --locked --no-default-groups --group test --extra viz --extra cli
+      - name: Verify test interpreter
+        env:
+          EXPECTED_PYTHON: ${{ matrix.python }}
+        run: |
+          uv run --no-sync python - <<'PY'
+          import os
+          import sys
+
+          expected = tuple(map(int, os.environ["EXPECTED_PYTHON"].split(".")))
+          actual = sys.version_info[: len(expected)]
+          print(f"Requested Python {expected}; running {sys.version}")
+          if actual != expected:
+              raise SystemExit(f"Python version mismatch: {actual} != {expected}")
+          PY
       - name: Install codecs on Linux
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y ffmpeg
@@ -135,8 +151,6 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.sha }}
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11.4"
@@ -163,8 +177,6 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.sha }}
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11.4"

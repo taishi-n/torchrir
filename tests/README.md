@@ -146,12 +146,19 @@ of the normal comparison dependency group.
 The automated validation entry point is [ci.yml](../.github/workflows/ci.yml).
 It separates quality, CPU tests, CPU comparisons, documentation, and distribution.
 CPU tests run on Linux Python 3.11.4/3.12/3.13 and macOS Python 3.13; only Linux
-3.11.4 collects branch-inclusive coverage with the 75% threshold. Each test job
-retains JUnit reports and explicit skip reasons; empty/all-skipped reports fail.
+3.11.4 collects branch-inclusive coverage with the 75% threshold. The workflow
+sets `UV_PYTHON` to 3.11.4 by default and overrides it from each CPU matrix entry
+so the development `.python-version` cannot select a different interpreter.
+Before pytest, the environment's actual Python version must match the requested
+major/minor, and the patch when specified.
+Each test job retains JUnit reports and explicit skip reasons;
+empty/all-skipped reports fail.
 Comparison reports additionally reject any skips. ffmpeg/ffprobe are installed
 in CPU jobs so real-media tests cannot disappear behind a missing-codec skip.
 Actionlint 1.7.12 validates workflow syntax and invokes the runner's ShellCheck
-for embedded shell scripts. Local workflow checks must also provide ShellCheck.
+for embedded shell scripts. The quality job requires ShellCheck and prints its
+version before actionlint, so a missing executable fails rather than silently
+omitting shell analysis. Local workflow checks must also provide ShellCheck.
 Optional reference libraries are imported at runtime; the quality environment
 does not need them to type-check the repository. When checking a separate local
 environment, pass its interpreter explicitly with `ty check --python PATH`.
@@ -244,6 +251,63 @@ the publication job downloads it without checking out or rebuilding source.
 without granting publication permission or running `uv publish`.
 Version-rejection tests use synthetic archives; a manual dispatch validates the
 complete gate without uploading a release.
+
+### Local workflow validation with act
+
+Use `act` with Docker to exercise the Linux jobs from the actual workflow,
+including dependency installation and artifact uploads. Use the default
+`actions/checkout` event ref/SHA selection: GitHub validates the event commit,
+while act 0.2.89 copies the local working tree, including uncommitted source
+changes. Do not override checkout's `ref` or use act's `--no-skip-checkout` for
+local validation. Keep act's default container copy mode rather than `--bind`.
+The medium runner image does not include every tool installed on GitHub-hosted
+runners. In particular,
+install ShellCheck in the local image before running quality checks; actionlint
+can otherwise omit shell analysis when ShellCheck is absent.
+
+From the repository root, prepare the local runner:
+
+```bash
+docker build --platform linux/amd64 -t torchrir-act:local - <<'DOCKERFILE'
+FROM catthehacker/ubuntu:act-24.04
+RUN apt-get update && apt-get install -y --no-install-recommends shellcheck \
+    && rm -rf /var/lib/apt/lists/*
+DOCKERFILE
+
+act_args=(
+  workflow_dispatch -W .github/workflows/ci.yml
+  --container-architecture linux/amd64
+  -P ubuntu-latest=torchrir-act:local --pull=false
+  --container-options '-v torchrir-act-uv-cache:/tmp/setup-uv-cache'
+  --container-daemon-socket -
+  --artifact-server-path /tmp/torchrir-act-artifacts
+)
+for job in quality docs comparison distribution; do
+  act "${act_args[@]}" -j "$job" || exit 1
+done
+for python_version in 3.11.4 3.12 3.13; do
+  act "${act_args[@]}" -j test \
+    --matrix os:ubuntu-latest --matrix python:"$python_version" || exit 1
+done
+```
+
+The architecture matches the Linux GitHub runners, including on Apple Silicon.
+Invoke jobs and matrix entries separately to limit Docker memory and disk usage;
+act's `--concurrent-jobs 1` does not serialize entries within a matrix job.
+The artifact server keeps report/distribution uploads local; no GitHub or PyPI
+token is required.
+The named Docker volume reuses downloaded packages between jobs while every
+job still creates its own environment with `uv sync --locked`.
+Rerun only the affected job or matrix entry after diagnosing a failure. Preserve
+logs and inspect JUnit counts and coverage rather than relying only on the
+workflow exit code.
+
+Docker-based Linux runs do not validate the macOS job, accelerator execution,
+GitHub permissions/concurrency/timeouts, or PyPI publication. See act's
+[unsupported functionality](https://nektosact.com/not_supported.html).
+Check the macOS job on GitHub or in a separate native macOS environment.
+For release-gate validation, use the release workflow's `workflow_dispatch`
+event with `release-tag`; never use a tag-push event for a local validation run.
 
 ### Manual accelerator checks
 
