@@ -37,6 +37,7 @@ from torchrir.geometry import arrays, sampling
 from torchrir.io import save_attribution_file, save_result_metadata, save_scene_audio
 from torchrir.logging import LoggingConfig, get_logger, setup_logging
 from torchrir.signal import convolve_rir
+from torchrir.signal import FrameSchedule
 from torchrir.sim import simulate
 from torchrir.util import add_output_args, resolve_device
 from torchrir.viz import save_scene_gifs, save_scene_plots
@@ -198,7 +199,8 @@ def main() -> None:
             src_traj=src_traj,
             mic_traj=mic_traj,
             prefix="static",
-            signal_len=signals.shape[1],
+            schedule=FrameSchedule.from_samples([0]),
+            stop_sample=signals.shape[1],
             fs=fs,
             gif_fps=-1,
             logger=logger,

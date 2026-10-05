@@ -494,6 +494,22 @@ not implemented.
 
 ### Visualization
 
+- GIF/MP4 animation requires an explicit `FrameSchedule`, `fs`, and
+  `stop_sample`. The display covers `[0, stop_sample / fs)`; trajectory records
+  become active at their exact sample starts and the last record is held through
+  the end, including any requested reverberation tail. Source and microphone
+  trajectories must both match the schedule length. No endpoint is invented.
+- `step` retains every positive-integer-th trajectory record at its original
+  start sample. With `fps=None`, the output has one frame per retained record.
+  A positive requested FPS selects `ceil(stop_sample / fs * fps)` output frames;
+  the effective FPS is that count divided by the duration. Geometry is sampled
+  by holding the latest retained record on this uniform output clock, and titles
+  show output time. FPS and frame subsampling never change the requested duration.
+- MP4 keeps fractional FPS. GIF rounds cumulative frame boundaries to its 10 ms
+  clock, limiting total-duration error to 5 ms; schedules requiring a GIF frame
+  shorter than 10 ms are rejected. Muxed audio must have the same duration as
+  the display timeline. The dynamic CMU builder renders the complete convolved
+  mixture duration and holds the final geometry through its tail.
 - Source-index annotations follow source positions in both 2D and 3D GIF/MP4
   animations. `annotate_sources=True` is supported in either view; disabling
   annotations changes only the labels. A 3D label uses the source's full XYZ
@@ -665,12 +681,12 @@ acceptance criteria; unchecked items remain incomplete.
       decoding, and HD MP4 dimensions. See
       [animation.py](src/torchrir/viz/animation.py) and
       [rendering tests](tests/test_viz_animation.py).
-- [ ] Align animation timestamps and playback duration with the exact sample
-      schedule. Frame times `[0, 0.25, 0.5, 0.75]` currently display as
-      `[0, 0.33, 0.67, 1.00]`; integer FPS rounding also turns a four-frame,
-      three-second MP4 into a four-second video. Define the display timeline and
-      handling of the reverberation tail, then test uniform/nonuniform schedules,
-      frame subsampling, fractional FPS, and audio/video synchronization.
+- [x] Align animation timestamps and playback duration with the exact sample
+      schedule. Animation callers now pass `schedule`, `fs`, and `stop_sample`.
+      Tests cover uniform/nonuniform schedules, retained sample starts under
+      subsampling, fractional MP4 FPS, cumulative GIF timing, invalid timelines,
+      and synchronized audio/video through the reverberation tail. See
+      [Visualization](#visualization) for the canonical timing contract.
 - [ ] Define and enforce the audio level policy for MP4 muxing. The temporary
       WAV currently defaults to PCM_16 and silently clips a FLOAT-WAV input with
       peak 1.5 to approximately 0.99997. Test out-of-range input, selected stereo

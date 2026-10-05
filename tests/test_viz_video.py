@@ -7,6 +7,8 @@ from typing import cast
 import pytest
 import torch
 
+from torchrir.signal import FrameSchedule
+
 import torchrir.viz.io as viz_io
 
 
@@ -39,7 +41,8 @@ def test_save_scene_videos_3d_calls_both(
         mics=[[3.0, 2.0, 1.2]],
         src_traj=src_traj,
         mic_traj=mic_traj,
-        signal_len=1600,
+        schedule=FrameSchedule.from_samples([0, 800]),
+        stop_sample=1600,
         fs=16000,
         logger=logging.getLogger("test"),
         save_3d=True,
@@ -77,7 +80,8 @@ def test_save_scene_videos_2d_calls_once(
         mics=[[3.0, 2.0]],
         src_traj=src_traj,
         mic_traj=mic_traj,
-        signal_len=1600,
+        schedule=FrameSchedule.from_samples([0, 800]),
+        stop_sample=1600,
         fs=16000,
         logger=logging.getLogger("test"),
         save_3d=True,
@@ -106,7 +110,8 @@ def test_save_scene_videos_warns_on_failure(
             mics=[[3.0, 2.0, 1.2]],
             src_traj=src_traj,
             mic_traj=mic_traj,
-            signal_len=1600,
+            schedule=FrameSchedule.from_samples([0, 800]),
+            stop_sample=1600,
             fs=16000,
             logger=logging.getLogger("test"),
             save_3d=True,
@@ -139,7 +144,8 @@ def test_save_scene_videos_forwards_annotation_lines(
         mics=[[3.0, 2.0, 1.2]],
         src_traj=src_traj,
         mic_traj=mic_traj,
-        signal_len=1600,
+        schedule=FrameSchedule.from_samples([0, 800]),
+        stop_sample=1600,
         fs=16000,
         logger=logging.getLogger("test"),
         save_3d=True,
@@ -377,6 +383,9 @@ def test_animate_scene_mp4_uses_hd_canvas(
         src_traj=src_traj,
         mic_traj=mic_traj,
         mux_audio=False,
+        schedule=FrameSchedule.from_samples([0, 800]),
+        fs=16000,
+        stop_sample=1600,
     )
 
     assert path == out_path

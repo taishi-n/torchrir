@@ -258,7 +258,8 @@ animate_scene_gif(
     mics=mics,
     src_traj=src_traj,
     mic_traj=mic_traj,
-    signal_len=signals.shape[1],
+    schedule=dynamic_schedule,
+    stop_sample=signals.shape[1],
     fs=fs,
 )
 

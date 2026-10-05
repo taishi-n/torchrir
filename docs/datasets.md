@@ -460,7 +460,10 @@ Useful video flags:
 
 - `--no-save-layout-mp4`: disable MP4 rendering
 - `--no-save-layout-mp4-3d`: skip `room_layout_3d.mp4`
-- `--layout-video-fps <float>`: override frame rate
+- `--layout-video-fps <float>`: request a positive frame rate; the frame count is
+  rounded up and the effective rate preserves the complete mixture duration.
+  Layout videos use the exact scene schedule and hold the final geometry
+  through the reverberation tail.
 - `--layout-video-no-audio`: disable mixture-audio mux into MP4
 - `--no-save-layout-images`: disable static layout images
 - `--no-save-layout-images-3d`: skip `room_layout_3d.png`

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 import logging
+import math
+from fractions import Fraction
 import shutil
 import subprocess
 from typing import Optional, Sequence
@@ -11,12 +13,14 @@ from typing import Optional, Sequence
 import numpy as np
 import torch
 
+from ..models.schedule import FrameSchedule
+from ..util._scalars import normalize_finite_real, normalize_integer
+
 from .utils import (
     _add_axes_annotation,
     _ensure_default_mpl_style,
     _positions_to_cpu,
     _to_cpu,
-    _traj_steps,
     _trajectory_to_cpu,
 )
 
@@ -38,16 +42,39 @@ def animate_scene_gif(
     mic_traj: Optional[torch.Tensor | Sequence] = None,
     step: int = 1,
     fps: Optional[float] = None,
-    signal_len: Optional[int] = None,
-    fs: Optional[float] = None,
-    duration_s: Optional[float] = None,
+    schedule: FrameSchedule,
+    fs: float,
+    stop_sample: int,
     plot_2d: bool = True,
     plot_3d: bool = False,
     annotate_sources: bool = True,
     annotation_lines: Optional[Sequence[str]] = None,
 ) -> Path:
-    """Render a GIF showing source/mic trajectories."""
+    """Render sample-scheduled trajectories; GIF timing uses a 10 ms clock."""
     import matplotlib.pyplot as plt
+    from matplotlib.animation import PillowWriter
+    from PIL.Image import Image as PillowImage
+
+    _, times, _ = _animation_timeline(schedule, fs, stop_sample, step, fps)
+    boundaries = [
+        round(i * stop_sample / fs / len(times) * 100) * 10
+        for i in range(len(times) + 1)
+    ]
+    durations = np.diff(boundaries).tolist()
+    if min(durations) < 10:
+        raise ValueError("GIF frame intervals must be at least 10 ms")
+
+    class TimedPillowWriter(PillowWriter):
+        _frames: list[PillowImage]
+
+        def finish(self):
+            self._frames[0].save(
+                self.outfile,
+                save_all=True,
+                append_images=self._frames[1:],
+                duration=durations,
+                loop=0,
+            )
 
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -60,16 +87,18 @@ def animate_scene_gif(
         mic_traj=mic_traj,
         step=step,
         fps=fps,
-        signal_len=signal_len,
+        schedule=schedule,
         fs=fs,
-        duration_s=duration_s,
+        stop_sample=stop_sample,
         plot_2d=plot_2d,
         plot_3d=plot_3d,
         annotate_sources=annotate_sources,
         annotation_lines=annotation_lines,
     )
-    anim.save(out_path, writer="pillow", fps=fps_out)
-    plt.close(fig)
+    try:
+        anim.save(out_path, writer=TimedPillowWriter(fps=fps_out))
+    finally:
+        plt.close(fig)
     return out_path
 
 
@@ -83,9 +112,9 @@ def animate_scene_mp4(
     mic_traj: Optional[torch.Tensor | Sequence] = None,
     step: int = 1,
     fps: Optional[float] = None,
-    signal_len: Optional[int] = None,
-    fs: Optional[float] = None,
-    duration_s: Optional[float] = None,
+    schedule: FrameSchedule,
+    fs: float,
+    stop_sample: int,
     plot_2d: bool = True,
     plot_3d: bool = False,
     annotate_sources: bool = True,
@@ -103,6 +132,16 @@ def animate_scene_mp4(
     import matplotlib.pyplot as plt
     from matplotlib.animation import FFMpegWriter
 
+    _animation_timeline(schedule, fs, stop_sample, step, fps)
+    if mux_audio and mixture_path is not None:
+        import soundfile as sf
+
+        info = sf.info(mixture_path)
+        if Fraction(info.frames, info.samplerate) != Fraction(stop_sample) / Fraction(
+            str(fs)
+        ):
+            raise ValueError("audio duration must match stop_sample / fs")
+
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -114,9 +153,9 @@ def animate_scene_mp4(
         mic_traj=mic_traj,
         step=step,
         fps=fps,
-        signal_len=signal_len,
+        schedule=schedule,
         fs=fs,
-        duration_s=duration_s,
+        stop_sample=stop_sample,
         plot_2d=plot_2d,
         plot_3d=plot_3d,
         annotate_sources=annotate_sources,
@@ -124,8 +163,10 @@ def animate_scene_mp4(
         figsize=_MP4_FIGSIZE_INCHES,
     )
     writer = FFMpegWriter(fps=fps_out)
-    anim.save(out_path, writer=writer, dpi=_MP4_DPI)
-    plt.close(fig)
+    try:
+        anim.save(out_path, writer=writer, dpi=_MP4_DPI)
+    finally:
+        plt.close(fig)
 
     if mux_audio and mixture_path is not None:
         _add_stereo_audio_to_mp4(
@@ -134,6 +175,43 @@ def animate_scene_mp4(
             audio_channels=audio_channels,
         )
     return out_path
+
+
+def _animation_timeline(
+    schedule: FrameSchedule,
+    fs: float,
+    stop_sample: int,
+    step: int,
+    fps: float | None,
+) -> tuple[list[int], list[float], float]:
+    """Sample held geometry on a uniform display clock without changing duration."""
+    if not isinstance(schedule, FrameSchedule):
+        raise TypeError("schedule must be a FrameSchedule")
+    fs = normalize_finite_real(fs, name="fs", positive=True)
+    stop_sample = normalize_integer(
+        stop_sample, name="stop_sample", minimum=1, maximum=torch.iinfo(torch.int64).max
+    )
+    step = normalize_integer(step, name="step", minimum=1)
+    if (
+        schedule.conversion_sample_rate is not None
+        and schedule.conversion_sample_rate != fs
+    ):
+        raise ValueError("schedule conversion sample rate must match fs")
+    starts = schedule.starts.tolist()
+    if starts[-1] >= stop_sample:
+        raise ValueError("last frame start must be before stop_sample")
+    selected = list(range(0, len(starts), step))
+    duration = Fraction(stop_sample) / Fraction(str(fs))
+    if fps is None:
+        frames = len(selected)
+    else:
+        fps = normalize_finite_real(fps, name="fps", positive=True)
+        frames = math.ceil(duration * Fraction(str(fps)))
+    sampled = [(i * stop_sample) // frames for i in range(frames)]
+    active = np.searchsorted([starts[i] for i in selected], sampled, side="right") - 1
+    indices = [selected[i] for i in active]
+    times = [float(i * duration / frames) for i in range(frames)]
+    return indices, times, float(frames / duration)
 
 
 def _build_scene_animation(
@@ -145,9 +223,9 @@ def _build_scene_animation(
     mic_traj: Optional[torch.Tensor | Sequence],
     step: int,
     fps: Optional[float],
-    signal_len: Optional[int],
-    fs: Optional[float],
-    duration_s: Optional[float],
+    schedule: FrameSchedule,
+    fs: float,
+    stop_sample: int,
     plot_2d: bool,
     plot_3d: bool,
     annotate_sources: bool,
@@ -172,9 +250,12 @@ def _build_scene_animation(
     if src_traj is None and mic_traj is None:
         raise ValueError("at least one trajectory is required for animation")
 
-    steps = _traj_steps(src_traj, mic_traj)
+    indices, times, fps_out = _animation_timeline(schedule, fs, stop_sample, step, fps)
+    steps = len(schedule)
     src_traj_t = _trajectory_to_cpu(src_traj, src_pos, steps)
     mic_traj_t = _trajectory_to_cpu(mic_traj, mic_pos, steps)
+    if src_traj_t.shape[0] != steps or mic_traj_t.shape[0] != steps:
+        raise ValueError("trajectories must match schedule length")
     view_src_traj = src_traj_t[:, :, :view_dim]
     view_mic_traj = mic_traj_t[:, :, :view_dim]
 
@@ -228,11 +309,8 @@ def _build_scene_animation(
         ax, annotation_lines, fontsize=_VIDEO_FONT_SIZE_PT
     )
 
-    if duration_s is None and signal_len is not None and fs is not None:
-        duration_s = float(signal_len) / float(fs)
-
     def _frame(i: int):
-        idx = min(i * step, view_src_traj.shape[0] - 1)
+        idx = indices[i]
         src_frame = view_src_traj[: idx + 1]
         mic_frame = view_mic_traj[: idx + 1]
         src_pos_frame = view_src_traj[idx]
@@ -275,26 +353,16 @@ def _build_scene_animation(
                     pos = src_pos_frame[s_idx]
                     text.set_position((float(pos[0]), float(pos[1])))
                     text.set_3d_properties(float(pos[2]))
-        if duration_s is not None and steps > 1:
-            t = (idx / (steps - 1)) * duration_s
-            ax.set_title(f"t = {t:.2f} s", fontsize=_VIDEO_FONT_SIZE_PT)
+        ax.set_title(f"t = {times[i]:.2f} s", fontsize=_VIDEO_FONT_SIZE_PT)
         artists = [src_scatter, mic_scatter, *src_lines, *mic_lines, *source_texts]
         if annotation_text is not None:
             artists.append(annotation_text)
         return artists
 
-    frames = max(1, (view_src_traj.shape[0] + step - 1) // step)
-    if fps is None or fps <= 0:
-        if duration_s is not None and duration_s > 0:
-            fps = frames / duration_s
-        else:
-            fps = 6.0
-    fps_out = max(1, int(round(float(fps))))
-
     anim = animation.FuncAnimation(
         fig,
         _frame,
-        frames=frames,
+        frames=len(times),
         interval=1000 / float(fps_out),
         blit=False,
     )

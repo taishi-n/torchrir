@@ -307,6 +307,26 @@ complete requested RIR, and is prefix invariant. `filter_family` accepts `bessel
 Enabling either phase requires SciPy, performs a CPU round trip, and detaches
 the result from autograd.
 
+## Animation timeline
+
+`animate_scene_gif`, `animate_scene_mp4`, `save_scene_gifs`, and
+`save_scene_videos` take the scene's exact `FrameSchedule`, sample rate `fs`,
+and output horizon `stop_sample`. Trajectory records are held from their sample
+start until the next retained record; `step` retains every kth record without
+moving its start. The last record continues through the selected horizon.
+
+The uniform display clock uses one frame per retained record by default, or
+`ceil(stop_sample / fs * fps)` frames for an explicit positive FPS. The effective
+FPS is adjusted to preserve duration. Frame titles show display time and use
+the latest active trajectory record, including for nonuniform schedules.
+MP4 uses fractional FPS; GIF rounds cumulative boundaries to 10 ms, with at
+most 5 ms total error, and rejects sub-10 ms frame intervals.
+
+Audio muxing requires equal audio and display durations. To include the
+reverberation tail, pass the convolved audio sample count as `stop_sample`;
+the dynamic CMU builder does this automatically. GIF examples can instead use
+the dry signal's sample count when only the source-motion interval is wanted.
+
 ## Metadata schema version 1
 
 `build_metadata` and `build_result_metadata` produce schema

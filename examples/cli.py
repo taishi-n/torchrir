@@ -123,8 +123,9 @@ def _plot_gif(
     src_traj: torch.Tensor | None = None,
     mic_traj: torch.Tensor | None = None,
     prefix="scene",
-    signal_len: int | None = None,
-    fs: float | None = None,
+    schedule: FrameSchedule,
+    stop_sample: int,
+    fs: float,
 ):
     if not args.gif:
         return
@@ -138,8 +139,9 @@ def _plot_gif(
         src_traj=src_traj,
         mic_traj=mic_traj,
         prefix=prefix,
-        signal_len=signal_len or 0,
-        fs=int(fs or 0),
+        schedule=schedule,
+        stop_sample=stop_sample,
+        fs=int(fs),
         gif_fps=int(args.gif_fps),
         logger=get_logger("examples.cli"),
     )
@@ -314,7 +316,8 @@ def _run_static(args, rng: random.Random, logger):
         src_traj=None,
         mic_traj=None,
         prefix="static",
-        signal_len=signals.shape[1],
+        schedule=FrameSchedule.from_samples([0]),
+        stop_sample=signals.shape[1],
         fs=fs,
     )
 
@@ -432,7 +435,8 @@ def _run_dynamic_src(args, rng: random.Random, logger):
         src_traj=src_traj,
         mic_traj=mic_traj,
         prefix="dynamic_src",
-        signal_len=signals.shape[1],
+        schedule=schedule,
+        stop_sample=signals.shape[1],
         fs=fs,
     )
 
@@ -551,7 +555,8 @@ def _run_dynamic_mic(args, rng: random.Random, logger):
         src_traj=src_traj,
         mic_traj=mic_traj,
         prefix="dynamic_mic",
-        signal_len=signals.shape[1],
+        schedule=schedule,
+        stop_sample=signals.shape[1],
         fs=fs,
     )
 

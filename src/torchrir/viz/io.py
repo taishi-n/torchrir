@@ -8,6 +8,8 @@ import logging
 
 import torch
 
+from ..models.schedule import FrameSchedule
+
 from .animation import animate_scene_gif, animate_scene_mp4
 from .scene import plot_scene_dynamic, plot_scene_static
 from .utils import (
@@ -143,7 +145,8 @@ def save_scene_gifs(
     src_traj: torch.Tensor,
     mic_traj: torch.Tensor,
     prefix: str,
-    signal_len: int,
+    schedule: FrameSchedule,
+    stop_sample: int,
     fs: int,
     gif_fps: int,
     logger: logging.Logger,
@@ -161,7 +164,8 @@ def save_scene_gifs(
             src_traj=src_traj,
             mic_traj=mic_traj,
             fps=gif_fps if gif_fps > 0 else None,
-            signal_len=signal_len,
+            schedule=schedule,
+            stop_sample=stop_sample,
             fs=fs,
             annotate_sources=annotate_sources,
             annotation_lines=annotation_lines,
@@ -177,7 +181,8 @@ def save_scene_gifs(
                 src_traj=src_traj,
                 mic_traj=mic_traj,
                 fps=gif_fps if gif_fps > 0 else None,
-                signal_len=signal_len,
+                schedule=schedule,
+                stop_sample=stop_sample,
                 fs=fs,
                 plot_2d=False,
                 plot_3d=True,
@@ -197,7 +202,8 @@ def save_scene_videos(
     mics: object,
     src_traj: torch.Tensor,
     mic_traj: torch.Tensor,
-    signal_len: int,
+    schedule: FrameSchedule,
+    stop_sample: int,
     fs: int,
     logger: logging.Logger,
     mp4_fps: float | None = None,
@@ -223,7 +229,8 @@ def save_scene_videos(
             src_traj=src_traj,
             mic_traj=mic_traj,
             fps=mp4_fps,
-            signal_len=signal_len,
+            schedule=schedule,
+            stop_sample=stop_sample,
             fs=fs,
             plot_2d=True,
             plot_3d=False,
@@ -244,7 +251,8 @@ def save_scene_videos(
                 src_traj=src_traj,
                 mic_traj=mic_traj,
                 fps=mp4_fps,
-                signal_len=signal_len,
+                schedule=schedule,
+                stop_sample=stop_sample,
                 fs=fs,
                 plot_2d=False,
                 plot_3d=True,
