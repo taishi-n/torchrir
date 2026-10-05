@@ -2214,3 +2214,142 @@ def test_librispeech_download_repairs_missing_requested_speaker(
     assert [item.utterance_id for item in dataset.available_sentences()] == [
         "104-1250-0000"
     ]
+
+
+def _publish_until_checkpoint(
+    staged_name: str, target_name: str, checkpoint: str, connection: Any
+) -> None:
+    """Stop inside a real publication while its OS lock is still held."""
+    staged, target = Path(staged_name), Path(target_name)
+    initialize = archive_utils._initialize_transaction
+    rename = archive_utils.rename_entry_noreplace
+    write_manifest = archive_utils._write_transaction_manifest
+
+    def reached(name: str) -> None:
+        if checkpoint == name:
+            connection.send(name)
+            connection.recv()  # The parent kills this process; no unwinding occurs.
+
+    def initialize_then_stop(*args, **kwargs):
+        initialize(*args, **kwargs)
+        reached("initialized")
+
+    def rename_then_stop(source: Path, destination: Path) -> None:
+        rename(source, destination)
+        if source == target:
+            reached("backup_renamed")
+        elif source == staged:
+            reached("created" if checkpoint == "created" else "published_renamed")
+
+    def manifest_then_stop(transaction, manifest):
+        write_manifest(transaction, manifest)
+        reached(
+            "initial_manifest" if manifest.phase == "initialized" else manifest.phase
+        )
+
+    with pytest.MonkeyPatch.context() as monkeypatch:
+        monkeypatch.setattr(
+            archive_utils, "_initialize_transaction", initialize_then_stop
+        )
+        monkeypatch.setattr(archive_utils, "rename_entry_noreplace", rename_then_stop)
+        monkeypatch.setattr(
+            archive_utils, "_write_transaction_manifest", manifest_then_stop
+        )
+        publish_staged_directory(staged, target)
+    raise AssertionError(f"publication missed checkpoint: {checkpoint}")
+
+
+def _recover_in_fresh_process(target_name: str, connection: Any) -> None:
+    target = Path(target_name)
+    archive_utils.recover_staged_publication(target)
+    lock = target.parent / f".{target.name}.torchrir-publish.lock"
+    with dataset_write_lock(lock, timeout=1.0):
+        contents = {
+            str(path.relative_to(target)): path.read_bytes()
+            for path in target.rglob("*")
+            if path.is_file()
+        }
+    connection.send(contents)
+
+
+@pytest.mark.parametrize(
+    "checkpoint,expected_generation",
+    [
+        ("initial_manifest", "old"),
+        ("initialized", "old"),
+        ("backup_renamed", "old"),
+        ("backed_up", "old"),
+        ("published_renamed", "new"),
+        ("published", "new"),
+        ("created", "new"),
+    ],
+)
+def test_publication_recovers_after_writer_is_killed(
+    tmp_path, checkpoint, expected_generation
+):
+    context = multiprocessing.get_context("spawn")
+    target, staged = tmp_path / "dataset", tmp_path / "staged"
+    trees = {
+        "old": {
+            "manifest.txt": b"old generation",
+            "audio/one.bin": bytes(range(128)),
+            "audio/two.bin": b"old audio" * 20,
+        },
+        "new": {
+            "manifest.txt": b"new generation",
+            "audio/one.bin": bytes(reversed(range(128))),
+            "audio/two.bin": b"new audio" * 20,
+        },
+    }
+    for generation, directory in (("old", target), ("new", staged)):
+        if generation == "old" and checkpoint == "created":
+            continue
+        for name, data in trees[generation].items():
+            path = directory / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(data)
+    parent_connection, child_connection = context.Pipe()
+    writer = context.Process(
+        target=_publish_until_checkpoint,
+        args=(str(staged), str(target), checkpoint, child_connection),
+    )
+    writer.start()
+    try:
+        assert parent_connection.poll(20), f"writer did not reach {checkpoint}"
+        assert parent_connection.recv() == checkpoint
+        with pytest.raises(TimeoutError):
+            with dataset_write_lock(
+                tmp_path / ".dataset.torchrir-publish.lock", timeout=0.05
+            ):
+                pytest.fail("writer should still hold publication lock")
+        writer.kill()
+        writer.join(10)
+        assert writer.exitcode is not None and writer.exitcode < 0
+    finally:
+        if writer.is_alive():
+            writer.kill()
+            writer.join(10)
+        parent_connection.close()
+        child_connection.close()
+    parent_connection, child_connection = context.Pipe()
+    recovery = context.Process(
+        target=_recover_in_fresh_process, args=(str(target), child_connection)
+    )
+    recovery.start()
+    try:
+        assert parent_connection.poll(20), (
+            "fresh-process recovery failed or retained a lock"
+        )
+        assert parent_connection.recv() == trees[expected_generation]
+        recovery.join(10)
+        assert recovery.exitcode == 0
+    finally:
+        if recovery.is_alive():
+            recovery.kill()
+            recovery.join(10)
+        parent_connection.close()
+        child_connection.close()
+    assert not (tmp_path / ".dataset.torchrir-transaction").exists()
+    assert not list(tmp_path.glob(".dataset.torchrir-transaction.init.*"))
+    with dataset_write_lock(tmp_path / ".dataset.torchrir-publish.lock", timeout=1.0):
+        pass

@@ -54,6 +54,12 @@ correctness for simulation or convolution kernels.
   no-replace/exchange races, lock deadlines, manifest identity recovery, and
   preservation of third-party entries. These filesystem cases require Linux or
   macOS primitives and explicitly test the unsupported-platform failure path.
+  Child-process interruption cases stop real publication after the initial
+  manifest write and initialization rename,
+  backup rename, backup manifest, final rename, and published manifest (plus
+  create-only rename). The parent confirms the lock is held, kills the writer,
+  and starts a fresh recovery process. Complete file contents, transaction cleanup,
+  and lock reacquisition are required; synthetic interrupted-state tests remain.
 - `test_compare_pyroomacoustics.py` removes pyroomacoustics 0.9.0's documented
   40-sample fractional-delay offset, then compares RIR and signal samples
   without estimated alignment. It includes analytic source-only and

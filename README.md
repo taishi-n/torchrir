@@ -661,6 +661,9 @@ CLI integration checks use synthetic local speech fixtures to execute static,
 moving-source, and moving-microphone scenarios. JSON/YAML configurations must
 round-trip, explicit CLI options override loaded values, and WAV outputs must
 agree with metadata and per-source references.
+Publication recovery checks kill writers at actual rename/manifest checkpoints
+and recover in a fresh process. Recovery must retain a complete old or new tree
+and release locks; these checks cover process death, not power-loss durability.
 Installed-wheel checks run outside the checkout in two fresh environments.
 Base dependencies must support physical direct-path simulation and all three
 convolution modes against direct sums; audio/dataset/CLI extras must preserve
@@ -753,12 +756,11 @@ acceptance criteria; unchecked items remain incomplete.
       stereo audio. Rendering/mux failures propagate; per-file atomic replacement
       preserves existing outputs and cleans temporary files and owned Figures.
       See [failure tests](tests/test_viz_failures.py).
-- [ ] Extend publication recovery tests with actual process interruption.
-      Terminate a child process at publication checkpoints, then recover in a fresh
-      process and verify complete old/new data and released locks. Retain the
-      existing exception-injection, race, and synthetic interrupted-state tests in
-      [test_dataset_security.py](tests/test_dataset_security.py); this addition
-      verifies current crash recovery, not data migration.
+- [x] Extend publication recovery tests with actual process interruption.
+      Writers are killed at seven initialization/rename/manifest checkpoints;
+      fresh processes verify complete old/new trees, transaction cleanup, and
+      lock reacquisition. Existing exception/race/synthetic-state tests remain
+      in [publication recovery tests](tests/test_dataset_security.py).
 - [ ] Extend manual accelerator validation on actual hardware. Add static and
       observation-time convolution output/gradient parity, multiple sources and
       microphones, chunk boundaries, and CUDA eager/compiled accumulation with LUT
