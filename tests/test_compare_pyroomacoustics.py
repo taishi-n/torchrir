@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from contextlib import contextmanager
+import importlib
 import os
 
 import numpy as np
@@ -22,7 +23,7 @@ from torchrir.signal import fft_convolve
 from torchrir.sim import simulate
 
 try:
-    import pyroomacoustics as pra
+    pra = importlib.import_module("pyroomacoustics")
 except ImportError:
     if os.environ.get("TORCHRIR_REQUIRE_COMPARISON") == "1":
         raise

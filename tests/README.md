@@ -151,6 +151,9 @@ retains JUnit reports and explicit skip reasons; empty/all-skipped reports fail.
 Comparison reports additionally reject any skips. ffmpeg/ffprobe are installed
 in CPU jobs so real-media tests cannot disappear behind a missing-codec skip.
 Actionlint 1.7.12 validates workflow syntax in the quality job.
+Optional reference libraries are imported at runtime; the quality environment
+does not need them to type-check the repository. When checking a separate local
+environment, pass its interpreter explicitly with `ty check --python PATH`.
 The [release workflow](../.github/workflows/release.yml) reuses all validation
 jobs at the same commit before publishing the checked artifact. Pull requests
 always trigger validation; pushes watch all workflows and relevant project files.
