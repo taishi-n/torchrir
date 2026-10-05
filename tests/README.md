@@ -39,6 +39,11 @@ correctness for simulation or convolution kernels.
   explicit high-pass phases.
 - `test_signal.py` compares FFT and dynamic convolution with direct NumPy
   convolution using fixed random seeds.
+- `test_cli_integration.py` executes the unified CLI, all three standalone
+  scenarios, and the dataset builder in fresh Python processes against tiny
+  local synthetic CMU-layout recordings. JSON/YAML configuration round trips,
+  explicit option precedence, time-reference metadata, sample counts, and
+  mixture/reference sums are checked. No corpus downloads are needed.
 - `test_util_contracts.py` exercises shared scalar/tensor boundaries, including
   max-scaled vector norms for extreme and subnormal `float64` vectors.
 - `test_outputs_logging.py` checks schema and output contracts, including

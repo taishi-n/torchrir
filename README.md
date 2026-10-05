@@ -651,6 +651,10 @@ accelerator/reference exclusions, required codecs, and retained JUnit reports.
 Only Linux 3.11.4 collects coverage (minimum 75%). Quality, pinned comparisons,
 documentation, and distribution run separately; actionlint validates all workflows.
 Every PR triggers validation. Obsolete CI runs may be cancelled; release runs may not.
+CLI integration checks use synthetic local speech fixtures to execute static,
+moving-source, and moving-microphone scenarios. JSON/YAML configurations must
+round-trip, explicit CLI options override loaded values, and WAV outputs must
+agree with metadata and per-source references.
 Installed-wheel checks run outside the checkout in two fresh environments.
 Base dependencies must support physical direct-path simulation and all three
 convolution modes against direct sums; audio/dataset/CLI extras must preserve
@@ -733,11 +737,11 @@ acceptance criteria; unchecked items remain incomplete.
 
 ### P2: Integration and hardware coverage
 
-- [ ] Run CLI/examples against small local synthetic speech fixtures. Exercise
-      static, moving-source, and moving-microphone modes; JSON/YAML configuration
-      save/reload and command-line overrides; and WAV/metadata consistency. Current
-      [example tests](tests/test_examples_dynamic_modes.py) inspect the AST, and the
-      builder's subprocess test only checks module `--help`.
+- [x] Run CLI/examples against small local synthetic speech fixtures. All three
+      modes, JSON/YAML save/reload, explicit overrides, standalone reference sums,
+      and a real builder subprocess are covered. WAV sample rates/counts/channels
+      and time-reference metadata are checked without downloading a corpus. See
+      [CLI integration tests](tests/test_cli_integration.py).
 - [ ] Add encoded-media integration tests using Pillow and ffmpeg/ffprobe.
       Verify frame count, dimensions, duration, decoding, and the requested audio
       stream. Specify how requested-output failures are reported and test ffmpeg
