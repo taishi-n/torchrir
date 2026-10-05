@@ -436,16 +436,6 @@ def test_dynamic_metadata_preserves_exact_sample_schedule_and_time_reference() -
         "convolution",
         "dynamic",
     }
-    serialized = json.dumps(metadata)
-    for removed_key in (
-        "array",
-        "rirs_shape",
-        "signal_samples",
-        "starts_seconds",
-        "time_axis",
-        "timestamps",
-    ):
-        assert f'"{removed_key}"' not in serialized
 
 
 def test_observation_metadata_accepts_moving_mic_and_schedule_in_tail() -> None:

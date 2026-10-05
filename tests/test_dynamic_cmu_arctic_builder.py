@@ -16,7 +16,6 @@ import pytest
 import soundfile as sf
 import torch
 
-import torchrir.datasets as datasets
 import torchrir.datasets._archive as archive_utils
 import torchrir.datasets.dynamic_cmu_arctic as dynamic_builder
 from torchrir.config import SimulationConfig
@@ -98,12 +97,6 @@ def built_dataset(tmp_path: Path) -> Path:
         scene_dirs=(dataset_root / "scene_0000",),
     )
     return dataset_root
-
-
-def test_dynamic_builder_has_one_public_entrypoint() -> None:
-    assert datasets.build_dynamic_cmu_arctic is build_dynamic_cmu_arctic
-    assert not hasattr(datasets, "build_dynamic_cmu_arctic_dataset")
-    assert not hasattr(dynamic_builder, "build_dynamic_cmu_arctic_dataset")
 
 
 def test_dynamic_builder_rejects_invalid_logger_before_side_effects(

@@ -7,18 +7,10 @@ from typing import Any, cast
 import pytest
 import torch
 
-import torchrir.models as models
 from torchrir import DynamicScene, MicrophoneArray, Room, Source, StaticScene
 from torchrir.config import ResolvedSimulationConfig, SimulationConfig
 from torchrir.signal import FrameSchedule
 from torchrir.sim import simulate
-
-
-def test_scene_public_surface_excludes_removed_type_helpers() -> None:
-    assert "SceneLike" not in models.__all__
-    assert not hasattr(models, "SceneLike")
-    assert not hasattr(StaticScene, "is_dynamic")
-    assert not hasattr(DynamicScene, "is_dynamic")
 
 
 def test_static_scene_validates_geometry() -> None:

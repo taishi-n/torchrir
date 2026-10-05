@@ -11,7 +11,6 @@ import torch
 
 from torchrir.config import (
     RIRHighPassConfig,
-    ResolvedSimulationConfig,
     SimulationConfig,
     _resolve_simulation_config,
 )
@@ -80,10 +79,6 @@ def test_simulation_config_requires_complete_exclusive_limits() -> None:
         SimulationConfig(max_order=1)
     with pytest.raises(ValueError, match="tmax or nsample"):
         SimulationConfig(max_order=1, tmax=0.1, nsample=64)
-
-
-def test_resolved_config_exposes_no_public_resolution_constructor() -> None:
-    assert not hasattr(ResolvedSimulationConfig, "from_config")
 
 
 @pytest.mark.parametrize(

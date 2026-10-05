@@ -1270,9 +1270,9 @@ def test_stream_download_uses_unique_non_following_temp_and_timeout(
 ) -> None:
     payload = b"verified archive"
     destination = tmp_path / "archive.tar.gz"
-    legacy_partial = destination.with_suffix(destination.suffix + ".part")
+    unowned_partial = destination.with_suffix(destination.suffix + ".part")
     outside = tmp_path / "outside"
-    legacy_partial.symlink_to(outside)
+    unowned_partial.symlink_to(outside)
     timeouts: list[float] = []
 
     class Response:
@@ -1310,7 +1310,7 @@ def test_stream_download_uses_unique_non_following_temp_and_timeout(
 
     assert destination.read_bytes() == payload
     assert not destination.is_symlink()
-    assert legacy_partial.is_symlink()
+    assert unowned_partial.is_symlink()
     assert not outside.exists()
     assert timeouts == [download_utils.DEFAULT_DOWNLOAD_TIMEOUT_SECONDS]
     assert not list(tmp_path.glob(f".{destination.name}.*.part"))

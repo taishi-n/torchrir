@@ -11,6 +11,32 @@
 - Examples live under `examples/` and should import from `torchrir` (no duplicated utilities).
 - Keep large assets out of the repo; use `assets/` only for small static files.
 
+## Development Policy and Required Cycle
+- This project is under active development. Do not preserve backward
+  compatibility or implement data migration. Rewrite affected code toward the
+  simplest coherent design for the current requirements (KISS), and regenerate
+  generated data when its format or numerical meaning changes.
+- Do not retain compatibility shims, deprecated APIs, migration utilities, or
+  tests whose only purpose is preserving historical behavior or remembering
+  removed APIs or fields. Update repository callers to the canonical API.
+- Follow this cycle for every change:
+  1. **Documentation first:** update the relevant specifications and documents,
+     starting with `README.md` when requirements change. Check related documents
+     and examples for contradictions and stale information before changing tests
+     or implementation.
+  2. **Tests first (TDD):** write or update tests for the documented behavior and
+     verify the expected failure before implementing a behavior change. For
+     documentation-only changes or removal of obsolete tests with no behavior
+     change, review the retained coverage without inventing an artificial failure.
+  3. **Minimal implementation:** implement only what satisfies the current
+     specification and tests, without speculative abstractions or compatibility
+     branches.
+  4. **Final cleanup:** run the relevant checks and review the diff for unused
+     code, obsolete tests, and contradictory or outdated documentation.
+- Keep tests for current numerical correctness, input validation, supported
+  external integrations, and filesystem failure/crash recovery. These protect
+  current behavior and are not backward-compatibility or data-migration tests.
+
 ## Build, Test, and Development Commands
 - This repository uses `uv` for local development and publishing.
 - Common commands:

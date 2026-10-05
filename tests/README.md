@@ -1,4 +1,24 @@
-# Numerical test methodology
+# Test policy and numerical methodology
+
+## Current-contract test policy
+
+Follow the documentation-first, test-first development cycle in
+[AGENTS.md](../AGENTS.md) and the current [specification](../README.md#specification).
+For behavior changes, first update the specification, then write or update tests
+and confirm the expected failure before implementing the minimum change.
+
+TorchRIR does not preserve backward compatibility or provide data migration.
+Remove tests whose only purpose is preserving historical behavior or asserting
+that particular retired APIs or fields remain absent. Test the current API and
+schema directly instead of maintaining lists of historical names. Do not add
+replacement tests when existing current-contract tests already cover the behavior.
+
+Retain numerical regression tests, current-format serialization round trips,
+input validation, supported corpus/format interoperability, external numerical
+comparisons, and filesystem failure/crash recovery. These test present behavior,
+not migration from earlier TorchRIR versions.
+
+## Numerical methodology
 
 The test suite separates independent analytic checks from cross-implementation
 comparisons. Shape-only checks are not accepted as evidence of numerical

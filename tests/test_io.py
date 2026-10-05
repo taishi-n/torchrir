@@ -9,8 +9,6 @@ import numpy as np
 import pytest
 import torch
 
-import torchrir
-import torchrir.io as torchrir_io
 import torchrir.io.audio as audio_module
 from torchrir.io import (
     AudioData,
@@ -437,21 +435,3 @@ def test_audio_data_equality_uses_identity_semantics() -> None:
     second = AudioData(audio=torch.zeros(8), sample_rate=8000)
     assert first == first
     assert first != second
-
-
-def test_audio_public_exports_are_complete() -> None:
-    assert AudioInfo.__name__ in torchrir_io.__all__
-    assert "save_attribution_file" in torchrir_io.__all__
-    for name in (
-        "AudioBackend",
-        "get_audio_backend",
-        "info",
-        "list_audio_backends",
-        "load",
-        "save",
-        "set_audio_backend",
-    ):
-        assert name not in torchrir_io.__all__
-        assert not hasattr(torchrir_io, name)
-    assert not hasattr(torchrir, "load")
-    assert not hasattr(torchrir, "save")

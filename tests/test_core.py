@@ -292,18 +292,3 @@ def test_simulate_rejects_non_scene_and_non_config_inputs() -> None:
         simulate(cast(Any, object()), SimulationConfig(max_order=0, nsample=16))
     with pytest.raises(TypeError, match="config"):
         simulate(scene, cast(Any, object()))
-
-
-def test_simulation_module_exposes_only_scene_oriented_entry() -> None:
-    import torchrir.sim as simulation_module
-
-    assert "simulate" in simulation_module.__all__
-    for removed in (
-        "simulate_rir",
-        "simulate_dynamic_rir",
-        "ISMSimulator",
-        "RIRSimulator",
-        "split_directivity",
-    ):
-        assert removed not in simulation_module.__all__
-        assert not hasattr(simulation_module, removed)

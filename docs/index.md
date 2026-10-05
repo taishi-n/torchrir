@@ -38,7 +38,8 @@ needs a system `ffmpeg`.
   rejected before the ISM kernel; convolution separately supports float16 and
   bfloat16 through float32 work buffers. MPS rejects float64 and disables the
   LUT path; CPU disables requested compilation.
-- Experimental status: APIs and outputs may change as the library matures.
+- No backward compatibility or data migration is provided during development.
+  Regenerate generated data after relevant format or numerical changes.
 
 ### Supported datasets
 - CMU ARCTIC

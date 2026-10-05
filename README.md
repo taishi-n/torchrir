@@ -579,18 +579,30 @@ itself and names beginning with `torchrir.` are already qualified.
 
 ### API stability
 
-- TorchRIR is under active development. Public contracts are intentionally
-  small, and obsolete compatibility wrappers are removed rather than retained
-  beside canonical APIs.
+- TorchRIR is under active development and does not preserve backward
+  compatibility or provide data migration. Code and repository callers follow
+  the current specification, using the simplest coherent design (KISS).
+- Replace obsolete APIs and formats directly; do not retain compatibility
+  wrappers, migration utilities, or tests that only preserve historical behavior
+  or enumerate removed APIs and fields.
 - Breaking API and numerical changes are recorded in
   [CHANGELOG.md](https://github.com/taishi-n/torchrir/blob/main/CHANGELOG.md).
-- Cached RIRs must be regenerated when the changelog reports a timing,
-  interpolation, geometry, directivity, diffuse-tail, or filtering change.
+- Regenerate generated data after relevant format or numerical changes. Cached
+  RIRs must be regenerated after changes to timing, interpolation, geometry,
+  directivity, diffuse tails, or filtering.
 
 For detailed documentation:
 [Documentation](https://torchrir.readthedocs.io/en/latest/)
 
 ## Development Verification
+
+Follow the documentation-first development cycle in [AGENTS.md](AGENTS.md):
+update and reconcile the specification and related documents, write failing
+tests for the new behavior, implement the minimum necessary change, then remove
+obsolete code/tests and check documentation consistency. Documentation-only
+changes and obsolete-test cleanup do not require an artificial failing test.
+Tests cover current contracts; supported external integrations and recovery from
+failed filesystem operations remain part of those contracts.
 
 Install exactly the committed dependency set, then run the same core checks as
 CI:
