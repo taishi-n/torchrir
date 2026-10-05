@@ -641,69 +641,167 @@ Zensical build in
 GitHub Actions validates the documentation but does not publish a GitHub Pages
 site.
 
-## Future Work
-- Advanced room geometry pipeline beyond shoebox rooms (e.g., irregular polygons/meshes and boundary handling).  
-  Motivation: [pyroomacoustics#393](https://github.com/LCAV/pyroomacoustics/issues/393), [pyroomacoustics#405](https://github.com/LCAV/pyroomacoustics/issues/405)
-- General reflection/path capping controls (e.g., first-K, strongest-K, or energy-threshold-based path selection).  
-  Motivation: [pyroomacoustics#338](https://github.com/LCAV/pyroomacoustics/issues/338)
-- Microphone hardware response modeling (frequency response, sensitivity, and self-noise).  
-  Motivation: [pyroomacoustics#394](https://github.com/LCAV/pyroomacoustics/issues/394)
-- Near-field speech source modeling for more realistic close-talk scenarios.  
-  Motivation: [pyroomacoustics#417](https://github.com/LCAV/pyroomacoustics/issues/417)
-- Integrated 3D spatial response visualization (e.g., array/directivity beam-pattern rendering).  
-  Motivation: [pyroomacoustics#397](https://github.com/LCAV/pyroomacoustics/issues/397)
+## TODO
 
-### Related Dynamic Dataset Integration Plan
+Outstanding work identified in the 2026-10-05 audit of commit `9bea4ce`.
+P1 covers confirmed defects and required validation; P2 extends integration and
+hardware coverage; P3 tracks future capabilities. Follow the documentation-first
+cycle in [Development Verification](#development-verification) for each item.
+The [test and CI plan](tests/README.md#test-and-ci-plan) contains the detailed CI
+acceptance criteria; the items below remain unimplemented.
+
+### P1: Confirmed visualization defects
+
+- [ ] Fix source annotations in 3D animations. With the default
+      `annotate_sources=True`, `Axes3D.text()` raises a missing-`s` `TypeError`;
+      rendering without source annotations succeeds. Add actual 2D/3D GIF and MP4
+      rendering tests with annotations enabled and disabled, rather than mocking
+      scene construction. See [animation.py](src/torchrir/viz/animation.py) and
+      [existing video tests](tests/test_viz_video.py).
+- [ ] Align animation timestamps and playback duration with the exact sample
+      schedule. Frame times `[0, 0.25, 0.5, 0.75]` currently display as
+      `[0, 0.33, 0.67, 1.00]`; integer FPS rounding also turns a four-frame,
+      three-second MP4 into a four-second video. Define the display timeline and
+      handling of the reverberation tail, then test uniform/nonuniform schedules,
+      frame subsampling, fractional FPS, and audio/video synchronization.
+- [ ] Define and enforce the audio level policy for MP4 muxing. The temporary
+      WAV currently defaults to PCM_16 and silently clips a FLOAT-WAV input with
+      peak 1.5 to approximately 0.99997. Test out-of-range input, selected stereo
+      channels, and mono duplication. The CMU builder already applies a common
+      anti-clipping gain; this defect concerns the general mux input path.
+
+### P1: Distribution and automated validation
+
+- [ ] Add a release validation gate. Require reusable CPU validation to pass for
+      the exact tagged commit, verify agreement between the tag, `pyproject.toml`,
+      `uv.lock`, and distribution versions, and publish the tested artifact. Verify
+      the gate without publishing. The current
+      [release workflow](.github/workflows/release.yml) builds and publishes without
+      a validation dependency.
+- [ ] Exercise the installed wheel outside the checkout in clean environments.
+      The current check only imports the package, while
+      [tests/conftest.py](tests/conftest.py) inserts the source tree into `sys.path`.
+      With base dependencies, check direct-path arrival/gain and static, emission,
+      and observation convolution against direct sums. With the relevant extras,
+      test floating multichannel WAV round trips and the installed builder CLI.
+- [ ] Implement the CPU CI plan: separate quality, reference-comparison, and
+      distribution jobs; add macOS CPU coverage for the Darwin filesystem
+      implementation and actionlint; retain test/skip/coverage reports; and measure
+      coverage on one designated matrix job. Mark the mixed-device collate test
+      explicitly for CUDA/MPS, preserve ordinary unmarked CPU tests, validate every
+      PR, and include every workflow file in any push path filter. Use the minimal
+      required dependencies and cancel superseded validation runs without cancelling
+      publication. See [ci.yml](.github/workflows/ci.yml) and
+      [test selection gaps](tests/README.md#test-additions-and-concrete-gaps).
+
+### P2: Integration and hardware coverage
+
+- [ ] Run CLI/examples against small local synthetic speech fixtures. Exercise
+      static, moving-source, and moving-microphone modes; JSON/YAML configuration
+      save/reload and command-line overrides; and WAV/metadata consistency. Current
+      [example tests](tests/test_examples_dynamic_modes.py) inspect the AST, and the
+      builder's subprocess test only checks module `--help`.
+- [ ] Add encoded-media integration tests using Pillow and ffmpeg/ffprobe.
+      Verify frame count, dimensions, duration, decoding, and the requested audio
+      stream. Specify how requested-output failures are reported and test ffmpeg
+      failure, temporary-file collisions, and file/Figure cleanup after exceptions.
+      Current [save helpers](src/torchrir/viz/io.py) turn rendering exceptions into
+      warnings, so successful caller completion does not establish output presence.
+- [ ] Extend publication recovery tests with actual process interruption.
+      Terminate a child process at publication checkpoints, then recover in a fresh
+      process and verify complete old/new data and released locks. Retain the
+      existing exception-injection, race, and synthetic interrupted-state tests in
+      [test_dataset_security.py](tests/test_dataset_security.py); this addition
+      verifies current crash recovery, not data migration.
+- [ ] Extend manual accelerator validation on actual hardware. Add static and
+      observation-time convolution output/gradient parity, multiple sources and
+      microphones, chunk boundaries, and CUDA eager/compiled accumulation with LUT
+      enabled/disabled. Assert the actual output/config device and record runtime
+      versions and skips. Existing tests cover basic static/dynamic RIR parity and
+      emission-time gradients. Follow the
+      [manual accelerator checks](tests/README.md#manual-accelerator-checks);
+      unavailable hardware does not close this item, and a replacement GPU workflow
+      is not required.
+
+### P3: Acoustic models and spatial visualization
+
+- [ ] Extend room geometry beyond shoebox rooms with irregular polygons/meshes
+      and boundary handling.
+      Motivation: [pyroomacoustics#393](https://github.com/LCAV/pyroomacoustics/issues/393),
+      [pyroomacoustics#405](https://github.com/LCAV/pyroomacoustics/issues/405).
+- [ ] Add reflection/path selection controls such as first-K, strongest-K, and
+      energy-threshold-based selection.
+      Motivation: [pyroomacoustics#338](https://github.com/LCAV/pyroomacoustics/issues/338).
+- [ ] Model microphone hardware frequency response, sensitivity, and self-noise.
+      Motivation: [pyroomacoustics#394](https://github.com/LCAV/pyroomacoustics/issues/394).
+- [ ] Add near-field speech source modeling for close-talk scenarios.
+      Motivation: [pyroomacoustics#417](https://github.com/LCAV/pyroomacoustics/issues/417).
+- [ ] Integrate 3D spatial response visualization, including array and
+      directivity beam patterns.
+      Motivation: [pyroomacoustics#397](https://github.com/LCAV/pyroomacoustics/issues/397).
+- [ ] Support simultaneous source/microphone motion and time-varying orientation
+      for dataset reproduction scenarios that require them. Specify propagation
+      and time-reference semantics before implementing these extensions.
+- [ ] Reconcile the ray-tracing/FDTD roadmap wording in
+      [the documentation overview](docs/index.md#limitations) with the current
+      acoustic-model TODOs. Decide their intended scope before implementation;
+      the retired placeholder classes do not need to be restored.
+
+### P3: Dynamic dataset foundation
 
 The external datasets surveyed in
 [Related Dynamic Speech and Acoustic Datasets](https://torchrir.readthedocs.io/en/latest/related-datasets.html)
-are not currently exposed through `torchrir.datasets`. Future integration work
-should keep corpus download and licensing decisions explicit and should avoid
-redistributing third-party recordings.
+are not currently exposed through `torchrir.datasets`. Their integration roadmap
+was added in the documentation-only commit `7304a8a`. Keep corpus download and
+licensing decisions explicit, preserve provenance, and avoid redistributing
+third-party recordings.
 
-Common integration work:
+- [ ] Define a dynamic multichannel dataset manifest for mixtures, reverberant
+      stems, optional dry or close-talk references, sample rates, microphone-array
+      geometry, source and microphone trajectories, orientations, synchronization,
+      provenance, and license metadata.
+- [ ] Add manifest-backed multichannel dataset adapters that preserve channels
+      and expose validated timing and geometry records without forcing every
+      corpus into the current mono `DatasetItem` contract.
+- [ ] Add reusable dataset-building controls for resampling, source onset and
+      offset, relative source level, SIR/SNR, background-noise mixing, arbitrary
+      microphone arrays, and straight or piecewise-linear trajectories.
+- [ ] Add small synthetic fixtures and schema-validation tests. Full external
+      corpora must remain optional and must not be required by the normal test
+      suite.
 
-- Define a dynamic multichannel dataset manifest for mixtures, reverberant
-  stems, optional dry or close-talk references, sample rates, microphone-array
-  geometry, source and microphone trajectories, orientations, synchronization,
-  provenance, and license metadata.
-- Add manifest-backed multichannel dataset adapters that preserve channels and
-  expose validated timing and geometry records without forcing every corpus
-  into the current mono `DatasetItem` contract.
-- Add reusable dataset-building controls for resampling, source onset and
-  offset, relative source level, SIR/SNR, background-noise mixing, arbitrary
-  microphone arrays, and straight or piecewise-linear trajectories.
-- Add small synthetic fixtures and schema-validation tests. Full external
-  corpora must remain optional and must not be required by the normal test
-  suite.
+### P3: Dynamic dataset integrations
 
-Dataset-specific work:
+- [ ] **SonicSet v2:** parse its audio, stem, trajectory, and JSON layout and map
+      its coordinate conventions into torchrir records. Exact regeneration also
+      depends on irregular mesh geometry, material-dependent propagation,
+      occlusion, and diffraction support.
+- [ ] **ASA_20k_4s_nspk2-4:** add an archive/manifest adapter. Reproduction requires
+      multi-corpus source loading, a four-channel tetrahedral array, source
+      onset/offset scheduling, diffuse background noise, and SNR-controlled mixing.
+- [ ] **WSJ0-Demand-6ch-Move:** implement the published generation recipe with
+      straight moving-source trajectories, a six-channel circular array, relative
+      speaker-level sampling, and DEMAND noise mixing. WSJ0 and DEMAND access must
+      be supplied and authorized by the user.
+- [ ] **LOCATA:** parse multichannel recordings, close-talk references, voice
+      activity, and OptiTrack position/orientation streams. Task 6 simulation also
+      requires simultaneous source and microphone motion plus time-varying
+      orientation.
+- [ ] **EasyCom:** synchronize the six-channel array, close-talk references, voice
+      activity, speaker identity, and pose metadata. Faithful simulation further
+      requires simultaneous motion, time-varying orientation, wearable-device
+      occlusion, near-field speech, and hardware response modeling.
+- [ ] **RealMAN:** add multichannel FLAC, source-position, direct-path target, and
+      transcript adapters. Multi-talker separation use also needs an explicit
+      mixture and reference-stem construction policy.
+- [ ] **trajectoRIR:** map the supplied audio, RIR, coordinate, speed, and array
+      configuration records into torchrir. Add evaluation utilities that compare
+      measured moving-microphone signals with observation-time convolution.
 
-- **SonicSet v2:** parse its audio, stem, trajectory, and JSON layout and map
-  its coordinate conventions into torchrir records. Exact regeneration also
-  depends on irregular mesh geometry, material-dependent propagation,
-  occlusion, and diffraction support.
-- **ASA_20k_4s_nspk2-4:** add an archive/manifest adapter. Reproduction requires
-  multi-corpus source loading, a four-channel tetrahedral array, source
-  onset/offset scheduling, diffuse background noise, and SNR-controlled mixing.
-- **WSJ0-Demand-6ch-Move:** implement the published generation recipe with
-  straight moving-source trajectories, a six-channel circular array, relative
-  speaker-level sampling, and DEMAND noise mixing. WSJ0 and DEMAND access must
-  be supplied and authorized by the user.
-- **LOCATA:** parse multichannel recordings, close-talk references, voice
-  activity, and OptiTrack position/orientation streams. Task 6 simulation also
-  requires simultaneous source and microphone motion plus time-varying
-  orientation.
-- **EasyCom:** synchronize the six-channel array, close-talk references, voice
-  activity, speaker identity, and pose metadata. Faithful simulation further
-  requires simultaneous motion, time-varying orientation, wearable-device
-  occlusion, near-field speech, and hardware response modeling.
-- **RealMAN:** add multichannel FLAC, source-position, direct-path target, and
-  transcript adapters. Multi-talker separation use also needs an explicit
-  mixture and reference-stem construction policy.
-- **trajectoRIR:** map the supplied audio, RIR, coordinate, speed, and array
-  configuration records into torchrir. Add evaluation utilities that compare
-  measured moving-microphone signals with observation-time convolution.
+The old `TODO.md` removed in `79946ba` had all entries checked. Removed APIs and
+compatibility wrappers are not outstanding work. Retain the current numerical,
+external-reference, and filesystem-recovery tests; the HPF changes in `4515a27`
+already include regression tests.
 
 ## Related Libraries
 - [gpuRIR](https://github.com/DavidDiazGuerra/gpuRIR)
