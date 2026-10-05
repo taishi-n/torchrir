@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
+import tempfile
 from typing import Any, Optional, Sequence
 
 import torch
@@ -71,17 +74,34 @@ def _trajectory_to_cpu(
     return traj
 
 
+@contextmanager
+def _atomic_output(path: Path) -> Iterator[Path]:
+    """Publish one complete media file and always clean its private workspace."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(
+        prefix=f".{path.name}-", dir=path.parent
+    ) as directory:
+        temporary = Path(directory) / path.name
+        yield temporary
+        if not temporary.is_file() or temporary.stat().st_size == 0:
+            raise RuntimeError(f"Renderer did not produce a non-empty output: {path}")
+        temporary.replace(path)
+
+
 def _save_axes(ax: Any, path: Path, *, show: bool) -> None:
-    """Save a matplotlib axis to disk."""
+    """Save one complete image, closing the owned Figure even on failure."""
     import matplotlib.pyplot as plt
 
     fig = ax.figure
-    fig.set_size_inches(*_STATIC_FIGSIZE_INCHES)
-    fig.tight_layout()
-    fig.savefig(path, dpi=_STATIC_SAVE_DPI)
-    if show:
-        plt.show()
-    plt.close(fig)
+    try:
+        fig.set_size_inches(*_STATIC_FIGSIZE_INCHES)
+        fig.tight_layout()
+        with _atomic_output(path) as temporary:
+            fig.savefig(temporary, dpi=_STATIC_SAVE_DPI)
+        if show:
+            plt.show()
+    finally:
+        plt.close(fig)
 
 
 def _add_axes_annotation(

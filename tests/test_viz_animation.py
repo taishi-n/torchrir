@@ -193,14 +193,19 @@ def test_gif_rounds_cumulative_boundaries(tmp_path):
     assert durations == [330, 340, 330]
 
 
-def test_mp4_audio_and_video_cover_full_tail(tmp_path):
+@pytest.mark.parametrize("mux_audio", [False, True])
+def test_mp4_audio_and_video_cover_full_tail(tmp_path, mux_audio):
     import numpy as np
     import soundfile as sf
 
     if not shutil.which("ffmpeg"):
         pytest.skip("ffmpeg unavailable")
     audio = tmp_path / "mixture.wav"
-    sf.write(audio, np.zeros((24000, 2)), 8000, subtype="FLOAT")
+    t = np.arange(24000) / 8000
+    samples = np.stack(
+        [0.1 * np.sin(2 * np.pi * 220 * t), 0.2 * np.sin(2 * np.pi * 440 * t)], axis=1
+    )
+    sf.write(audio, samples, 8000, subtype="FLOAT")
     path = tmp_path / "tail.mp4"
     trajectory = torch.tensor([[[1.0, 1.0]], [[2.0, 1.0]]])
     animate_scene_mp4(
@@ -213,6 +218,7 @@ def test_mp4_audio_and_video_cover_full_tail(tmp_path):
         fs=8000,
         stop_sample=24000,
         mixture_path=audio,
+        mux_audio=mux_audio,
     )
     probe = subprocess.run(
         ["ffprobe", "-v", "error", "-show_streams", "-of", "json", str(path)],
@@ -223,7 +229,37 @@ def test_mp4_audio_and_video_cover_full_tail(tmp_path):
     streams = {
         stream["codec_type"]: stream for stream in json.loads(probe.stdout)["streams"]
     }
-    assert set(streams) == {"audio", "video"}
+    assert set(streams) == ({"audio", "video"} if mux_audio else {"video"})
+    assert (streams["video"]["width"], streams["video"]["height"]) == (1280, 720)
+    assert int(streams["video"]["nb_frames"]) == 2
+    subprocess.run(
+        ["ffmpeg", "-v", "error", "-i", str(path), "-f", "null", "-"],
+        check=True,
+        capture_output=True,
+    )
+    if mux_audio:
+        assert streams["audio"]["channels"] == 2
+        decoded = subprocess.run(
+            [
+                "ffmpeg",
+                "-v",
+                "error",
+                "-i",
+                str(path),
+                "-map",
+                "0:a:0",
+                "-f",
+                "f32le",
+                "-",
+            ],
+            check=True,
+            capture_output=True,
+        )
+        actual = np.frombuffer(decoded.stdout, dtype=np.float32).reshape(-1, 2)[
+            : len(samples)
+        ]
+        for channel in range(2):
+            assert np.corrcoef(actual[:, channel], samples[:, channel])[0, 1] > 0.95
     for stream in streams.values():
         assert float(stream["duration"]) == pytest.approx(3.0, abs=0.01)
 
@@ -286,5 +322,6 @@ def test_mp4_rejects_mismatched_audio_duration(tmp_path):
             fs=8000,
             stop_sample=16000,
             mixture_path=audio,
+            mux_audio=True,
         )
     assert not (tmp_path / "mismatch.mp4").exists()

@@ -36,26 +36,31 @@ def plot_scene_static(
         )
         ```
     """
+    owns_axes = ax is None
     plt, ax = _setup_axes(ax, room)
+    try:
+        size = _room_size(room, ax)
+        _draw_room(ax, size)
 
-    size = _room_size(room, ax)
-    _draw_room(ax, size)
+        src = _extract_positions(sources, ax)
+        mic = _extract_positions(mics, ax)
 
-    src = _extract_positions(sources, ax)
-    mic = _extract_positions(mics, ax)
+        _scatter_positions(ax, src, label="sources", marker="^")
+        _scatter_positions(ax, mic, label="mics", marker="o", color=_MIC_COLOR)
+        if annotate_sources:
+            _annotate_source_indices(ax, src)
+        _add_axes_annotation(ax, annotation_lines)
 
-    _scatter_positions(ax, src, label="sources", marker="^")
-    _scatter_positions(ax, mic, label="mics", marker="o", color=_MIC_COLOR)
-    if annotate_sources:
-        _annotate_source_indices(ax, src)
-    _add_axes_annotation(ax, annotation_lines)
-
-    if title:
-        ax.set_title(title)
-    ax.legend(loc="best")
-    if show:
-        plt.show()
-    return ax
+        if title:
+            ax.set_title(title)
+        ax.legend(loc="best")
+        if show:
+            plt.show()
+        return ax
+    except BaseException:
+        if owns_axes:
+            plt.close(ax.figure)
+        raise
 
 
 def plot_scene_dynamic(
@@ -85,37 +90,46 @@ def plot_scene_dynamic(
         )
         ```
     """
+    owns_axes = ax is None
     plt, ax = _setup_axes(ax, room)
+    try:
+        size = _room_size(room, ax)
+        _draw_room(ax, size)
 
-    size = _room_size(room, ax)
-    _draw_room(ax, size)
+        src_traj = _as_trajectory(src_traj)
+        mic_traj = _as_trajectory(mic_traj)
+        src_pos_t = (
+            _extract_positions(src_pos, ax) if src_pos is not None else src_traj[0]
+        )
+        mic_pos_t = (
+            _extract_positions(mic_pos, ax) if mic_pos is not None else mic_traj[0]
+        )
 
-    src_traj = _as_trajectory(src_traj)
-    mic_traj = _as_trajectory(mic_traj)
-    src_pos_t = _extract_positions(src_pos, ax) if src_pos is not None else src_traj[0]
-    mic_pos_t = _extract_positions(mic_pos, ax) if mic_pos is not None else mic_traj[0]
+        _plot_entity(ax, src_traj, src_pos_t, step=step, label="sources", marker="^")
+        _plot_entity(
+            ax,
+            mic_traj,
+            mic_pos_t,
+            step=step,
+            label="mics",
+            marker="o",
+            color=_MIC_COLOR,
+            uniform_color=True,
+        )
+        if annotate_sources:
+            _annotate_source_indices(ax, src_pos_t)
+        _add_axes_annotation(ax, annotation_lines)
 
-    _plot_entity(ax, src_traj, src_pos_t, step=step, label="sources", marker="^")
-    _plot_entity(
-        ax,
-        mic_traj,
-        mic_pos_t,
-        step=step,
-        label="mics",
-        marker="o",
-        color=_MIC_COLOR,
-        uniform_color=True,
-    )
-    if annotate_sources:
-        _annotate_source_indices(ax, src_pos_t)
-    _add_axes_annotation(ax, annotation_lines)
-
-    if title:
-        ax.set_title(title)
-    ax.legend(loc="best")
-    if show:
-        plt.show()
-    return ax
+        if title:
+            ax.set_title(title)
+        ax.legend(loc="best")
+        if show:
+            plt.show()
+        return ax
+    except BaseException:
+        if owns_axes:
+            plt.close(ax.figure)
+        raise
 
 
 def _setup_axes(
@@ -129,11 +143,12 @@ def _setup_axes(
     size = _room_size(room, ax)
     dim = size.numel()
     if ax is None:
-        if dim == 3:
-            fig = plt.figure()
-            ax = fig.add_subplot(111, projection="3d")
-        else:
-            _, ax = plt.subplots()
+        fig = plt.figure()
+        try:
+            ax = fig.add_subplot(111, projection="3d" if dim == 3 else None)
+        except BaseException:
+            plt.close(fig)
+            raise
     return plt, ax
 
 

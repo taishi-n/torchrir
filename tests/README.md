@@ -208,11 +208,11 @@ must fail validation.
    builder entry point's `--help`. Both environments install the same checked wheel.
 3. **Exercise actual media output.**
    `test_viz_animation.py` exercises actual GIF/MP4 rendering for 2D/3D scenes
-   with source annotations enabled and disabled. Extend encoded-output checks
-   to duration and audio-stream presence when muxing is requested, and run them
-   in one Linux job with
-   Pillow and system ffmpeg/ffprobe; use synthetic audio and avoid pixel hashes
-   or wall-clock performance thresholds.
+   with source annotations enabled and disabled, exact timing, decoding, HD
+   dimensions, and requested audio streams. Failure-injection tests cover missing
+   tools/inputs, encoder failures, atomic destination preservation, temporary-name
+   collisions, and Figure cleanup. CPU jobs provide Pillow and ffmpeg/ffprobe;
+   inputs are synthetic, with no pixel hashes or wall-clock performance thresholds.
 4. **Extend accelerator coverage when hardware is available.**
    Existing device tests cover basic static/dynamic RIR parity and emission-time
    convolution gradients. Add static and observation-time output/gradient parity,

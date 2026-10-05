@@ -333,6 +333,12 @@ validated integer channel indices. The temporary WAV is double precision;
 the final AAC stream is lossy. Apply a common gain explicitly before muxing if
 needed; there is no silent clipping, channel fallback, or normalization.
 
+Request audio explicitly with `mux_audio=True` and `mixture_path`; the default
+is silent video. Requested rendering/mux failures raise exceptions. Outputs use
+unique temporary directories and atomic per-file replacement; exceptions preserve
+existing destinations and release temporary files and owned Figures. A multi-view
+call may retain views that completed successfully before a later view failed.
+
 ## Metadata schema version 1
 
 `build_metadata` and `build_result_metadata` produce schema

@@ -92,8 +92,8 @@ def test_save_scene_videos_2d_calls_once(
     assert calls[0]["out_path"] == tmp_path / "room_layout_2d.mp4"
 
 
-def test_save_scene_videos_warns_on_failure(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+def test_save_scene_videos_raises_on_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     src_traj, mic_traj = _traj(3)
 
@@ -102,7 +102,7 @@ def test_save_scene_videos_warns_on_failure(
 
     monkeypatch.setattr(viz_io, "animate_scene_mp4", _raise)
 
-    with caplog.at_level(logging.WARNING):
+    with pytest.raises(RuntimeError, match="boom"):
         viz_io.save_scene_videos(
             out_dir=tmp_path,
             room=[6.0, 4.0, 3.0],
@@ -117,7 +117,6 @@ def test_save_scene_videos_warns_on_failure(
             save_3d=True,
             mixture_path=tmp_path / "mixture.wav",
         )
-    assert "MP4 skipped" in caplog.text
 
 
 def test_save_scene_videos_forwards_annotation_lines(
@@ -330,6 +329,7 @@ def test_save_axes_uses_fixed_static_size_and_dpi(
             calls["tight_layout"] = True
 
         def savefig(self, path: Path, *, dpi: int) -> None:
+            path.write_bytes(b"image")
             calls["savefig"] = (path, dpi)
 
     class _DummyAx:
@@ -343,7 +343,8 @@ def test_save_axes_uses_fixed_static_size_and_dpi(
 
     assert calls["figsize"] == pytest.approx(viz_utils._STATIC_FIGSIZE_INCHES)
     assert calls["tight_layout"] is True
-    assert calls["savefig"] == (out_path, viz_utils._STATIC_SAVE_DPI)
+    assert cast(tuple[Path, int], calls["savefig"])[1] == viz_utils._STATIC_SAVE_DPI
+    assert out_path.read_bytes() == b"image"
 
 
 def test_animate_scene_mp4_uses_hd_canvas(
@@ -357,6 +358,7 @@ def test_animate_scene_mp4_uses_hd_canvas(
 
     class _DummyAnim:
         def save(self, path: Path, *, writer: object, dpi: int) -> None:
+            path.write_bytes(b"video")
             calls["anim_save"] = (path, writer, dpi)
 
     class _DummyWriter:
@@ -395,6 +397,7 @@ def test_animate_scene_mp4_uses_hd_canvas(
     assert calls["figsize"] == viz_animation._MP4_FIGSIZE_INCHES
     assert calls["writer_fps"] == 12
     saved_path, writer, dpi = cast(tuple[Path, object, int], calls["anim_save"])
-    assert saved_path == out_path
+    assert saved_path.name == out_path.name
+    assert out_path.read_bytes() == b"video"
     assert writer.__class__.__name__ == "_DummyWriter"
     assert dpi == viz_animation._MP4_DPI

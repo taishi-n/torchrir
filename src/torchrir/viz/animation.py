@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-import logging
 import math
 from fractions import Fraction
 import shutil
@@ -18,13 +17,13 @@ from ..util._scalars import normalize_finite_real, normalize_integer
 
 from .utils import (
     _add_axes_annotation,
+    _atomic_output,
     _ensure_default_mpl_style,
     _positions_to_cpu,
     _to_cpu,
     _trajectory_to_cpu,
 )
 
-LOGGER = logging.getLogger(__name__)
 _MP4_WIDTH_PX = 1280
 _MP4_HEIGHT_PX = 720
 _MP4_DPI = 100
@@ -96,7 +95,8 @@ def animate_scene_gif(
         annotation_lines=annotation_lines,
     )
     try:
-        anim.save(out_path, writer=TimedPillowWriter(fps=fps_out))
+        with _atomic_output(out_path) as temporary:
+            anim.save(temporary, writer=TimedPillowWriter(fps=fps_out))
     finally:
         plt.close(fig)
     return out_path
@@ -120,12 +120,12 @@ def animate_scene_mp4(
     annotate_sources: bool = True,
     annotation_lines: Optional[Sequence[str]] = None,
     mixture_path: Path | None = None,
-    mux_audio: bool = True,
+    mux_audio: bool = False,
     audio_channels: tuple[int, int] = (0, 1),
 ) -> Path:
     """Render an MP4 showing source/mic trajectories.
 
-    When ``mux_audio`` is enabled and ``mixture_path`` is given, a stereo track
+    When ``mux_audio`` is enabled, ``mixture_path`` is required and a stereo track
     is added with ffmpeg using the requested channel indices.
     The video canvas defaults to HD (1280x720).
     """
@@ -133,7 +133,9 @@ def animate_scene_mp4(
     from matplotlib.animation import FFMpegWriter
 
     _animation_timeline(schedule, fs, stop_sample, step, fps)
-    if mux_audio and mixture_path is not None:
+    if mux_audio:
+        if mixture_path is None:
+            raise ValueError("mixture_path is required when mux_audio=True")
         import soundfile as sf
 
         info = sf.info(mixture_path)
@@ -162,18 +164,19 @@ def animate_scene_mp4(
         annotation_lines=annotation_lines,
         figsize=_MP4_FIGSIZE_INCHES,
     )
-    writer = FFMpegWriter(fps=fps_out)
     try:
-        anim.save(out_path, writer=writer, dpi=_MP4_DPI)
+        with _atomic_output(out_path) as temporary:
+            writer = FFMpegWriter(fps=fps_out)
+            anim.save(temporary, writer=writer, dpi=_MP4_DPI)
+            if mux_audio and mixture_path is not None:
+                _add_stereo_audio_to_mp4(
+                    video_path=temporary,
+                    mixture_path=Path(mixture_path),
+                    audio_channels=audio_channels,
+                )
     finally:
         plt.close(fig)
 
-    if mux_audio and mixture_path is not None:
-        _add_stereo_audio_to_mp4(
-            video_path=out_path,
-            mixture_path=Path(mixture_path),
-            audio_channels=audio_channels,
-        )
     return out_path
 
 
@@ -259,114 +262,120 @@ def _build_scene_animation(
     view_src_traj = src_traj_t[:, :, :view_dim]
     view_mic_traj = mic_traj_t[:, :, :view_dim]
 
-    if view_dim == 3:
-        fig = plt.figure(figsize=figsize)
-        ax = fig.add_subplot(111, projection="3d")
-        ax.set_xlim(0, view_room[0].item())
-        ax.set_ylim(0, view_room[1].item())
-        ax.set_zlim(0, view_room[2].item())
-        ax.set_xlabel("x", fontsize=_VIDEO_FONT_SIZE_PT)
-        ax.set_ylabel("y", fontsize=_VIDEO_FONT_SIZE_PT)
-        ax.set_zlabel("z", fontsize=_VIDEO_FONT_SIZE_PT)
-        ax.tick_params(axis="both", labelsize=_VIDEO_FONT_SIZE_PT)
-        ax.tick_params(axis="z", labelsize=_VIDEO_FONT_SIZE_PT)
-    else:
-        fig, ax = plt.subplots(figsize=figsize)
-        ax.set_xlim(0, view_room[0].item())
-        ax.set_ylim(0, view_room[1].item())
-        ax.set_aspect("equal", adjustable="box")
-        ax.set_xlabel("x", fontsize=_VIDEO_FONT_SIZE_PT)
-        ax.set_ylabel("y", fontsize=_VIDEO_FONT_SIZE_PT)
-        ax.tick_params(axis="both", labelsize=_VIDEO_FONT_SIZE_PT)
+    fig = plt.figure(figsize=figsize)
+    try:
+        if view_dim == 3:
+            ax = fig.add_subplot(111, projection="3d")
+            ax.set_xlim(0, view_room[0].item())
+            ax.set_ylim(0, view_room[1].item())
+            ax.set_zlim(0, view_room[2].item())
+            ax.set_xlabel("x", fontsize=_VIDEO_FONT_SIZE_PT)
+            ax.set_ylabel("y", fontsize=_VIDEO_FONT_SIZE_PT)
+            ax.set_zlabel("z", fontsize=_VIDEO_FONT_SIZE_PT)
+            ax.tick_params(axis="both", labelsize=_VIDEO_FONT_SIZE_PT)
+            ax.tick_params(axis="z", labelsize=_VIDEO_FONT_SIZE_PT)
+        else:
+            ax = fig.add_subplot(111)
+            ax.set_xlim(0, view_room[0].item())
+            ax.set_ylim(0, view_room[1].item())
+            ax.set_aspect("equal", adjustable="box")
+            ax.set_xlabel("x", fontsize=_VIDEO_FONT_SIZE_PT)
+            ax.set_ylabel("y", fontsize=_VIDEO_FONT_SIZE_PT)
+            ax.tick_params(axis="both", labelsize=_VIDEO_FONT_SIZE_PT)
 
-    src_scatter = ax.scatter([], [], marker="^", color="tab:green", label="sources")
-    mic_scatter = ax.scatter([], [], marker="o", color="tab:orange", label="mics")
-    src_lines = []
-    mic_lines = []
-    for _ in range(view_src_traj.shape[1]):
-        if view_dim == 2:
-            (line,) = ax.plot([], [], color="tab:green", alpha=0.6)
-        else:
-            (line,) = ax.plot([], [], [], color="tab:green", alpha=0.6)
-        src_lines.append(line)
-    for _ in range(view_mic_traj.shape[1]):
-        if view_dim == 2:
-            (line,) = ax.plot([], [], color="tab:orange", alpha=0.6)
-        else:
-            (line,) = ax.plot([], [], [], color="tab:orange", alpha=0.6)
-        mic_lines.append(line)
-    source_texts = []
-    if annotate_sources:
-        for idx in range(view_src_traj.shape[1]):
-            if isinstance(ax, Axes3D):
-                text = ax.text(0.0, 0.0, 0.0, f"S{idx}", fontsize=_VIDEO_FONT_SIZE_PT)
+        src_scatter = ax.scatter([], [], marker="^", color="tab:green", label="sources")
+        mic_scatter = ax.scatter([], [], marker="o", color="tab:orange", label="mics")
+        src_lines = []
+        mic_lines = []
+        for _ in range(view_src_traj.shape[1]):
+            if view_dim == 2:
+                (line,) = ax.plot([], [], color="tab:green", alpha=0.6)
             else:
-                text = ax.text(0.0, 0.0, f"S{idx}", fontsize=_VIDEO_FONT_SIZE_PT)
-            source_texts.append(text)
+                (line,) = ax.plot([], [], [], color="tab:green", alpha=0.6)
+            src_lines.append(line)
+        for _ in range(view_mic_traj.shape[1]):
+            if view_dim == 2:
+                (line,) = ax.plot([], [], color="tab:orange", alpha=0.6)
+            else:
+                (line,) = ax.plot([], [], [], color="tab:orange", alpha=0.6)
+            mic_lines.append(line)
+        source_texts = []
+        if annotate_sources:
+            for idx in range(view_src_traj.shape[1]):
+                if isinstance(ax, Axes3D):
+                    text = ax.text(
+                        0.0, 0.0, 0.0, f"S{idx}", fontsize=_VIDEO_FONT_SIZE_PT
+                    )
+                else:
+                    text = ax.text(0.0, 0.0, f"S{idx}", fontsize=_VIDEO_FONT_SIZE_PT)
+                source_texts.append(text)
 
-    ax.legend(loc="best", fontsize=_VIDEO_FONT_SIZE_PT)
-    annotation_text = _add_axes_annotation(
-        ax, annotation_lines, fontsize=_VIDEO_FONT_SIZE_PT
-    )
+        ax.legend(loc="best", fontsize=_VIDEO_FONT_SIZE_PT)
+        annotation_text = _add_axes_annotation(
+            ax, annotation_lines, fontsize=_VIDEO_FONT_SIZE_PT
+        )
 
-    def _frame(i: int):
-        idx = indices[i]
-        src_frame = view_src_traj[: idx + 1]
-        mic_frame = view_mic_traj[: idx + 1]
-        src_pos_frame = view_src_traj[idx]
-        mic_pos_frame = view_mic_traj[idx]
+        def _frame(i: int):
+            idx = indices[i]
+            src_frame = view_src_traj[: idx + 1]
+            mic_frame = view_mic_traj[: idx + 1]
+            src_pos_frame = view_src_traj[idx]
+            mic_pos_frame = view_mic_traj[idx]
 
-        if view_dim == 2:
-            src_scatter.set_offsets(src_pos_frame)
-            mic_scatter.set_offsets(mic_pos_frame)
-            for s_idx, line in enumerate(src_lines):
-                xy = src_frame[:, s_idx, :]
-                line.set_data(xy[:, 0], xy[:, 1])
-            for m_idx, line in enumerate(mic_lines):
-                xy = mic_frame[:, m_idx, :]
-                line.set_data(xy[:, 0], xy[:, 1])
-            if annotate_sources:
-                for s_idx, text in enumerate(source_texts):
-                    pos = src_pos_frame[s_idx]
-                    text.set_position((float(pos[0]), float(pos[1])))
-        else:
-            setattr(
-                src_scatter,
-                "_offsets3d",
-                (src_pos_frame[:, 0], src_pos_frame[:, 1], src_pos_frame[:, 2]),
-            )
-            setattr(
-                mic_scatter,
-                "_offsets3d",
-                (mic_pos_frame[:, 0], mic_pos_frame[:, 1], mic_pos_frame[:, 2]),
-            )
-            for s_idx, line in enumerate(src_lines):
-                xyz = src_frame[:, s_idx, :]
-                line.set_data(xyz[:, 0], xyz[:, 1])
-                line.set_3d_properties(xyz[:, 2])
-            for m_idx, line in enumerate(mic_lines):
-                xyz = mic_frame[:, m_idx, :]
-                line.set_data(xyz[:, 0], xyz[:, 1])
-                line.set_3d_properties(xyz[:, 2])
-            if annotate_sources:
-                for s_idx, text in enumerate(source_texts):
-                    pos = src_pos_frame[s_idx]
-                    text.set_position((float(pos[0]), float(pos[1])))
-                    text.set_3d_properties(float(pos[2]))
-        ax.set_title(f"t = {times[i]:.2f} s", fontsize=_VIDEO_FONT_SIZE_PT)
-        artists = [src_scatter, mic_scatter, *src_lines, *mic_lines, *source_texts]
-        if annotation_text is not None:
-            artists.append(annotation_text)
-        return artists
+            if view_dim == 2:
+                src_scatter.set_offsets(src_pos_frame)
+                mic_scatter.set_offsets(mic_pos_frame)
+                for s_idx, line in enumerate(src_lines):
+                    xy = src_frame[:, s_idx, :]
+                    line.set_data(xy[:, 0], xy[:, 1])
+                for m_idx, line in enumerate(mic_lines):
+                    xy = mic_frame[:, m_idx, :]
+                    line.set_data(xy[:, 0], xy[:, 1])
+                if annotate_sources:
+                    for s_idx, text in enumerate(source_texts):
+                        pos = src_pos_frame[s_idx]
+                        text.set_position((float(pos[0]), float(pos[1])))
+            else:
+                setattr(
+                    src_scatter,
+                    "_offsets3d",
+                    (src_pos_frame[:, 0], src_pos_frame[:, 1], src_pos_frame[:, 2]),
+                )
+                setattr(
+                    mic_scatter,
+                    "_offsets3d",
+                    (mic_pos_frame[:, 0], mic_pos_frame[:, 1], mic_pos_frame[:, 2]),
+                )
+                for s_idx, line in enumerate(src_lines):
+                    xyz = src_frame[:, s_idx, :]
+                    line.set_data(xyz[:, 0], xyz[:, 1])
+                    line.set_3d_properties(xyz[:, 2])
+                for m_idx, line in enumerate(mic_lines):
+                    xyz = mic_frame[:, m_idx, :]
+                    line.set_data(xyz[:, 0], xyz[:, 1])
+                    line.set_3d_properties(xyz[:, 2])
+                if annotate_sources:
+                    for s_idx, text in enumerate(source_texts):
+                        pos = src_pos_frame[s_idx]
+                        text.set_position((float(pos[0]), float(pos[1])))
+                        text.set_3d_properties(float(pos[2]))
+            ax.set_title(f"t = {times[i]:.2f} s", fontsize=_VIDEO_FONT_SIZE_PT)
+            artists = [src_scatter, mic_scatter, *src_lines, *mic_lines, *source_texts]
+            if annotation_text is not None:
+                artists.append(annotation_text)
+            return artists
 
-    anim = animation.FuncAnimation(
-        fig,
-        _frame,
-        frames=len(times),
-        interval=1000 / float(fps_out),
-        blit=False,
-    )
-    return fig, anim, fps_out
+        anim = animation.FuncAnimation(
+            fig,
+            _frame,
+            frames=len(times),
+            interval=1000 / float(fps_out),
+            blit=False,
+        )
+        return fig, anim, fps_out
+    except BaseException:
+        plt.close(fig)
+        raise
 
 
 def _add_stereo_audio_to_mp4(
@@ -381,16 +390,13 @@ def _add_stereo_audio_to_mp4(
         raise ImportError(
             "Audio muxing requires the 'audio' extra: pip install torchrir[audio]"
         ) from exc
-    if not video_path.exists():
-        return
-    if not mixture_path.exists():
-        LOGGER.warning("mixture file not found. Skip audio mux for %s", video_path.name)
-        return
-
+    if not video_path.is_file():
+        raise FileNotFoundError(video_path)
+    if not mixture_path.is_file():
+        raise FileNotFoundError(mixture_path)
     ffmpeg = shutil.which("ffmpeg")
     if ffmpeg is None:
-        LOGGER.warning("ffmpeg not found. Skip audio mux for %s", video_path.name)
-        return
+        raise RuntimeError("ffmpeg is required for requested audio muxing")
 
     mixture, sample_rate = sf.read(mixture_path, always_2d=True)
     mixture = np.asarray(mixture, dtype=np.float64)
@@ -412,39 +418,29 @@ def _add_stereo_audio_to_mp4(
             "selected audio exceeds [-1, 1]; apply a common gain before muxing"
         )
 
-    tmp_audio = video_path.with_name(video_path.stem + "_tmp_audio.wav")
-    tmp_video = video_path.with_name(video_path.stem + "_tmp_mux.mp4")
-    sf.write(tmp_audio, stereo, int(sample_rate), subtype="DOUBLE")
-
-    cmd = [
-        ffmpeg,
-        "-y",
-        "-i",
-        str(video_path),
-        "-i",
-        str(tmp_audio),
-        "-map",
-        "0:v:0",
-        "-map",
-        "1:a:0",
-        "-c:v",
-        "copy",
-        "-c:a",
-        "aac",
-        "-shortest",
-        str(tmp_video),
-    ]
-    result = subprocess.run(cmd, check=False, capture_output=True, text=True)
-    if result.returncode != 0:
-        LOGGER.warning(
-            "Failed to mux audio into %s: %s",
-            video_path.name,
-            (result.stderr or result.stdout).strip(),
-        )
-    else:
-        tmp_video.replace(video_path)
-
-    if tmp_audio.exists():
-        tmp_audio.unlink()
-    if tmp_video.exists():
-        tmp_video.unlink()
+    with _atomic_output(video_path) as tmp_video:
+        tmp_audio = tmp_video.with_suffix(".wav")
+        sf.write(tmp_audio, stereo, int(sample_rate), subtype="DOUBLE")
+        cmd = [
+            ffmpeg,
+            "-y",
+            "-i",
+            str(video_path),
+            "-i",
+            str(tmp_audio),
+            "-map",
+            "0:v:0",
+            "-map",
+            "1:a:0",
+            "-c:v",
+            "copy",
+            "-c:a",
+            "aac",
+            "-shortest",
+            str(tmp_video),
+        ]
+        result = subprocess.run(cmd, check=False, capture_output=True, text=True)
+        if result.returncode != 0:
+            raise RuntimeError(
+                f"Audio mux failed: {(result.stderr or result.stdout).strip()}"
+            )

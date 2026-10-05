@@ -516,6 +516,12 @@ not implemented.
   selection; `audio_channels` must contain two valid non-boolean integer indices.
   The intermediate WAV uses `DOUBLE`, avoiding PCM quantization before lossy
   AAC encoding. Callers must apply any desired common gain explicitly.
+- Requested visualization failures propagate to the caller, including missing
+  codecs/audio files and encoder errors. Set `mux_audio=True` with a mixture
+  path to request audio; silent video is the default. Each PNG/GIF/MP4 is written
+  through a unique temporary directory and replaces its destination only after
+  success. Errors preserve an existing destination and clean up temporary files
+  and owned Figures. Earlier successful outputs in a multi-view call remain.
 - Source-index annotations follow source positions in both 2D and 3D GIF/MP4
   animations. `annotate_sources=True` is supported in either view; disabling
   annotations changes only the labels. A 3D label uses the source's full XYZ
@@ -742,12 +748,11 @@ acceptance criteria; unchecked items remain incomplete.
       and a real builder subprocess are covered. WAV sample rates/counts/channels
       and time-reference metadata are checked without downloading a corpus. See
       [CLI integration tests](tests/test_cli_integration.py).
-- [ ] Add encoded-media integration tests using Pillow and ffmpeg/ffprobe.
-      Verify frame count, dimensions, duration, decoding, and the requested audio
-      stream. Specify how requested-output failures are reported and test ffmpeg
-      failure, temporary-file collisions, and file/Figure cleanup after exceptions.
-      Current [save helpers](src/torchrir/viz/io.py) turn rendering exceptions into
-      warnings, so successful caller completion does not establish output presence.
+- [x] Add encoded-media integration and failure handling. Pillow/ffmpeg/ffprobe
+      tests verify frame counts, dimensions, duration, decoding, and requested
+      stereo audio. Rendering/mux failures propagate; per-file atomic replacement
+      preserves existing outputs and cleans temporary files and owned Figures.
+      See [failure tests](tests/test_viz_failures.py).
 - [ ] Extend publication recovery tests with actual process interruption.
       Terminate a child process at publication checkpoints, then recover in a fresh
       process and verify complete old/new data and released locks. Retain the

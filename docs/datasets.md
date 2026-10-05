@@ -477,9 +477,10 @@ ISM geometry is rejected before execution.
 ### Output structure
 
 PNG files are present when layout images are enabled. MP4 files are produced
-only when requested and a system `ffmpeg` is available; audio muxing also
-requires the `audio` extra. Otherwise the builder records/skips those optional
-artifacts without changing the required scene data.
+only when requested; requested MP4 output requires a system `ffmpeg`, and audio
+muxing also requires the `audio` extra. Rendering failures abort the build instead
+of silently omitting requested artifacts. The dataset is published only after
+all requested outputs are produced.
 
 ```text
 <dataset-root>/
