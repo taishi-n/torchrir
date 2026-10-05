@@ -628,7 +628,9 @@ def test_dynamic_cmu_arctic_builder_calls_video_save(
     assert call["save_3d"] is False
     assert call["mp4_fps"] == pytest.approx(12.0)
     assert call["mux_audio"] is False
-    assert call["stop_sample"] == sf.info(dataset_root / "scene_0000/mixture.wav").frames
+    assert (
+        call["stop_sample"] == sf.info(dataset_root / "scene_0000/mixture.wav").frames
+    )
     assert isinstance(call["schedule"], FrameSchedule)
     assert len(call["schedule"]) == cast(torch.Tensor, call["src_traj"]).shape[0]
     annotation_lines = cast(list[str], call["annotation_lines"])

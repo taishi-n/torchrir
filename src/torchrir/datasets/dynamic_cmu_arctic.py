@@ -816,7 +816,7 @@ def _build_dynamic_cmu_arctic_in_place(
                 src_traj=src_traj,
                 mic_traj=mic_traj,
                 schedule=schedule,
-            stop_sample=mix.shape[0],
+                stop_sample=mix.shape[0],
                 fs=sample_rate,
                 logger=log,
                 mp4_fps=layout_video_fps,
