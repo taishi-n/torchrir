@@ -50,21 +50,16 @@ Legend: `✅` native support, `🟡` manual setup, `🚧` candidate (not yet imp
 For detailed notes and equations, see
 [Documentation: Library Comparisons](https://torchrir.readthedocs.io/en/latest/comparisons.html).
 
-## CUDA CI (GitHub Actions)
+## Continuous Integration
 
-- CUDA tests run in `.github/workflows/cuda-ci.yml` on a self-hosted runner with labels:
-  `self-hosted`, `linux`, `x64`, `cuda`.
-- The workflow validates the lockfile-based installation via
-  `uv sync --locked --group test`, checks `torch.cuda.is_available()`, runs
-  `tests/test_device_parity.py` with `-k cuda`, and executes the dynamic
-  emission-time convolution autograd regression on CUDA.
-- The extended job installs the pinned `gpuRIR` reference revision.
-- The extended workflow requires `gpuRIR` installation and runs direct-path
-  static/dynamic RIR comparisons plus an isolated `simulateTrajectory`
-  comparison using identical synthetic RIRs. Known normalization, image-count,
-  and fractional-delay conventions are handled explicitly; signals are never
-  freely aligned. Installation failure or a skipped comparison fails that
-  workflow.
+- [The main CI workflow](.github/workflows/ci.yml) runs Linux CPU tests for
+  Python 3.11.4, 3.12, and 3.13, numerical reference comparisons, formatting and
+  type checks, documentation builds, and package checks.
+- There is no dedicated CUDA or MPS workflow. Device parity and accelerator
+  autograd tests remain available for manual execution on suitable hardware;
+  passing CPU CI does not establish accelerator correctness.
+- The current coverage, proposed CI jobs, missing tests, and implementation
+  order are recorded in the [test and CI plan](tests/README.md#test-and-ci-plan).
 
 ## Examples
 - `examples/static.py`: fixed sources and microphones with configurable mic count (default: binaural).  
@@ -576,6 +571,9 @@ itself and names beginning with `torchrir.` are already qualified.
 - Unexpected warnings fail the test suite. Reference, CUDA, MPS, numerical, and
   slow tests use explicit pytest markers.
 - CI measures branch coverage and requires at least 75% overall coverage.
+- Automated CI does not require accelerator hardware. CUDA/MPS validation is
+  manual and must record the actual device, runtime versions, and skipped tests;
+  an unavailable device is not evidence of a successful accelerator check.
 
 ### API stability
 

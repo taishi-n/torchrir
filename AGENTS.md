@@ -62,6 +62,10 @@
 - Use `pytest` with filenames like `test_*.py` under `tests/`.
 - Add unit tests for geometry, ISM correctness, and dynamic trajectory handling.
   - Prefer parity tests across `cpu`, `cuda`, and `mps` where available.
+- Automated CI must run without accelerator hardware. Retain CUDA/MPS tests
+  for explicit manual validation; do not equate a skipped device test with a pass.
+- Follow the current scope and implementation order in the
+  [test and CI plan](tests/README.md#test-and-ci-plan).
 
 ## Commit & Pull Request Guidelines
 - Codex proposes commit message drafts; the user reviews/approves before committing.

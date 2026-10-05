@@ -50,7 +50,8 @@
 ## Device selection
 - `device="cpu"`: CPU execution
 - `device="mps"`: Apple Silicon GPU via Metal (MPS) if available, otherwise fallback to CPU
-- `device="cuda"`: CUDA execution (validated in CI on CUDA runners; requires a CUDA-enabled PyTorch environment)
+- `device="cuda"`: CUDA execution (requires a CUDA-enabled PyTorch environment;
+  accelerator validation is manual, with no dedicated CUDA CI workflow)
 - `device="auto"`: CUDA, then MPS, then CPU; MPS is skipped for `float64`
 - `device=None`: inherit the common scene-tensor device
 

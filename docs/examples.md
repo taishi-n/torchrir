@@ -213,8 +213,8 @@ microphone simulation with observation-time convolution.
   convolution as well.
 
 !!! note
-    CUDA paths are validated in CI on CUDA runners. Runtime and numerical behavior
-    still depend on your local CUDA/PyTorch environment.
+    CUDA validation is manual; there is no dedicated CUDA CI workflow. Run the
+    device tests on the CUDA/PyTorch environment used for an experiment.
 
     MP4 output requires a system `ffmpeg`. If audio is muxed into a video, also
     install `torchrir[audio]`.
@@ -346,8 +346,8 @@ uv run python examples/build_dynamic_dataset.py \
   `speaker-chapter-utterance` format) raise `ValueError`.
 
 !!! note
-    `cuda` is available and validated in CI. Actual runtime behavior still depends
-    on your local CUDA/PyTorch environment.
+    `cuda` is supported but is not continuously validated by CI. Run the device
+    tests on the CUDA/PyTorch environment used for dataset generation.
 
 ### Implementation notes
 

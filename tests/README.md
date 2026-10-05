@@ -69,8 +69,8 @@ review test design:
 
 - The pyroomacoustics runtime oracle is the PyPI `0.9.0` artifact resolved and
   hashed in `uv.lock`.
-- The CUDA workflow installs gpuRIR commit
-  `fd8af43a4a113d3c2c05f0085a0119ecb1f1a484`.
+- Optional manual gpuRIR comparisons use commit
+  `fd8af43a4a113d3c2c05f0085a0119ecb1f1a484`; no GPU runner is required by CI.
 - The optional rir-generator oracle must report version `0.3.0`; it is not a
   project dependency and is skipped unless installed explicitly.
 
@@ -127,3 +127,157 @@ missing reference dependency cannot turn the entire comparison into a passing
 skip. A dedicated rir-generator job instead sets
 `TORCHRIR_REQUIRE_RIR_GENERATOR_COMPARISON=1` because rir-generator is not part
 of the normal comparison dependency group.
+
+## Test and CI plan
+
+### Current state
+
+The automated validation entry point is
+[ci.yml](../.github/workflows/ci.yml). It has a documentation job, a Linux test
+matrix for Python 3.11.4/3.12/3.13, and one job combining lint, types, CPU
+reference comparisons, and package checks. The
+[release workflow](../.github/workflows/release.yml) currently builds and
+publishes on version tags without a validation dependency in that workflow.
+There is no dedicated CUDA or MPS workflow. Keep the accelerator tests for
+manual runs; a successful CPU run says nothing about their execution status.
+
+The existing numerical suite already tests analytic path delays/gains,
+fractional-delay interpolation, directivity, diffuse tails, filtering,
+reciprocity, static/dynamic equivalence, and both convolution time references.
+Extend those tests for concrete gaps rather than adding duplicate shape checks
+or introducing compatibility/migration tests.
+
+The jobs and additions below are a plan, not implemented CI behavior.
+
+### Required automated jobs
+
+Use GitHub-hosted CPU runners for pull requests and pushes to `main`, with a
+manual dispatch entry point. Keep one validation workflow with these jobs;
+accelerators and real corpus downloads are not prerequisites.
+
+| Job | Environment | Scope and acceptance criteria | Change from current CI |
+| --- | --- | --- | --- |
+| Quality | Linux, Python 3.11.4 | Ruff format/lint and ty must pass; validate workflow syntax with actionlint. | Separate from optional integrations and package builds; add workflow validation. |
+| CPU tests | Linux, Python 3.11.4/3.12/3.13 | Run all non-comparison, non-accelerator tests, including numerical tests, audio I/O, synthetic dataset builds, and filesystem recovery. Measure branch-inclusive coverage on one designated Linux job and keep the existing 75% threshold. | Explicitly select CPU tests and report skip reasons; avoid repeating coverage collection across the entire matrix. |
+| macOS CPU tests | GitHub-hosted macOS, Python 3.13 | Run the same CPU suite, especially descriptor-relative reads, atomic publication, locks, and recovery. | Add coverage for the separate Darwin filesystem implementation; do not require MPS availability. |
+| CPU comparisons | Linux, Python 3.11.4 | Run the pinned pyroomacoustics and rir-generator test files with their required-dependency flags; no skipped comparison is acceptable. | Separate external-reference installation/execution from fast quality checks. |
+| Documentation | Linux, Python 3.11.4, docs-only dependencies | Strict Zensical build; verify the index/API pages and exclusion of private API helpers. | Preserve the existing minimal-dependency job. |
+| Distribution | Linux, Python 3.11.4 | Build sdist/wheel, check license/changelog metadata, and run installed-package smoke tests described below. | Extend the existing import-only wheel check to exercise the installed library. |
+
+Use `uv sync --locked` with only the groups/extras each job needs, then preserve
+that environment for the job. Do not install `oobss` or all extras solely to run
+lint or CPU reference comparisons. Keep SciPy, SoundFile, and visualization
+dependencies present in the full CPU test jobs so their absence cannot hide
+required coverage. Keep test inputs small, synthetic, and local; mock network
+responses instead of downloading speech corpora.
+
+Run the validation workflow for every pull request so its result is always
+reported. Include all workflow files in any push path filter. Cancel superseded
+validation runs for the same pull request/ref using workflow-specific
+concurrency groups, but do not cancel an in-progress publication. Record test
+counts, skip reasons, and coverage in the job output; retain JUnit and coverage
+reports for failed-run diagnosis. A skipped optional codec case needs an explicit
+reason; required dependencies, empty test selections, and entirely skipped jobs
+must fail validation.
+
+### Test additions and concrete gaps
+
+1. **Make CPU/device selection accurate.**
+   `test_collate_dataset_items_rejects_mixed_devices_when_available` currently
+   selects an accelerator at runtime without a device marker. Parameterize it
+   with explicit `cuda`/`mps` marks before using marker selection as the CPU CI
+   boundary. Ignore the `test_compare_*.py` files in CPU-only jobs to avoid
+   optional-reference imports during collection. Keep ordinary unmarked tests;
+   selecting only `unit` or `numerical` would omit current API contracts.
+2. **Exercise the installed distribution.**
+   The current wheel check only imports the package, while `tests/conftest.py`
+   inserts the checkout's `src` directory into `sys.path`. Add a small smoke
+   script and execute it outside the checkout with no source-path injection.
+   With only base dependencies, simulate a tiny direct path and check its
+   physical arrival/gain, then check static and both dynamic convolution
+   conventions against direct sums. Confirm imports resolve inside the clean
+   environment. In a separate environment with the required extras, check a
+   multichannel floating-WAV round trip and the installed builder CLI's `--help`.
+3. **Exercise actual media output.**
+   `test_viz_video.py` largely substitutes animation writers and scene builders;
+   it does not prove that a video can be encoded. Add a tiny GIF/MP4 integration
+   test that opens the result and checks frame count, dimensions, duration, and
+   audio-stream presence when muxing is requested. Run it in one Linux job with
+   Pillow and system ffmpeg/ffprobe; use synthetic audio and avoid pixel hashes
+   or wall-clock performance thresholds.
+4. **Extend accelerator coverage when hardware is available.**
+   Existing device tests cover basic static/dynamic RIR parity and emission-time
+   convolution gradients. Add static and observation-time output/gradient parity,
+   multi-source/microphone and chunk-boundary cases, and CUDA eager/compiled
+   accumulation parity with LUT enabled/disabled. Use float32/float64 on CUDA
+   and float32 on MPS. Verify the actual output/config device; silent CPU
+   fallback must not count as a device pass. Compilation validation needs an
+   actual supported backend, not only a mocked flag. These remain manual until
+   reliable hardware is explicitly provided.
+
+### Release validation
+
+Before the next release, make the CPU validation workflow callable from the
+release workflow and require it to succeed for the exact tagged commit before
+publishing. Reuse the same job definitions instead of copying the test commands.
+Verify tag, `pyproject.toml`, `uv.lock`, and built distribution versions agree.
+Publish the artifact that passed the distribution checks, rather than rebuilding
+an untested wheel after the checks. Validate the gate using a non-publishing run;
+do not test it by uploading a release.
+
+### Manual accelerator checks
+
+Prepare the desired PyTorch/CUDA or PyTorch/MPS environment before running these
+commands. They use `--no-sync` to preserve that prepared environment. Record the
+commit, Python/PyTorch version, actual device, driver/runtime where applicable,
+and the pytest summary. An unavailable accelerator fails the preflight; it must
+not be recorded as a successful GPU check.
+
+```bash
+# CUDA: RIR parity, sample schedules, and emission-time convolution/autograd.
+uv run --no-sync python -c 'import torch; assert torch.cuda.is_available(), "CUDA unavailable"'
+uv run --no-sync pytest -q -rs tests/test_device_parity.py tests/test_signal.py -m cuda
+
+# MPS: run separately on an environment with an available MPS device.
+uv run --no-sync python -c 'import torch; assert torch.backends.mps.is_available(), "MPS unavailable"'
+uv run --no-sync pytest -q -rs tests/test_device_parity.py tests/test_signal.py -m mps
+```
+
+Run gpuRIR separately only when the pinned reference revision is installed and
+the CUDA preflight has passed:
+
+```bash
+TORCHRIR_REQUIRE_COMPARISON=1 uv run --no-sync pytest -q -rs tests/test_compare_gpurir.py
+```
+
+The required-reference flag makes a missing gpuRIR import fail, but the tests
+still skip without CUDA, so the preflight and skip-summary review are necessary.
+Preserve the existing explicit amplitude/time conventions and direct-path-only
+RIR comparison scope. Do not make this external CUDA build a dependency of CPU
+validation or restore a scheduled self-hosted GPU workflow without a maintained
+runner and successful manual verification.
+
+### Implementation order
+
+1. **P1: CPU selection and CI separation.** Update the specification/test markers,
+   then split quality, comparisons, and distribution jobs; add macOS CPU coverage
+   and workflow syntax checks. Done when all required jobs run on hosted CPU
+   runners and skip reports contain no unexplained omissions.
+2. **P1: Distribution smoke and release gate.** Write behavior-based smoke cases
+   before wiring them into CI; then reuse validation on tag builds. Done when
+   the installed artifact is exercised and failed validation prevents publishing.
+3. **P2: Real media integration.** Add the tiny encoded-output test, demonstrate
+   failure for missing/invalid output, and enable its prepared Linux environment.
+4. **P2, hardware-dependent: Accelerator extensions.** Add the missing parity
+   cases and record manual results on actual devices. CPU success does not close
+   this item, and there is no requirement to add a replacement GPU workflow now.
+
+Each step follows documentation first, failing tests for new behavior, minimal
+implementation, and final removal of unused code or contradictory documentation.
+Deleting a workflow or revising this plan does not warrant a permanent test that
+asserts a retired filename is absent.
+
+GitHub Actions references for implementation:
+[hosted runners](https://docs.github.com/en/actions/reference/runners/github-hosted-runners),
+[reusable workflows](https://docs.github.com/en/actions/how-tos/reuse-automations/reuse-workflows),
+and [concurrency](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency).
