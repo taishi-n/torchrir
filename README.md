@@ -2,11 +2,12 @@
 
 A PyTorch-based room impulse response (RIR) simulation toolkit with a clean API and GPU support.
 This project has been developed with substantial assistance from Codex.
+
 > [!WARNING]
 > TorchRIR is under active development and may contain bugs or breaking changes.
 > Please validate results for your use case.
-If you find bugs or have feature requests, please open an issue.
-Contributions are welcome.
+> If you find bugs or have feature requests, please open an issue.
+> Contributions are welcome.
 
 ## Installation
 
@@ -31,21 +32,31 @@ pip install "torchrir[all]"         # all optional features
 ```
 
 ## Library Comparison
-| Feature | `torchrir` | `gpuRIR` | `pyroomacoustics` | `rir-generator` |
-|---|---|---|---|---|
-| 🎯 Dynamic Sources | ✅ Emission-time | 🟡 Single moving source | 🟡 Manual loop | ❌ |
-| 🎤 Dynamic Microphones | ✅ Observation-time | ❌ | 🟡 Manual loop | ❌ |
-| 🖥️ CPU | ✅ | ❌ | ✅ | ✅ |
-| 🧮 CUDA | ✅ | ✅ | ❌ | ❌ |
-| 🍎 MPS | ✅ | ❌ | ❌ | ❌ |
-| 📊 Scene Plot | ✅ | ❌ | ✅ | ❌ |
-| 🎞️ Dynamic Scene GIF | ✅ | ❌ | 🟡 Manual animation script | ❌ |
-| 🗂️ Dataset Build | ✅ | ❌ | ✅ | ❌ |
-| 🎛️ RIR Convolution | ✅ Static/dynamic | 🟡 Dynamic helper | ✅ | ❌ |
-| 🧱 Non-shoebox Geometry | 🚧 Candidate | ❌ | ✅ | ❌ |
-| 🌐 Geometric Acoustics | 🚧 Candidate | ❌ | ✅ | ❌ |
+
+| Feature | `torchrir` | `gpuRIR` | `pyroomacoustics` | `rir-generator` | `dynamic-sound` | `das-generator` |
+|---|---|---|---|---|---|---|
+| 🎯 Dynamic Sources | ✅ Emission-time | 🟡 Single moving source | 🟡 Manual loop | ❌ | ✅ Retarded-time | ✅ Emission-time |
+| 🎤 Dynamic Microphones | ✅ Observation-time | ❌ | 🟡 Manual loop | ❌ | ✅ Observation-time | ✅ Observation-time* |
+| Source + Microphone Motion | ❌ Signal synthesis | ❌ | 🟡 Custom propagation | ❌ | ✅ Direct sound | ✅ Two-time kernel* |
+| Shoebox ISM | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ |
+| 🖥️ CPU | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ |
+| 🧮 CUDA | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
+| 🍎 MPS | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| 📊 Scene Plot | ✅ | ❌ | ✅ | ❌ | ✅ Paths/arrays | ❌ |
+| 🎞️ Dynamic Scene GIF | ✅ | ❌ | 🟡 Manual animation script | ❌ | 🟡 Manual animation script | ❌ |
+| 🗂️ Dataset Build | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ |
+| 🎛️ RIR Convolution | ✅ Static/dynamic | 🟡 Dynamic helper | ✅ | ❌ | ❌ Signal time warping | ✅ Internal dynamic RIR |
+| 🧱 Non-shoebox Geometry | 🚧 Candidate | ❌ | ✅ | ❌ | ❌ | ❌ |
+| 🌐 Geometric Acoustics | 🚧 Candidate | ❌ | ✅ | ❌ | ❌ | ❌ |
 
 Legend: `✅` native support, `🟡` manual setup, `🚧` candidate (not yet implemented), `❌` unavailable
+
+Motion rows describe signal synthesis, not just RIR snapshots. `dynamic-sound`
+models direct sound without automatic room reflections; a multiple-source
+superposition error was reproduced in the inspected revision. `das-generator`
+implements a two-time ISM kernel, but moving-receiver RIR reuse and startup
+errors were reproduced (`*`). Feature availability does not establish numerical
+correctness; pinned revisions, equations, and CPU checks are documented below.
 
 For detailed notes and equations, see
 [Documentation: Library Comparisons](https://torchrir.readthedocs.io/en/latest/comparisons.html).
@@ -62,6 +73,7 @@ For detailed notes and equations, see
   order are recorded in the [test and CI plan](tests/README.md#test-and-ci-plan).
 
 ## Examples
+
 - `examples/static.py`: fixed sources and microphones with configurable mic count (default: binaural).  
   `uv run python examples/static.py --plot`
 - `examples/dynamic_src.py`: moving sources, fixed microphones.  
@@ -78,10 +90,12 @@ For detailed notes and equations, see
   `uv run python examples/benchmark_device.py --dynamic`
 
 ## Dataset Notices
+
 - For dataset attribution and redistribution notes, see
   [THIRD_PARTY_DATASETS.md](https://github.com/taishi-n/torchrir/blob/main/THIRD_PARTY_DATASETS.md).
 
 ## Dataset API Quick Guide
+
 - `torchrir.datasets.CmuArcticDataset(root, speaker=..., download=...)`
   - Accepted `speaker`: `aew`, `ahw`, `aup`, `awb`, `axb`, `bdl`, `clb`, `eey`, `fem`, `gka`, `jmk`, `ksp`, `ljm`, `lnh`, `rms`, `rxr`, `slp`, `slt`
   - A non-string `speaker` raises `TypeError`; an unsupported string raises
@@ -175,6 +189,7 @@ For detailed notes and equations, see
     metadata records both requested and effective sample-aligned durations.
   - Other defaults include `n_sources=3`, moving speed range `0.3-0.8 m/s`, and motion profile ratios `0-35%`, `35-65%`, `65-100%`.
 - Local-only (no download) example:
+
   ```python
   from pathlib import Path
   from torchrir.datasets import CmuArcticDataset, LibriSpeechDataset
@@ -187,10 +202,12 @@ For detailed notes and equations, see
       download=False,
   )
   ```
+
 - Full dataset usage details, expected directory layout, and invalid-input handling:
   [Documentation: Datasets](https://torchrir.readthedocs.io/en/latest/datasets.html)
 
 ## Core API Overview
+
 - Geometry: `Room`, `Source`, `MicrophoneArray`
 - Scene models: `StaticScene`, `DynamicScene`
 - Scene-oriented simulation: `torchrir.sim.simulate(scene, config)`
@@ -206,6 +223,7 @@ For detailed notes and equations, see
   `torchrir.io.save_result_metadata`
 
 ## Module Layout (for contributors)
+
 - `torchrir.sim`: the scene-oriented simulation entry point (the private ISM
   implementation lives under `torchrir.sim.ism`)
 - `torchrir.signal`: convolution utilities and dynamic convolver
@@ -220,6 +238,7 @@ For detailed notes and equations, see
 - `torchrir.config`: simulation configuration objects
 
 ## Design Notes
+
 - Scene typing is explicit: use `StaticScene` for fixed geometry and `DynamicScene` for trajectory-based simulation.
 - `DynamicScene` accepts tensor-like trajectories (e.g., lists) and normalizes them to tensors internally.
 - `DynamicScene.schedule` optionally stores the authoritative frame axis as
@@ -313,7 +332,7 @@ y = DynamicConvolver(time_reference="emission").convolve(signal, dynamic_result)
   tail.
 - Continuous geometry must be sampled on that same frame axis. Use
   `progress = schedule.normalized_progress(stop_sample=..., dtype=...,
-  device=...)` and pass it as the keyword-only `progress` argument to
+device=...)` and pass it as the keyword-only `progress` argument to
   `linear_trajectory`. Frame `i` corresponds to
   `schedule.starts[i] / stop_sample`; the division is evaluated in float64
   before the requested dtype cast. If that dtype cannot distinguish the final
@@ -853,7 +872,10 @@ external-reference, and filesystem-recovery tests; the HPF changes in `4515a27`
 already include regression tests.
 
 ## Related Libraries
+
 - [gpuRIR](https://github.com/DavidDiazGuerra/gpuRIR)
 - [Cross3D](https://github.com/DavidDiazGuerra/Cross3D)
 - [pyroomacoustics](https://github.com/LCAV/pyroomacoustics)
 - [rir-generator](https://github.com/audiolabs/rir-generator)
+- [dynamic-sound](https://github.com/vlsi-nanocomputing/dynamic-sound)
+- [das-generator](https://github.com/ehabets/das-generator)
