@@ -646,6 +646,11 @@ uv build
 
 CI also inspects the built artifacts: the sdist must contain `CHANGELOG.md`,
 and the wheel must declare `License-Expression: Apache-2.0`.
+CPU CI runs Linux Python 3.11.4/3.12/3.13 and macOS Python 3.13 with explicit
+accelerator/reference exclusions, required codecs, and retained JUnit reports.
+Only Linux 3.11.4 collects coverage (minimum 75%). Quality, pinned comparisons,
+documentation, and distribution run separately; actionlint validates all workflows.
+Every PR triggers validation. Obsolete CI runs may be cancelled; release runs may not.
 Installed-wheel checks run outside the checkout in two fresh environments.
 Base dependencies must support physical direct-path simulation and all three
 convolution modes against direct sums; audio/dataset/CLI extras must preserve
@@ -719,15 +724,12 @@ acceptance criteria; unchecked items remain incomplete.
       static/emission/observation convolution. Audio/datasets/CLI extras pass FLOAT
       multichannel WAV round trips and the installed builder command. See
       [wheel smoke checks](scripts/smoke_wheel.py).
-- [ ] Implement the CPU CI plan: separate quality, reference-comparison, and
-      distribution jobs; add macOS CPU coverage for the Darwin filesystem
-      implementation and actionlint; retain test/skip/coverage reports; and measure
-      coverage on one designated matrix job. Mark the mixed-device collate test
-      explicitly for CUDA/MPS, preserve ordinary unmarked CPU tests, validate every
-      PR, and include every workflow file in any push path filter. Use the minimal
-      required dependencies and cancel superseded validation runs without cancelling
-      publication. See [ci.yml](.github/workflows/ci.yml) and
-      [test selection gaps](tests/README.md#test-additions-and-concrete-gaps).
+- [x] Implement the CPU CI plan: separate quality, comparisons, and distribution;
+      Linux 3.11.4/3.12/3.13 plus macOS 3.13; actionlint; retained test/coverage
+      reports; one 75% coverage gate; explicit device markers; minimal dependency
+      groups; every-PR validation; complete workflow push filters; and cancellation
+      limited to superseded CI runs. Local CPU validation passes with zero skips.
+      See [ci.yml](.github/workflows/ci.yml).
 
 ### P2: Integration and hardware coverage
 

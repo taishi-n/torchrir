@@ -46,6 +46,7 @@
   - `uv run --group docs zensical build --strict` to build docs locally
   - `uv run ruff format .` for formatting
   - `uv run ty check` for type checking
+  - `actionlint` (version 1.7.12 in CI) to validate all GitHub Actions workflows
 - `uv.lock` is committed. Update it **only** when `pyproject.toml` changes.
 
 ## Coding Style & Naming Conventions

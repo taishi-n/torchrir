@@ -276,14 +276,23 @@ def test_collate_dataset_items_revalidates_and_rejects_mixed_layout() -> None:
         collate_dataset_items([single], pad_value=1.0e40)
 
 
-def test_collate_dataset_items_rejects_mixed_devices_when_available() -> None:
-    accelerator: str | None = None
-    if torch.cuda.is_available():
-        accelerator = "cuda"
-    elif torch.backends.mps.is_available():
-        accelerator = "mps"
-    if accelerator is None:
-        pytest.skip("no accelerator available for a mixed-device batch")
+@pytest.mark.parametrize(
+    "accelerator",
+    [
+        pytest.param("cuda", marks=pytest.mark.cuda),
+        pytest.param("mps", marks=pytest.mark.mps),
+    ],
+)
+def test_collate_dataset_items_rejects_mixed_devices_when_available(
+    accelerator: str,
+) -> None:
+    available = (
+        torch.cuda.is_available()
+        if accelerator == "cuda"
+        else torch.backends.mps.is_available()
+    )
+    if not available:
+        pytest.skip(f"{accelerator} unavailable for a mixed-device batch")
 
     cpu = DatasetItem(audio=torch.ones(2), sample_rate=8000, utterance_id="cpu")
     other = DatasetItem(

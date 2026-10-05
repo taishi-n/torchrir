@@ -132,14 +132,20 @@ of the normal comparison dependency group.
 
 ### Current state
 
-The automated validation entry point is
-[ci.yml](../.github/workflows/ci.yml). It has a documentation job, a Linux test
-matrix for Python 3.11.4/3.12/3.13, and one job combining lint, types, CPU
-reference comparisons, and package checks. The
-[release workflow](../.github/workflows/release.yml) calls this validation at the
-same commit and publishes its checked artifact only after validation succeeds.
-There is no dedicated CUDA or MPS workflow. Keep the accelerator tests for
-manual runs; a successful CPU run says nothing about their execution status.
+The automated validation entry point is [ci.yml](../.github/workflows/ci.yml).
+It separates quality, CPU tests, CPU comparisons, documentation, and distribution.
+CPU tests run on Linux Python 3.11.4/3.12/3.13 and macOS Python 3.13; only Linux
+3.11.4 collects branch-inclusive coverage with the 75% threshold. Each test job
+retains JUnit reports and explicit skip reasons; empty/all-skipped reports fail.
+Comparison reports additionally reject any skips. ffmpeg/ffprobe are installed
+in CPU jobs so real-media tests cannot disappear behind a missing-codec skip.
+Actionlint 1.7.12 validates workflow syntax in the quality job.
+The [release workflow](../.github/workflows/release.yml) reuses all validation
+jobs at the same commit before publishing the checked artifact. Pull requests
+always trigger validation; pushes watch all workflows and relevant project files.
+Workflow-specific concurrency cancels obsolete CI runs, while release validation
+and publication are never cancelled by this policy. There is no GPU workflow;
+a successful CPU run says nothing about manual accelerator execution.
 
 The existing numerical suite already tests analytic path delays/gains,
 fractional-delay interpolation, directivity, diffuse tails, filtering,
@@ -147,7 +153,8 @@ reciprocity, static/dynamic equivalence, and both convolution time references.
 Extend those tests for concrete gaps rather than adding duplicate shape checks
 or introducing compatibility/migration tests.
 
-The jobs and additions below are a plan, not implemented CI behavior.
+The table records the implemented CPU validation contract. Accelerator extensions
+remain deferred as noted in the README TODO.
 
 ### Required automated jobs
 
@@ -155,14 +162,14 @@ Use GitHub-hosted CPU runners for pull requests and pushes to `main`, with a
 manual dispatch entry point. Keep one validation workflow with these jobs;
 accelerators and real corpus downloads are not prerequisites.
 
-| Job | Environment | Scope and acceptance criteria | Change from current CI |
-| --- | --- | --- | --- |
-| Quality | Linux, Python 3.11.4 | Ruff format/lint and ty must pass; validate workflow syntax with actionlint. | Separate from optional integrations and package builds; add workflow validation. |
-| CPU tests | Linux, Python 3.11.4/3.12/3.13 | Run all non-comparison, non-accelerator tests, including numerical tests, audio I/O, synthetic dataset builds, and filesystem recovery. Measure branch-inclusive coverage on one designated Linux job and keep the existing 75% threshold. | Explicitly select CPU tests and report skip reasons; avoid repeating coverage collection across the entire matrix. |
-| macOS CPU tests | GitHub-hosted macOS, Python 3.13 | Run the same CPU suite, especially descriptor-relative reads, atomic publication, locks, and recovery. | Add coverage for the separate Darwin filesystem implementation; do not require MPS availability. |
-| CPU comparisons | Linux, Python 3.11.4 | Run the pinned pyroomacoustics and rir-generator test files with their required-dependency flags; no skipped comparison is acceptable. | Separate external-reference installation/execution from fast quality checks. |
-| Documentation | Linux, Python 3.11.4, docs-only dependencies | Strict Zensical build; verify the index/API pages and exclusion of private API helpers. | Preserve the existing minimal-dependency job. |
-| Distribution | Linux, Python 3.11.4 | Build sdist/wheel, check license/changelog metadata, and run installed-package smoke tests described below. | Extend the existing import-only wheel check to exercise the installed library. |
+| Job | Environment | Scope and acceptance criteria |
+| --- | --- | --- |
+| Quality | Linux, Python 3.11.4 | Ruff format/lint, ty, and actionlint 1.7.12. Uses the quality/test groups and visualization/CLI extras needed for static analysis. |
+| CPU tests | Linux, Python 3.11.4/3.12/3.13 | All non-comparison/non-accelerator tests, required codecs, JUnit reports; branch-inclusive coverage only on 3.11.4 (75% minimum). |
+| macOS CPU tests | macOS, Python 3.13 | Same CPU suite, including Darwin filesystem publication and recovery. |
+| CPU comparisons | Linux, Python 3.11.4 | Pinned pyroomacoustics/rir-generator; required-dependency flags and zero skips. |
+| Documentation | Linux, Python 3.11.4 | Docs-only strict build and generated index/API checks. |
+| Distribution | Linux, Python 3.11.4 | Version/metadata validation, isolated installed-wheel checks, and upload of the tested sdist/wheel. |
 
 Use `uv sync --locked` with only the groups/extras each job needs, then preserve
 that environment for the job. Do not install `oobss` or all extras solely to run
@@ -182,13 +189,10 @@ must fail validation.
 
 ### Test additions and concrete gaps
 
-1. **Make CPU/device selection accurate.**
-   `test_collate_dataset_items_rejects_mixed_devices_when_available` currently
-   selects an accelerator at runtime without a device marker. Parameterize it
-   with explicit `cuda`/`mps` marks before using marker selection as the CPU CI
-   boundary. Ignore the `test_compare_*.py` files in CPU-only jobs to avoid
-   optional-reference imports during collection. Keep ordinary unmarked tests;
-   selecting only `unit` or `numerical` would omit current API contracts.
+1. **Keep CPU/device selection accurate.**
+   Mixed-device collate cases have explicit `cuda`/`mps` marks. CPU jobs select
+   `not comparison and not cuda and not mps` and ignore `test_compare_*.py`
+   during collection. Ordinary unmarked tests remain part of the CPU suite.
 2. **Exercise the installed distribution.**
    `scripts/smoke_wheel.py` runs under isolated Python (`-I`) from a temporary
    directory, without pytest/conftest or source-path injection. It requires the
@@ -260,18 +264,10 @@ runner and successful manual verification.
 
 ### Implementation order
 
-1. **P1: CPU selection and CI separation.** Update the specification/test markers,
-   then split quality, comparisons, and distribution jobs; add macOS CPU coverage
-   and workflow syntax checks. Done when all required jobs run on hosted CPU
-   runners and skip reports contain no unexplained omissions.
-2. **P1: Distribution smoke and release gate.** Write behavior-based smoke cases
-   before wiring them into CI; then reuse validation on tag builds. Done when
-   the installed artifact is exercised and failed validation prevents publishing.
-3. **P2: Real media integration.** Add the tiny encoded-output test, demonstrate
-   failure for missing/invalid output, and enable its prepared Linux environment.
-4. **P2, hardware-dependent: Accelerator extensions.** Add the missing parity
-   cases and record manual results on actual devices. CPU success does not close
-   this item, and there is no requirement to add a replacement GPU workflow now.
+Follow the checklist order in [README TODO](../README.md#todo): visualization
+correctness, release gate, installed distributions, CPU CI, CLI/examples, media
+failure handling, and process-interruption recovery. Commit each completed item.
+The accelerator extension remains unchecked until hardware is available.
 
 Each step follows documentation first, failing tests for new behavior, minimal
 implementation, and final removal of unused code or contradictory documentation.

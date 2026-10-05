@@ -49,13 +49,13 @@ Repository = "https://github.com/taishi-n/torchrir"
 torchrir-build-dynamic-cmu-arctic = "torchrir.datasets.dynamic_cmu_arctic:main"
 
 [dependency-groups]
+quality = ["ruff>=0.12.2", "ty>=0.0.14,<0.1"]
 dev = [
+  {include-group = "quality"},
   "commitizen>=3.29.0",
   "git-cliff>=2.10.1",
   "matplotlib>=3.10.8",
   "pillow>=11.2.1",
-  "ruff>=0.12.2",
-  "ty>=0.0.14,<0.1",
 ]
 docs = [
   "zensical>=0.0.51",

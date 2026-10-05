@@ -1617,6 +1617,10 @@ docs = [
     { name = "mkdocstrings-python" },
     { name = "zensical" },
 ]
+quality = [
+    { name = "ruff" },
+    { name = "ty" },
+]
 test = [
     { name = "pytest" },
     { name = "pytest-cov" },
@@ -1662,6 +1666,10 @@ dev = [
 docs = [
     { name = "mkdocstrings-python", specifier = ">=2.0.2" },
     { name = "zensical", specifier = ">=0.0.51" },
+]
+quality = [
+    { name = "ruff", specifier = ">=0.12.2" },
+    { name = "ty", specifier = ">=0.0.14,<0.1" },
 ]
 test = [
     { name = "pytest", specifier = ">=9.0.2" },

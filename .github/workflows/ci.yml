@@ -10,7 +10,7 @@ on:
   push:
     branches: [main]
     paths:
-      - ".github/workflows/ci.yml"
+      - ".github/workflows/**"
       - ".readthedocs.yaml"
       - "CHANGELOG.md"
       - "LICENSE"
@@ -20,27 +20,19 @@ on:
       - "uv.lock"
       - "src/**"
       - "tests/**"
+      - "scripts/**"
       - "docs/**"
       - "examples/**"
       - "zensical.toml"
       - "README.md"
   pull_request:
-    branches: [main]
-    paths:
-      - ".github/workflows/ci.yml"
-      - ".readthedocs.yaml"
-      - "CHANGELOG.md"
-      - "LICENSE"
-      - "MANIFEST.in"
-      - "NOTICE"
-      - "pyproject.toml"
-      - "uv.lock"
-      - "src/**"
-      - "tests/**"
-      - "docs/**"
-      - "examples/**"
-      - "zensical.toml"
-      - "README.md"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: ${{ github.workflow == 'ci' }}
 
 jobs:
   docs:
@@ -68,27 +60,77 @@ jobs:
           '_validate_wav_path', '__all__');
           assert not any(name in text for name in forbidden), forbidden"
 
-  test:
-    name: Tests (Python ${{ matrix.python-version }})
+  quality:
+    name: Lint, types, and workflows
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.11.4", "3.12", "3.13"]
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
       - uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: "3.11.4"
       - uses: astral-sh/setup-uv@v5
-      - run: uv sync --locked --group test --extra audio --extra viz
-      - run: uv run pytest -q --cov=torchrir --cov-branch --cov-report=term-missing
+      - run: uv sync --locked --no-default-groups --group quality --group test --extra viz --extra cli
+      - run: uv run --no-sync ruff format --check .
+      - run: uv run --no-sync ruff check .
+      - run: uv run --no-sync ty check
+      - name: Install actionlint 1.7.12
+        run: |
+          curl -fsSL https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz -o "$RUNNER_TEMP/actionlint.tar.gz"
+          tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP" actionlint
+      - run: '"$RUNNER_TEMP/actionlint"'
 
-  quality:
-    name: Lint, type, comparisons, and wheel
+  test:
+    name: CPU (${{ matrix.os }}, Python ${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-latest, python: "3.11.4", coverage: true}
+          - {os: ubuntu-latest, python: "3.12", coverage: false}
+          - {os: ubuntu-latest, python: "3.13", coverage: false}
+          - {os: macos-latest, python: "3.13", coverage: false}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --locked --no-default-groups --group test --extra viz --extra cli
+      - name: Install codecs on Linux
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: Install codecs on macOS
+        if: runner.os == 'macOS'
+        run: command -v ffmpeg || brew install ffmpeg
+      - run: ffmpeg -version && ffprobe -version
+      - name: CPU tests with execution report
+        shell: bash
+        env:
+          COVERAGE: ${{ matrix.coverage }}
+          MPLBACKEND: Agg
+        run: |
+          coverage_args=()
+          if [[ "$COVERAGE" == true ]]; then
+            coverage_args=(--cov=torchrir --cov-branch --cov-report=term-missing --cov-report=xml:reports/coverage.xml)
+          fi
+          uv run --no-sync pytest -q -rs -m 'not comparison and not cuda and not mps' --ignore-glob='tests/test_compare_*.py' --junitxml=reports/cpu.xml "${coverage_args[@]}"
+          uv run --no-sync python scripts/check_test_report.py reports/cpu.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: reports-${{ matrix.os }}-${{ matrix.python }}
+          path: reports/
+          if-no-files-found: warn
+
+  comparison:
+    name: Pinned CPU reference comparisons
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -99,20 +141,39 @@ jobs:
         with:
           python-version: "3.11.4"
       - uses: astral-sh/setup-uv@v5
-      - run: uv sync --locked --all-groups --all-extras
-      - run: uv run ruff format --check .
-      - run: uv run ruff check .
-      - run: uv run ty check
-      - run: TORCHRIR_REQUIRE_COMPARISON=1 uv run pytest -q tests/test_compare_pyroomacoustics.py
-      - name: Compare against rir-generator 0.3.0
+      - run: uv sync --locked --no-default-groups --group test --group comparison
+      - run: uv pip install 'rir-generator==0.3.0'
+      - name: Compare both pinned references (no skips)
         env:
+          TORCHRIR_REQUIRE_COMPARISON: "1"
           TORCHRIR_REQUIRE_RIR_GENERATOR_COMPARISON: "1"
-        run: uv run --with 'rir-generator==0.3.0' pytest -q tests/test_compare_rir_generator.py
+        run: |
+          uv run --no-sync pytest -q -rs tests/test_compare_pyroomacoustics.py tests/test_compare_rir_generator.py --junitxml=reports/comparison.xml
+          uv run --no-sync python scripts/check_test_report.py reports/comparison.xml --no-skips
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: reports-comparison
+          path: reports/
+          if-no-files-found: warn
+
+  distribution:
+    name: Build and installed-wheel validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11.4"
+      - uses: astral-sh/setup-uv@v5
       - run: uv build
       - name: Verify release inputs
         env:
           RELEASE_TAG: ${{ inputs.release-tag }}
-        run: uv run --no-sync python scripts/check_distribution.py --tag "$RELEASE_TAG"
+        run: python scripts/check_distribution.py --tag "$RELEASE_TAG"
       - name: Exercise installed wheel outside the checkout
         run: |
           uv venv "$RUNNER_TEMP/wheel-base"
