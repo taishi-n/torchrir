@@ -646,6 +646,10 @@ uv build
 
 CI also inspects the built artifacts: the sdist must contain `CHANGELOG.md`,
 and the wheel must declare `License-Expression: Apache-2.0`.
+Installed-wheel checks run outside the checkout in two fresh environments.
+Base dependencies must support physical direct-path simulation and all three
+convolution modes against direct sums; audio/dataset/CLI extras must preserve
+multichannel FLOAT WAV samples and expose the installed builder command.
 The release workflow calls the same CPU validation at the exact event commit.
 It checks tag/project/lock/wheel/sdist version agreement and downloads the
 validated artifact for publication without rebuilding. Manual release dispatch
@@ -710,12 +714,11 @@ acceptance criteria; unchecked items remain incomplete.
       the event commit, checks tag/project/lock/distribution versions, and
       publishes the tested artifact. The checker passes a real local build and
       rejects inconsistent inputs; manual dispatch validates without publishing.
-- [ ] Exercise the installed wheel outside the checkout in clean environments.
-      The current check only imports the package, while
-      [tests/conftest.py](tests/conftest.py) inserts the source tree into `sys.path`.
-      With base dependencies, check direct-path arrival/gain and static, emission,
-      and observation convolution against direct sums. With the relevant extras,
-      test floating multichannel WAV round trips and the installed builder CLI.
+- [x] Exercise the installed wheel outside the checkout in two clean environments.
+      Base dependencies pass direct-path arrival/gain and direct-sum checks for
+      static/emission/observation convolution. Audio/datasets/CLI extras pass FLOAT
+      multichannel WAV round trips and the installed builder command. See
+      [wheel smoke checks](scripts/smoke_wheel.py).
 - [ ] Implement the CPU CI plan: separate quality, reference-comparison, and
       distribution jobs; add macOS CPU coverage for the Darwin filesystem
       implementation and actionlint; retain test/skip/coverage reports; and measure

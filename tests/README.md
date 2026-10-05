@@ -190,14 +190,13 @@ must fail validation.
    optional-reference imports during collection. Keep ordinary unmarked tests;
    selecting only `unit` or `numerical` would omit current API contracts.
 2. **Exercise the installed distribution.**
-   The current wheel check only imports the package, while `tests/conftest.py`
-   inserts the checkout's `src` directory into `sys.path`. Add a small smoke
-   script and execute it outside the checkout with no source-path injection.
-   With only base dependencies, simulate a tiny direct path and check its
-   physical arrival/gain, then check static and both dynamic convolution
-   conventions against direct sums. Confirm imports resolve inside the clean
-   environment. In a separate environment with the required extras, check a
-   multichannel floating-WAV round trip and the installed builder CLI's `--help`.
+   `scripts/smoke_wheel.py` runs under isolated Python (`-I`) from a temporary
+   directory, without pytest/conftest or source-path injection. It requires the
+   imported package to reside inside the fresh environment. The base case checks
+   physical direct-path arrival/gain and static/emission/observation convolution
+   against direct sums. A separate audio/datasets/cli environment checks a FLOAT
+   multichannel WAV round trip (including amplitudes above one) and the installed
+   builder entry point's `--help`. Both environments install the same checked wheel.
 3. **Exercise actual media output.**
    `test_viz_animation.py` exercises actual GIF/MP4 rendering for 2D/3D scenes
    with source annotations enabled and disabled. Extend encoded-output checks
