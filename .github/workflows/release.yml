@@ -2,17 +2,34 @@ name: release
 
 on:
   push:
-    tags:
-      - "v*"
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      release-tag:
+        description: Expected version tag (validation only; never publishes)
+        required: true
+        type: string
+
+permissions:
+  contents: read
 
 jobs:
+  validate:
+    uses: ./.github/workflows/ci.yml
+    with:
+      release-tag: ${{ github.event_name == 'push' && github.ref_name || inputs.release-tag }}
+
   pypi:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: validate
     runs-on: ubuntu-latest
     permissions:
       id-token: write
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist-${{ github.sha }}
+          path: dist
       - uses: astral-sh/setup-uv@v5
-      - run: uv build
-      - run: uv publish
+      - run: uv publish dist/*

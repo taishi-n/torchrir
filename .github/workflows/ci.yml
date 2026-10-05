@@ -1,6 +1,11 @@
 name: ci
 
 on:
+  workflow_call:
+    inputs:
+      release-tag:
+        type: string
+        default: ""
   workflow_dispatch:
   push:
     branches: [main]
@@ -44,6 +49,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11.4"
@@ -71,6 +78,8 @@ jobs:
         python-version: ["3.11.4", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
@@ -84,6 +93,8 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11.4"
@@ -98,39 +109,15 @@ jobs:
           TORCHRIR_REQUIRE_RIR_GENERATOR_COMPARISON: "1"
         run: uv run --with 'rir-generator==0.3.0' pytest -q tests/test_compare_rir_generator.py
       - run: uv build
-      - name: Verify source and wheel package metadata
-        run: |
-          uv run python - <<'PY'
-          from email.parser import BytesParser
-          from pathlib import Path, PurePosixPath
-          import tarfile
-          import zipfile
-
-          dist = Path("dist")
-          sdists = sorted(dist.glob("*.tar.gz"))
-          wheels = sorted(dist.glob("*.whl"))
-          assert len(sdists) == 1, sdists
-          assert len(wheels) == 1, wheels
-
-          with tarfile.open(sdists[0], mode="r:gz") as archive:
-              changelogs = [
-                  name
-                  for name in archive.getnames()
-                  if len(PurePosixPath(name).parts) == 2
-                  and PurePosixPath(name).name == "CHANGELOG.md"
-              ]
-          assert len(changelogs) == 1, changelogs
-
-          with zipfile.ZipFile(wheels[0]) as archive:
-              metadata_files = [
-                  name
-                  for name in archive.namelist()
-                  if name.endswith(".dist-info/METADATA")
-              ]
-              assert len(metadata_files) == 1, metadata_files
-              metadata = BytesParser().parsebytes(archive.read(metadata_files[0]))
-          assert metadata["License-Expression"] == "Apache-2.0", metadata.items()
-          PY
+      - name: Verify release inputs
+        env:
+          RELEASE_TAG: ${{ inputs.release-tag }}
+        run: uv run --no-sync python scripts/check_distribution.py --tag "$RELEASE_TAG"
       - run: uv venv /tmp/torchrir-wheel-smoke
       - run: uv pip install --python /tmp/torchrir-wheel-smoke/bin/python dist/*.whl
       - run: /tmp/torchrir-wheel-smoke/bin/python -c "import torchrir; from torchrir.sim import simulate"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ github.sha }}
+          path: dist/*
+          if-no-files-found: error

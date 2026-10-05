@@ -646,6 +646,11 @@ uv build
 
 CI also inspects the built artifacts: the sdist must contain `CHANGELOG.md`,
 and the wheel must declare `License-Expression: Apache-2.0`.
+The release workflow calls the same CPU validation at the exact event commit.
+It checks tag/project/lock/wheel/sdist version agreement and downloads the
+validated artifact for publication without rebuilding. Manual release dispatch
+accepts an expected tag and runs validation only; publishing requires a tag push
+and successful completion of every validation job.
 
 ## Documentation Development
 
@@ -701,12 +706,10 @@ acceptance criteria; unchecked items remain incomplete.
 
 ### P1: Distribution and automated validation
 
-- [ ] Add a release validation gate. Require reusable CPU validation to pass for
-      the exact tagged commit, verify agreement between the tag, `pyproject.toml`,
-      `uv.lock`, and distribution versions, and publish the tested artifact. Verify
-      the gate without publishing. The current
-      [release workflow](.github/workflows/release.yml) builds and publishes without
-      a validation dependency.
+- [x] Add a release validation gate. The release workflow reuses validation at
+      the event commit, checks tag/project/lock/distribution versions, and
+      publishes the tested artifact. The checker passes a real local build and
+      rejects inconsistent inputs; manual dispatch validates without publishing.
 - [ ] Exercise the installed wheel outside the checkout in clean environments.
       The current check only imports the package, while
       [tests/conftest.py](tests/conftest.py) inserts the source tree into `sys.path`.

@@ -136,8 +136,8 @@ The automated validation entry point is
 [ci.yml](../.github/workflows/ci.yml). It has a documentation job, a Linux test
 matrix for Python 3.11.4/3.12/3.13, and one job combining lint, types, CPU
 reference comparisons, and package checks. The
-[release workflow](../.github/workflows/release.yml) currently builds and
-publishes on version tags without a validation dependency in that workflow.
+[release workflow](../.github/workflows/release.yml) calls this validation at the
+same commit and publishes its checked artifact only after validation succeeds.
 There is no dedicated CUDA or MPS workflow. Keep the accelerator tests for
 manual runs; a successful CPU run says nothing about their execution status.
 
@@ -217,13 +217,15 @@ must fail validation.
 
 ### Release validation
 
-Before the next release, make the CPU validation workflow callable from the
-release workflow and require it to succeed for the exact tagged commit before
-publishing. Reuse the same job definitions instead of copying the test commands.
-Verify tag, `pyproject.toml`, `uv.lock`, and built distribution versions agree.
-Publish the artifact that passed the distribution checks, rather than rebuilding
-an untested wheel after the checks. Validate the gate using a non-publishing run;
-do not test it by uploading a release.
+The release workflow calls `ci.yml` from the event commit and requires all its
+jobs to succeed. `scripts/check_distribution.py` verifies the project and lock
+versions, wheel/sdist metadata, license, changelog, and optional expected tag.
+The artifact is named with the event SHA and uploaded only after its checks;
+the publication job downloads it without checking out or rebuilding source.
+`workflow_dispatch` takes an expected `release-tag` and exercises the same gate
+without granting publication permission or running `uv publish`.
+Version-rejection tests use synthetic archives; a manual dispatch validates the
+complete gate without uploading a release.
 
 ### Manual accelerator checks
 
