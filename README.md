@@ -510,6 +510,12 @@ not implemented.
   shorter than 10 ms are rejected. Muxed audio must have the same duration as
   the display timeline. The dynamic CMU builder renders the complete convolved
   mixture duration and holds the final geometry through its tail.
+- MP4 audio muxing preserves the selected channels' gain and rejects empty,
+  non-finite, or out-of-range (`abs(sample) > 1`) stereo samples. It does not
+  normalize automatically. A mono input is duplicated to stereo before channel
+  selection; `audio_channels` must contain two valid non-boolean integer indices.
+  The intermediate WAV uses `DOUBLE`, avoiding PCM quantization before lossy
+  AAC encoding. Callers must apply any desired common gain explicitly.
 - Source-index annotations follow source positions in both 2D and 3D GIF/MP4
   animations. `annotate_sources=True` is supported in either view; disabling
   annotations changes only the labels. A 3D label uses the source's full XYZ
@@ -687,11 +693,11 @@ acceptance criteria; unchecked items remain incomplete.
       subsampling, fractional MP4 FPS, cumulative GIF timing, invalid timelines,
       and synchronized audio/video through the reverberation tail. See
       [Visualization](#visualization) for the canonical timing contract.
-- [ ] Define and enforce the audio level policy for MP4 muxing. The temporary
-      WAV currently defaults to PCM_16 and silently clips a FLOAT-WAV input with
-      peak 1.5 to approximately 0.99997. Test out-of-range input, selected stereo
-      channels, and mono duplication. The CMU builder already applies a common
-      anti-clipping gain; this defect concerns the general mux input path.
+- [x] Define and enforce the audio level policy for MP4 muxing. Muxing preserves
+      gain in a DOUBLE intermediate WAV, validates selected stereo channels, and
+      rejects empty/non-finite/out-of-range audio before encoding. Tests cover
+      channel ordering, mono duplication, and sub-PCM-resolution amplitudes. See
+      [audio mux tests](tests/test_viz_audio.py).
 
 ### P1: Distribution and automated validation
 

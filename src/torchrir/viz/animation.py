@@ -394,30 +394,27 @@ def _add_stereo_audio_to_mp4(
 
     mixture, sample_rate = sf.read(mixture_path, always_2d=True)
     mixture = np.asarray(mixture, dtype=np.float64)
-    n_channels = int(mixture.shape[1])
-    if n_channels <= 0:
-        LOGGER.warning(
-            "mixture has no channels. Skip audio mux for %s", video_path.name
+    if mixture.shape[1] == 1:
+        mixture = np.repeat(mixture, repeats=2, axis=1)
+    if len(audio_channels) != 2:
+        raise ValueError("audio_channels must contain exactly two indices")
+    channels = [
+        normalize_integer(
+            channel, name="audio_channels", minimum=0, maximum=mixture.shape[1] - 1
         )
-        return
-
-    if n_channels == 1:
-        stereo = np.repeat(mixture[:, :1], repeats=2, axis=1)
-    else:
-        ch_l, ch_r = audio_channels
-        if ch_l < 0 or ch_r < 0 or ch_l >= n_channels or ch_r >= n_channels:
-            LOGGER.warning(
-                "Requested channels %s unavailable for %s. Using first two channels.",
-                audio_channels,
-                video_path.name,
-            )
-            stereo = mixture[:, :2]
-        else:
-            stereo = mixture[:, [ch_l, ch_r]]
+        for channel in audio_channels
+    ]
+    stereo = mixture[:, channels]
+    if stereo.size == 0 or not np.isfinite(stereo).all():
+        raise ValueError("selected audio must be non-empty and finite")
+    if np.max(np.abs(stereo)) > 1.0:
+        raise ValueError(
+            "selected audio exceeds [-1, 1]; apply a common gain before muxing"
+        )
 
     tmp_audio = video_path.with_name(video_path.stem + "_tmp_audio.wav")
     tmp_video = video_path.with_name(video_path.stem + "_tmp_mux.mp4")
-    sf.write(tmp_audio, stereo, int(sample_rate))
+    sf.write(tmp_audio, stereo, int(sample_rate), subtype="DOUBLE")
 
     cmd = [
         ffmpeg,

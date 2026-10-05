@@ -327,6 +327,12 @@ reverberation tail, pass the convolved audio sample count as `stop_sample`;
 the dynamic CMU builder does this automatically. GIF examples can instead use
 the dry signal's sample count when only the source-motion interval is wanted.
 
+Muxing preserves gain and rejects empty/non-finite selected audio or samples
+outside `[-1, 1]`. Mono is duplicated to two channels before applying the two
+validated integer channel indices. The temporary WAV is double precision;
+the final AAC stream is lossy. Apply a common gain explicitly before muxing if
+needed; there is no silent clipping, channel fallback, or normalization.
+
 ## Metadata schema version 1
 
 `build_metadata` and `build_result_metadata` produce schema
