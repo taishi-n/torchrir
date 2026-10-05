@@ -199,10 +199,10 @@ must fail validation.
    environment. In a separate environment with the required extras, check a
    multichannel floating-WAV round trip and the installed builder CLI's `--help`.
 3. **Exercise actual media output.**
-   `test_viz_video.py` largely substitutes animation writers and scene builders;
-   it does not prove that a video can be encoded. Add a tiny GIF/MP4 integration
-   test that opens the result and checks frame count, dimensions, duration, and
-   audio-stream presence when muxing is requested. Run it in one Linux job with
+   `test_viz_animation.py` exercises actual GIF/MP4 rendering for 2D/3D scenes
+   with source annotations enabled and disabled. Extend encoded-output checks
+   to duration and audio-stream presence when muxing is requested, and run them
+   in one Linux job with
    Pillow and system ffmpeg/ffprobe; use synthetic audio and avoid pixel hashes
    or wall-clock performance thresholds.
 4. **Extend accelerator coverage when hardware is available.**

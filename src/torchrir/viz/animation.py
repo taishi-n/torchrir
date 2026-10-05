@@ -156,6 +156,7 @@ def _build_scene_animation(
 ):
     import matplotlib.pyplot as plt
     from matplotlib import animation
+    from mpl_toolkits.mplot3d import Axes3D
 
     _ensure_default_mpl_style()
 
@@ -216,7 +217,10 @@ def _build_scene_animation(
     source_texts = []
     if annotate_sources:
         for idx in range(view_src_traj.shape[1]):
-            text = ax.text(0.0, 0.0, f"S{idx}", fontsize=_VIDEO_FONT_SIZE_PT)
+            if isinstance(ax, Axes3D):
+                text = ax.text(0.0, 0.0, 0.0, f"S{idx}", fontsize=_VIDEO_FONT_SIZE_PT)
+            else:
+                text = ax.text(0.0, 0.0, f"S{idx}", fontsize=_VIDEO_FONT_SIZE_PT)
             source_texts.append(text)
 
     ax.legend(loc="best", fontsize=_VIDEO_FONT_SIZE_PT)

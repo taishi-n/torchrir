@@ -492,6 +492,13 @@ not implemented.
   or non-seekable streams raise `ValueError` before SoundFile is opened. The
   WAV-only wrapper requires a `.wav`/`.wave` `Path`.
 
+### Visualization
+
+- Source-index annotations follow source positions in both 2D and 3D GIF/MP4
+  animations. `annotate_sources=True` is supported in either view; disabling
+  annotations changes only the labels. A 3D label uses the source's full XYZ
+  position.
+
 ### Logging
 
 `LoggingConfig` is a frozen, slotted, keyword-only record whose level and
@@ -648,16 +655,16 @@ P1 covers confirmed defects and required validation; P2 extends integration and
 hardware coverage; P3 tracks future capabilities. Follow the documentation-first
 cycle in [Development Verification](#development-verification) for each item.
 The [test and CI plan](tests/README.md#test-and-ci-plan) contains the detailed CI
-acceptance criteria; the items below remain unimplemented.
+acceptance criteria; unchecked items remain incomplete.
 
 ### P1: Confirmed visualization defects
 
-- [ ] Fix source annotations in 3D animations. With the default
-      `annotate_sources=True`, `Axes3D.text()` raises a missing-`s` `TypeError`;
-      rendering without source annotations succeeds. Add actual 2D/3D GIF and MP4
-      rendering tests with annotations enabled and disabled, rather than mocking
-      scene construction. See [animation.py](src/torchrir/viz/animation.py) and
-      [existing video tests](tests/test_viz_video.py).
+- [x] Fix source annotations in 3D animations. The default
+      `annotate_sources=True` now uses XYZ text coordinates. Actual 2D/3D GIF and
+      MP4 rendering tests cover annotations enabled and disabled, frame counts,
+      decoding, and HD MP4 dimensions. See
+      [animation.py](src/torchrir/viz/animation.py) and
+      [rendering tests](tests/test_viz_animation.py).
 - [ ] Align animation timestamps and playback duration with the exact sample
       schedule. Frame times `[0, 0.25, 0.5, 0.75]` currently display as
       `[0, 0.33, 0.67, 1.00]`; integer FPS rounding also turns a four-frame,
@@ -721,7 +728,8 @@ acceptance criteria; the items below remain unimplemented.
       emission-time gradients. Follow the
       [manual accelerator checks](tests/README.md#manual-accelerator-checks);
       unavailable hardware does not close this item, and a replacement GPU workflow
-      is not required.
+      is not required. Deferred for this development cycle because a GPU
+      environment is unavailable.
 
 ### P3: Acoustic models and spatial visualization
 
