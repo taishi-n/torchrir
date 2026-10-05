@@ -180,7 +180,7 @@ jobs:
           uv venv "$RUNNER_TEMP/wheel-extras"
           wheel=$(realpath dist/*.whl)
           uv pip install --python "$RUNNER_TEMP/wheel-base/bin/python" "$wheel"
-          uv pip install --python "$RUNNER_TEMP/wheel-extras/bin/python" "$wheel[audio,datasets,cli]"
+          uv pip install --python "$RUNNER_TEMP/wheel-extras/bin/python" "${wheel}[audio,datasets,cli]"
           cp scripts/smoke_wheel.py "$RUNNER_TEMP/smoke_wheel.py"
           cd "$RUNNER_TEMP"
           ./wheel-base/bin/python -I smoke_wheel.py

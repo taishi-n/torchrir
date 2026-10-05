@@ -150,7 +150,8 @@ CPU tests run on Linux Python 3.11.4/3.12/3.13 and macOS Python 3.13; only Linux
 retains JUnit reports and explicit skip reasons; empty/all-skipped reports fail.
 Comparison reports additionally reject any skips. ffmpeg/ffprobe are installed
 in CPU jobs so real-media tests cannot disappear behind a missing-codec skip.
-Actionlint 1.7.12 validates workflow syntax in the quality job.
+Actionlint 1.7.12 validates workflow syntax and invokes the runner's ShellCheck
+for embedded shell scripts. Local workflow checks must also provide ShellCheck.
 Optional reference libraries are imported at runtime; the quality environment
 does not need them to type-check the repository. When checking a separate local
 environment, pass its interpreter explicitly with `ty check --python PATH`.
