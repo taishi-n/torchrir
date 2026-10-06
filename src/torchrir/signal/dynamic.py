@@ -14,7 +14,6 @@ from ..models.scene import _validate_dynamic_time_reference
 from .internal import (
     _ensure_dynamic_rirs,
     _ensure_signal,
-    _fft_convolve_sources_work,
     _fft_work_dtype,
     _validate_convolution_dtypes,
 )
@@ -162,34 +161,79 @@ def _convolve_emission(signal: Tensor, rirs: Tensor, *, starts: Tensor) -> Tenso
 
 
 def _convolve_observation(signal: Tensor, rirs: Tensor, *, starts: Tensor) -> Tensor:
-    """Select one RIR frame for every observed output sample."""
+    """Select output-time RIR frames using batched overlap-save."""
 
     n_samples = int(signal.shape[1])
     _, n_src, n_mic, rir_len = rirs.shape
     out_len = n_samples + rir_len - 1
-    boundaries = torch.cat(
-        [starts, torch.tensor([out_len], dtype=torch.int64, device="cpu")]
-    )
+    boundaries = [*starts.tolist(), out_len]
+    work_dtype = _fft_work_dtype(signal.dtype)
     out = torch.zeros(
         (n_mic, out_len),
-        dtype=_fft_work_dtype(signal.dtype),
+        dtype=work_dtype,
         device=signal.device,
     )
 
-    for frame_index in range(int(rirs.shape[0])):
-        output_start = int(boundaries[frame_index].item())
-        output_end = int(boundaries[frame_index + 1].item())
-        input_start = max(0, output_start - rir_len + 1)
-        input_end = min(n_samples, output_end)
-
-        local_start = output_start - input_start
-        local_end = output_end - input_start
-        convolution = _fft_convolve_sources_work(
-            signal[:, input_start:input_end],
-            rirs[frame_index],
+    for chunk_start, chunk_end, fft_len in _observation_chunk_ranges(
+        boundaries, rir_len=rir_len, max_frames=8
+    ):
+        segments = torch.zeros(
+            (chunk_end - chunk_start, n_src, fft_len),
+            dtype=work_dtype,
+            device=signal.device,
         )
-        out[:, output_start:output_end] = convolution[:, local_start:local_end]
+        for chunk_index, frame_index in enumerate(range(chunk_start, chunk_end)):
+            input_base = boundaries[frame_index] - rir_len + 1
+            input_start = max(0, input_base)
+            input_end = min(n_samples, boundaries[frame_index + 1])
+            local_start = input_start - input_base
+            segments[
+                chunk_index, :, local_start : local_start + input_end - input_start
+            ] = signal[:, input_start:input_end]
+
+        segment_spectrum = torch.fft.rfft(segments, n=fft_len, dim=-1)
+        rir_spectrum = torch.fft.rfft(
+            rirs[chunk_start:chunk_end].to(dtype=work_dtype), n=fft_len, dim=-1
+        )
+        convolution = torch.fft.irfft(
+            (segment_spectrum[:, :, None, :] * rir_spectrum).sum(dim=1),
+            n=fft_len,
+            dim=-1,
+        )
+        # Circular aliasing is confined to the first rir_len - 1 samples.
+        for chunk_index, frame_index in enumerate(range(chunk_start, chunk_end)):
+            output_start = boundaries[frame_index]
+            output_end = boundaries[frame_index + 1]
+            out[:, output_start:output_end] = convolution[
+                chunk_index, :, rir_len - 1 : rir_len - 1 + output_end - output_start
+            ]
     return out.to(dtype=signal.dtype)
+
+
+def _observation_chunk_ranges(
+    boundaries: list[int], *, rir_len: int, max_frames: int
+) -> list[tuple[int, int, int]]:
+    """Batch adjacent frames of equal FFT length without padding inflation."""
+    ranges: list[tuple[int, int, int]] = []
+    frame_count = len(boundaries) - 1
+    chunk_start = 0
+    while chunk_start < frame_count:
+        window_length = (
+            rir_len - 1 + boundaries[chunk_start + 1] - boundaries[chunk_start]
+        )
+        fft_length = 1 << (window_length - 1).bit_length()
+        chunk_end = chunk_start + 1
+        limit = min(chunk_start + max_frames, frame_count)
+        while chunk_end < limit:
+            next_length = (
+                rir_len - 1 + boundaries[chunk_end + 1] - boundaries[chunk_end]
+            )
+            if 1 << (next_length - 1).bit_length() != fft_length:
+                break
+            chunk_end += 1
+        ranges.append((chunk_start, chunk_end, fft_length))
+        chunk_start = chunk_end
+    return ranges
 
 
 def _validate_schedule_for_convolution(
@@ -285,12 +329,11 @@ def _convolve_emission_batched(
             n=fft_len,
             dim=-1,
         )
-        convolution = torch.fft.irfft(
-            segment_spectrum[:, :, None, :] * rir_spectrum,
+        source_sum = torch.fft.irfft(
+            (segment_spectrum[:, :, None, :] * rir_spectrum).sum(dim=1),
             n=fft_len,
             dim=-1,
         )[..., :convolution_len]
-        source_sum = convolution.sum(dim=1)
 
         for chunk_index, frame_index in enumerate(range(chunk_start, chunk_end)):
             segment_len = int(chunk_lengths[chunk_index].item())

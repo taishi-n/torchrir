@@ -487,10 +487,22 @@ not implemented.
   or arithmetic. Audio and dataset sample rates are limited to `1..2**31-1`,
   simulation sample counts and frame starts fit positive/non-negative `int64`,
   and random seeds fit non-negative `int64`.
-- Source and microphone FFT convolution is batched. `float16` and `bfloat16`
-  inputs use `float32` FFT, source-sum, and overlap-add work buffers, then cast
-  once on return; the implementation remains differentiable, including dynamic
-  emission-time convolution on CUDA.
+- FFT convolution sums source spectra before the inverse FFT, so the inverse
+  transform has a microphone axis rather than a source/microphone axis.
+  Emission-time convolution retains segment overlap-add. Observation-time
+  convolution uses overlap-save with `rir_samples - 1` history samples and
+  zero padding outside the dry signal. It batches up to eight adjacent frames
+  with the same FFT length; each frame uses the next power of two at or above
+  `rir_samples - 1 + output_frame_samples`. Nonuniform schedules and frames in
+  the reverberation tail follow the same observation-time formula above.
+- `float16` and `bfloat16` inputs use `float32` FFT, spectral source-sum, and
+  output work buffers, then cast once on return. Static and both dynamic
+  convolution modes remain differentiable. Changes to FFT lengths and addition
+  order permit small floating-point roundoff differences; numerical correctness
+  is checked against independent direct sums and gradients, not bitwise equality
+  between different FFT algorithms. CPU work-budget tests bound transform
+  volume without hardware-dependent latency thresholds. CUDA/MPS parity and
+  performance require separate manual hardware validation.
 - Audio-file tensors separately use `(samples,)` or `(channels, samples)`.
   `AudioData` is keyword-only and validates non-empty, finite, floating-point
   audio plus a positive integer sample rate. It preserves all channels, sample

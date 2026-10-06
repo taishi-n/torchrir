@@ -44,11 +44,11 @@ def _fft_convolve_sources_work(signal: Tensor, rirs: Tensor) -> Tensor:
         dim=-1,
     )
     convolution = torch.fft.irfft(
-        signal_spectrum[:, None, :] * rir_spectrum,
+        (signal_spectrum[:, None, :] * rir_spectrum).sum(dim=0),
         n=fft_length,
         dim=-1,
     )[..., :output_length]
-    return convolution.sum(dim=0)
+    return convolution
 
 
 def _ensure_signal(signal: Tensor) -> Tensor:

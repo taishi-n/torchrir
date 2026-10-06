@@ -145,6 +145,24 @@ reference for fixed sources and moving microphones. The final RIR frame remains 
 through the complete convolution tail, whose length is
 `signal_length + rir_length - 1`.
 
+### FFT execution and numerical validation
+
+Static and dynamic convolution sum source spectra before the inverse FFT,
+reducing inverse-transform work and output buffers to the microphone axis.
+Emission-time convolution uses segment overlap-add. Observation-time
+convolution uses overlap-save: each output interval includes `rir_length - 1`
+input-history samples, pads outside the dry signal with zeros, and discards
+the first `rir_length - 1` circular-convolution samples. Adjacent frames with
+the same required power-of-two FFT length are processed in batches of up to
+eight; a longer interval does not enlarge unrelated frames' transforms.
+
+These changes preserve the stated time-reference formulas and autograd, with
+small floating-point roundoff differences caused by transform lengths and
+addition order. CPU tests use independent direct sums, gradient checks, and
+deterministic FFT-work budgets. Accelerator parity and speed are validated
+separately on actual hardware. Low-precision input tensors use float32 work
+buffers and are narrowed only on return.
+
 ### Frame schedules
 
 `FrameSchedule` keeps one immutable integer start per RIR frame. Its `starts`
@@ -438,11 +456,11 @@ pairwise-distance intermediate for finite extreme coordinates.
 - `torchrir.signal.DynamicConvolver` with 3D dynamic RIR input (`(T, n_mic, rir_len)`) is treated as single-source only; multi-source dynamic convolution must use 4D RIR input (`(T, n_src, n_mic, rir_len)`).
 - Static and dynamic convolution outputs always keep the microphone axis,
   including one-microphone results.
-- Static and dynamic source/microphone convolution is batched. Half and
-  bfloat16 inputs use float32 FFT, source-sum, and overlap-add work buffers and
-  are cast once on return. Autograd is tested for static and both dynamic
-  conventions on CPU, with dynamic-emission output/gradient parity also tested
-  on accelerator paths.
+- Static and dynamic convolution use spectral source reduction. Half and
+  bfloat16 inputs use float32 FFT and output work buffers and are cast once on
+  return. CPU tests cover autograd for static and both dynamic conventions;
+  manual accelerator tests also cover output/gradient parity for both dynamic
+  conventions.
 - Simultaneous source and microphone motion requires a retarded-time model and
   is not implemented.
 - Dynamic simulation batches trajectory frames, but memory and compute still grow with

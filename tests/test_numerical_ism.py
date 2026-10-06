@@ -664,6 +664,34 @@ def test_fractional_delay_accumulation_matches_direct_reference(
 
 @pytest.mark.numerical
 @pytest.mark.parametrize("use_lut", [False, True])
+def test_fractional_delay_accumulation_passes_gradcheck(use_lut: bool) -> None:
+    samples = torch.tensor(
+        [[[0.23, 5.37], [2.13, 11.27]], [[1.17, 6.33], [3.21, 10.39]]],
+        dtype=torch.float64,
+        requires_grad=True,
+    )
+    amplitudes = torch.linspace(-0.4, 0.7, samples.numel(), dtype=torch.float64)
+    amplitudes = amplitudes.reshape_as(samples).requires_grad_()
+    config = _resolved_accumulation_config(
+        nsample=12,
+        dtype=torch.float64,
+        frac_delay_length=7,
+        use_lut=use_lut,
+        accumulate_chunk_size=1,
+    )
+
+    def accumulate(
+        sample_values: torch.Tensor, amplitude_values: torch.Tensor
+    ) -> torch.Tensor:
+        output = sample_values.new_zeros((2, 2, 12))
+        _accumulate_rir_batch(output, sample_values, amplitude_values, config)
+        return output
+
+    assert torch.autograd.gradcheck(accumulate, (samples, amplitudes))
+
+
+@pytest.mark.numerical
+@pytest.mark.parametrize("use_lut", [False, True])
 def test_accumulation_masks_non_castable_samples_before_integer_conversion(
     use_lut: bool,
 ) -> None:

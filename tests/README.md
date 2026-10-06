@@ -38,7 +38,16 @@ correctness for simulation or convolution kernels.
   overflow handling, representability failures, crossfade behavior, and both
   explicit high-pass phases.
 - `test_signal.py` compares FFT and dynamic convolution with direct NumPy
-  convolution using fixed random seeds.
+  convolution using fixed random seeds. Gradient checks cover uneven
+  observation-time chunks, FFT-size changes, and tail-only frames. Manual
+  CUDA/MPS tests compare outputs and gradients for both dynamic conventions.
+- `test_signal_work_budget.py` bounds the total transformed samples for
+  static/emission/observation convolution. The budgets require source reduction
+  before inverse FFT and observation-time overlap-save, including nonuniform
+  intervals and frames in the reverberation tail. Independent direct sums and
+  gradients verify numerical behavior. These are deterministic operation-volume
+  checks, not machine-dependent latency thresholds or bitwise comparisons of
+  different FFT algorithms.
 - `test_cli_integration.py` executes the unified CLI, all three standalone
   scenarios, and the dataset builder in fresh Python processes against tiny
   local synthetic CMU-layout recordings. JSON/YAML configuration round trips,

@@ -94,9 +94,9 @@ def _accumulate_rir_batch_impl(
         contrib = amp[..., None] * filt
         target = idx[..., None] + offsets[None, None, :]
         valid = castable[..., None] & (target >= 0) & (target < nsample)
-        target = target.clamp(0, nsample - 1) + sm_offsets
+        target.clamp_(0, nsample - 1).add_(sm_offsets)
         target_flat = target.reshape(-1).to(torch.int64)
-        values_flat = torch.where(valid, contrib, torch.zeros_like(contrib)).reshape(-1)
+        values_flat = torch.where(valid, contrib, 0.0).reshape(-1)
         rir_flat.scatter_add_(0, target_flat, values_flat)
 
 

@@ -409,6 +409,7 @@ def test_convolve_rir_multi_source_multi_mic_matches_numpy_sum() -> None:
 
 
 @pytest.mark.numerical
+@pytest.mark.parametrize("time_reference", ["emission", "observation"])
 @pytest.mark.parametrize(
     "device",
     [
@@ -433,7 +434,9 @@ def test_convolve_rir_multi_source_multi_mic_matches_numpy_sum() -> None:
         ),
     ],
 )
-def test_dynamic_emission_batched_path_supports_autograd(device: str) -> None:
+def test_dynamic_convolution_supports_autograd(
+    device: str, time_reference: str
+) -> None:
     if device == "cuda" and not torch.cuda.is_available():
         pytest.skip("CUDA not available")
     if device == "mps" and not torch.backends.mps.is_available():
@@ -457,7 +460,7 @@ def test_dynamic_emission_batched_path_supports_autograd(device: str) -> None:
     def run(target: str) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         signal = base_signal.to(device=target).detach().requires_grad_()
         rirs = base_rirs.to(device=target).detach().requires_grad_()
-        output = DynamicConvolver(time_reference="emission").convolve(
+        output = DynamicConvolver(time_reference=cast(Any, time_reference)).convolve(
             signal,
             rirs,
             schedule=FrameSchedule.from_samples([0, 4, 8]),
@@ -574,6 +577,28 @@ def test_dynamic_observation_passes_gradcheck() -> None:
             schedule=schedule,
         ),
         (signal, rirs),
+    )
+
+
+@pytest.mark.numerical
+def test_dynamic_observation_uneven_chunks_and_tail_pass_gradcheck() -> None:
+    generator = torch.Generator().manual_seed(215)
+    signal = (
+        torch.randn(2, 13, generator=generator, dtype=torch.float64) / 10
+    ).requires_grad_()
+    starts = [*range(10), 14, 16]
+    rirs = (
+        torch.randn(len(starts), 2, 2, 5, generator=generator, dtype=torch.float64) / 10
+    ).requires_grad_()
+    schedule = FrameSchedule.from_samples(starts)
+    convolver = DynamicConvolver(time_reference="observation")
+
+    assert torch.autograd.gradcheck(
+        lambda signal_value, rir_value: convolver.convolve(
+            signal_value, rir_value, schedule=schedule
+        ),
+        (signal, rirs),
+        fast_mode=True,
     )
 
 
@@ -786,6 +811,55 @@ def test_dynamic_observation_selects_rir_at_each_output_sample() -> None:
 
     expected = torch.tensor([[1.0, 12.0, 46.0, 68.0, 80.0]], dtype=torch.float64)
     torch.testing.assert_close(actual, expected, rtol=1e-12, atol=1e-12)
+
+
+@pytest.mark.numerical
+@pytest.mark.parametrize("dtype", [torch.float32, torch.float64])
+@pytest.mark.parametrize(
+    ("signal_len", "rir_len", "starts"),
+    [
+        (1, 1, [0]),
+        (1, 9, [0, 1, 4, 8]),
+        (5, 17, [0, 1, 3, 5, 13, 20]),
+        (13, 1, list(range(11))),
+        (71, 9, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 13, 18, 23, 27, 40, 56, 70, 75]),
+    ],
+)
+def test_dynamic_observation_matches_direct_sum_at_fft_and_tail_boundaries(
+    dtype: torch.dtype, signal_len: int, rir_len: int, starts: list[int]
+) -> None:
+    generator = torch.Generator().manual_seed(signal_len * 100 + rir_len)
+    # Strided inputs exercise window copies without requiring contiguous callers.
+    signal = torch.randn(3, signal_len * 2, generator=generator, dtype=dtype)[:, ::2]
+    rirs = torch.randn(
+        len(starts), 3, 2, rir_len * 2, generator=generator, dtype=dtype
+    )[..., ::2]
+
+    actual = DynamicConvolver(time_reference="observation").convolve(
+        signal, rirs, schedule=FrameSchedule.from_samples(starts)
+    )
+
+    output_len = signal_len + rir_len - 1
+    expected = np.zeros((2, output_len), dtype=np.float64)
+    boundaries = [*starts, output_len]
+    for frame, (start, end) in enumerate(
+        zip(boundaries[:-1], boundaries[1:], strict=True)
+    ):
+        for source in range(3):
+            for mic in range(2):
+                convolution = np.convolve(
+                    signal[source].double().numpy(),
+                    rirs[frame, source, mic].double().numpy(),
+                )
+                expected[mic, start:end] += convolution[start:end]
+
+    tolerance = 2e-5 if dtype == torch.float32 else 1e-12
+    torch.testing.assert_close(
+        actual,
+        torch.from_numpy(expected).to(dtype),
+        rtol=tolerance,
+        atol=tolerance,
+    )
 
 
 @pytest.mark.numerical
