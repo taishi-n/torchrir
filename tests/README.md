@@ -242,15 +242,15 @@ must fail validation.
    tools/inputs, encoder failures, atomic destination preservation, temporary-name
    collisions, and Figure cleanup. CPU jobs provide Pillow and ffmpeg/ffprobe;
    inputs are synthetic, with no pixel hashes or wall-clock performance thresholds.
-4. **Extend accelerator coverage when hardware is available.**
-   Existing device tests cover basic static/dynamic RIR parity and emission-time
-   convolution gradients. Add static and observation-time output/gradient parity,
-   multi-source/microphone and chunk-boundary cases, and CUDA eager/compiled
-   accumulation parity with LUT enabled/disabled. Use float32/float64 on CUDA
-   and float32 on MPS. Verify the actual output/config device; silent CPU
+4. **Complete manual CUDA validation when hardware is available.**
+   Existing device tests cover basic static/dynamic RIR parity and both dynamic
+   convolution conventions' gradients. Complete static and observation-time
+   output/gradient parity, multi-source/microphone and chunk-boundary cases,
+   and CUDA eager/compiled accumulation parity with LUT enabled/disabled.
+   Use float32/float64 on CUDA. Verify the actual output/config device; silent CPU
    fallback must not count as a device pass. Compilation validation needs an
-   actual supported backend, not only a mocked flag. These remain manual until
-   reliable hardware is explicitly provided.
+   actual supported backend, not only a mocked flag. Repeat float32 MPS checks
+   when accelerator paths change. These checks remain manual.
 
 ### Release validation
 
@@ -336,8 +336,39 @@ uv run --no-sync pytest -q -rs tests/test_device_parity.py tests/test_signal.py 
 
 # MPS: run separately on an environment with an available MPS device.
 uv run --no-sync python -c 'import torch; assert torch.backends.mps.is_available(), "MPS unavailable"'
-uv run --no-sync pytest -q -rs tests/test_device_parity.py tests/test_signal.py -m mps
+PYTORCH_ENABLE_MPS_FALLBACK=0 uv run --no-sync pytest -q -rs tests/test_device_parity.py tests/test_signal.py tests/test_datasets.py -m mps
 ```
+
+Run MPS checks with access to Metal; a sandboxed process can report an unavailable
+device even when the host supports MPS. A preflight or suite that skips all MPS
+cases is not a successful hardware check. Keep CPU fallback disabled and assert
+that outputs and gradients remain on MPS during extended validation.
+
+The marked suite covers basic static/dynamic RIR parity, frame schedules,
+emission/observation convolution gradients, and mixed-device collate validation.
+Extended validation also requires static convolution output and
+gradient parity, multiple sources/microphones, and image/accumulation and
+convolution frame-chunk boundaries. Compare against CPU results and use
+independent direct sums for convolution outputs and gradients. CUDA eager/compiled
+and LUT validation remains deferred until CUDA is available.
+
+MPS was validated on 2026-10-06 at commit `0ccdbf2` on an Apple M3 Max with
+macOS 15.7.7, Python 3.11.11, and PyTorch 2.10.0. With CPU fallback disabled,
+the marked suite passed all six tests with zero skips. A separate manual harness
+passed 24 additional float32 cases: 11 static/emission/observation convolution
+cases compared with CPU and independent float64 direct sums and analytic
+gradients; 12 static/moving-source/moving-microphone RIR cases with multiple
+sources/microphones, different image/accumulation chunks, and requested LUT
+enabled/disabled; and one static RIR position-gradient case. Actual outputs,
+resolved configurations, and gradients were checked on MPS. LUT resolved to
+disabled on MPS as specified.
+
+The maximum absolute MPS/CPU differences were `1.20e-6` across convolution
+outputs/gradients, `2.64e-6` for RIRs, and `2.27e-5` for position gradients.
+All passed the predefined tolerances: `rtol=3e-4, atol=3e-5` for convolution,
+and `rtol=1e-3, atol=1e-4` for RIRs/position gradients. This records numerical
+validation on the tested fixtures; it does not establish bitwise equality,
+CUDA coverage, or a performance improvement.
 
 Run gpuRIR separately only when the pinned reference revision is installed and
 the CUDA preflight has passed:
@@ -356,7 +387,7 @@ runner and successful manual verification.
 ### Implementation order
 
 The remaining validation item in [README TODO](../README.md#todo) is the
-accelerator extension, which remains unchecked until hardware is available.
+CUDA extension, which remains unchecked until CUDA hardware is available.
 Commit each completed implementation item.
 
 For subsequent P3 acoustic-model work, follow the

@@ -757,16 +757,15 @@ acceptance criteria; unchecked items remain incomplete.
 
 ### P2: Hardware validation
 
-- [ ] Extend manual accelerator validation on actual hardware. Add static and
+- [ ] Complete manual CUDA validation on actual hardware. Check static and
       observation-time convolution output/gradient parity, multiple sources and
       microphones, chunk boundaries, and CUDA eager/compiled accumulation with LUT
       enabled/disabled. Assert the actual output/config device and record runtime
-      versions and skips. Existing tests cover basic static/dynamic RIR parity and
-      emission-time gradients. Follow the
+      versions and skips. Follow the
       [manual accelerator checks](tests/README.md#manual-accelerator-checks);
       unavailable hardware does not close this item, and a replacement GPU workflow
-      is not required. Deferred for this development cycle because a GPU
-      environment is unavailable.
+      is not required. This remains deferred for this development cycle because a
+      CUDA environment is unavailable.
 
 ### P3: Acoustic models and spatial visualization
 
