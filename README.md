@@ -316,7 +316,8 @@ y = DynamicConvolver(time_reference="emission").convolve(signal, dynamic_result)
 
 The implemented propagation model is shoebox ISM. Non-shoebox geometry and
 ray tracing are future candidates; FDTD is outside the active implementation
-sequence. Planned extensions and their acceptance criteria are listed in the
+sequence. First-K (earliest-arrival) path selection is not adopted.
+Planned extensions and their acceptance criteria are listed in the
 [acoustic model roadmap](docs/acoustic-roadmap.md).
 
 ### Geometry and scenes
@@ -770,14 +771,15 @@ acceptance criteria; unchecked items remain incomplete.
 ### P3: Acoustic models and spatial visualization
 
 The [acoustic model roadmap](docs/acoustic-roadmap.md) defines implementation
-order, initial scope, and validation gates. Start with path selection within
-the current shoebox ISM. Ray tracing is a later candidate, and FDTD remains
-deferred without a scheduled implementation milestone. The feature tasks below
-remain incomplete until their numerical and API acceptance criteria pass.
+order, initial scope, and validation gates. Start with gain- and energy-based
+path selection within the current shoebox ISM. Ray tracing is a later candidate,
+and FDTD remains deferred without a scheduled implementation milestone. The
+feature tasks below remain incomplete until their numerical and API acceptance
+criteria pass.
 
-- [ ] Add reflection/path selection controls such as first-K, strongest-K, and
-      energy-threshold-based selection. Define deterministic arrival ordering
-      and implement first-K before gain- or energy-based policies.
+- [ ] Add strongest-K and energy-threshold-based reflection/path selection.
+      Define ranking quantities, normalization, and deterministic tie handling
+      before implementation.
       Motivation: [pyroomacoustics#338](https://github.com/LCAV/pyroomacoustics/issues/338).
 - [ ] Support time-varying source/microphone orientation on the scene schedule.
       Specify coordinate frames and orientation time references first; retain

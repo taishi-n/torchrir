@@ -23,7 +23,8 @@ adds ray tracing, irregular boundaries, or a wave-equation solver.
 | Area | Status | Scope decision |
 |---|---|---|
 | Shoebox ISM | Implemented | Keep the current model as the numerical baseline for the extensions below. |
-| Path selection, orientation trajectories, and joint motion | Planned | Develop incrementally within shoebox scenes, with separate acceptance gates. |
+| Gain/energy-based path selection, orientation trajectories, and joint motion | Planned | Develop incrementally within shoebox scenes, with separate acceptance gates. |
+| First-K arrival selection | Not adopted | Excluded from the development plan. |
 | Non-shoebox geometry | Candidate | Begin with static 2D convex polygons and direct/first-order specular paths. |
 | Ray tracing | Later candidate | Evaluate after geometry and boundary contracts are defined; no backend is scheduled yet. |
 | FDTD | Deferred | Outside the active implementation sequence; revisit only for a specified wave-equation use case. |
@@ -37,25 +38,23 @@ runtime oracles in the test plan.
 
 ## Implementation order and acceptance gates
 
-### 1. Path selection within shoebox ISM
+### 1. Gain- and energy-based path selection within shoebox ISM
 
-Start with first-K arrival selection for each source/microphone pair and each
-dynamic frame. Before implementation, define the candidate image set, whether
-the direct path counts toward K, equal-arrival tie ordering, and treatment of
-paths outside the requested output horizon. The selection must be independent
-of image chunk size and enumeration order.
+Strongest-K and energy-threshold selection are separate planned policies for
+each source/microphone pair and each dynamic frame. Before implementation,
+define the candidate image set, ranking quantity, normalization, deterministic
+tie ordering, and treatment of paths outside the requested output horizon.
+Specify whether the direct path counts toward K and whether the energy threshold
+refers to individual path contributions or the accumulated waveform. Do not
+infer a waveform-energy guarantee from a path-gain ranking. The selection must
+be independent of image chunk size and enumeration order.
 
-The first implementation must match direct sums of independently enumerated
-paths in small rooms. Selecting every eligible path must reproduce the current
+Each policy must match direct sums of independently enumerated paths in small
+rooms. Selecting every eligible path must reproduce the current
 unfiltered ISM result within stated numerical tolerances. Cover asymmetric
 walls, non-omnidirectional endpoints, static/dynamic equivalence, and selections
 spanning chunk boundaries. Define how selection interacts with diffuse-tail
 level estimation before allowing those options together.
-
-Strongest-K and energy-threshold selection follow separately. Their specification
-must define the ranking quantity, normalization, and whether the threshold
-refers to individual path contributions or the accumulated waveform. Do not
-infer a waveform-energy guarantee from a path-gain ranking.
 
 ### 2. Orientation trajectories and spatial response plots
 
@@ -134,7 +133,8 @@ items. They need identified target behavior before model parameters are added:
   source/microphone separation alone does not define the new model.
 
 These items can proceed independently once their specifications and references
-are available; they are not prerequisites for the first path-selection task.
+are available; they are not prerequisites for gain- or energy-based path
+selection.
 
 ## FDTD reconsideration criteria
 
