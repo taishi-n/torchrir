@@ -33,21 +33,21 @@ pip install "torchrir[all]"         # all optional features
 
 ## Library Comparison
 
-| Feature | `torchrir` | `gpuRIR` | `pyroomacoustics` | `rir-generator` | `dynamic-sound` | `das-generator` |
-|---|---|---|---|---|---|---|
-| 🎯 Dynamic Sources | ✅ Emission-time | 🟡 Single moving source | 🟡 Manual loop | ❌ | ✅ Retarded-time | ✅ Emission-time |
-| 🎤 Dynamic Microphones | ✅ Observation-time | ❌ | 🟡 Manual loop | ❌ | ✅ Observation-time | ✅ Observation-time* |
-| Source + Microphone Motion | ❌ Signal synthesis | ❌ | 🟡 Custom propagation | ❌ | ✅ Direct sound | ✅ Two-time kernel* |
-| Shoebox ISM | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ |
-| 🖥️ CPU | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ |
-| 🧮 CUDA | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
-| 🍎 MPS | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| 📊 Scene Plot | ✅ | ❌ | ✅ | ❌ | ✅ Paths/arrays | ❌ |
-| 🎞️ Dynamic Scene GIF | ✅ | ❌ | 🟡 Manual animation script | ❌ | 🟡 Manual animation script | ❌ |
-| 🗂️ Dataset Build | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ |
-| 🎛️ RIR Convolution | ✅ Static/dynamic | 🟡 Dynamic helper | ✅ | ❌ | ❌ Signal time warping | ✅ Internal dynamic RIR |
-| 🧱 Non-shoebox Geometry | 🚧 Candidate | ❌ | ✅ | ❌ | ❌ | ❌ |
-| 🌐 Ray Tracing | 🚧 Candidate | ❌ | ✅ | ❌ | ❌ | ❌ |
+| Feature | `torchrir` | `gpuRIR` | `pyroomacoustics` | `rir-generator` | `dynamic-sound` | `das-generator` | `TASCAR` |
+|---|---|---|---|---|---|---|---|
+| 🎯 Dynamic Sources | ✅ Emission-time | 🟡 Single moving source | 🟡 Manual loop | ❌ | ✅ Retarded-time | ✅ Emission-time | ✅ Delay lines |
+| 🎤 Dynamic Microphones | ✅ Observation-time | ❌ | 🟡 Manual loop | ❌ | ✅ Observation-time | ✅ Observation-time* | ✅ Delay lines |
+| Source + Microphone Motion | ❌ Signal synthesis | ❌ | 🟡 Custom propagation | ❌ | ✅ Direct sound | ✅ Two-time kernel* | ✅ Block geometry |
+| Shoebox ISM | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ Polygon faces |
+| 🖥️ CPU | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ C++ |
+| 🧮 CUDA | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| 🍎 MPS | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| 📊 Scene Plot | ✅ | ❌ | ✅ | ❌ | ✅ Paths/arrays | ❌ | ✅ GUI/SVG |
+| 🎞️ Dynamic Scene GIF | ✅ | ❌ | 🟡 Manual animation script | ❌ | 🟡 Manual animation script | ❌ | ❌ GIF API |
+| 🗂️ Dataset Build | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ Scene rendering only |
+| 🎛️ RIR Convolution | ✅ Static/dynamic | 🟡 Dynamic helper | ✅ | ❌ | ❌ Signal time warping | ✅ Internal dynamic RIR | ✅ Static IR plugins |
+| 🧱 Non-shoebox Geometry | 🚧 Candidate | ❌ | ✅ | ❌ | ❌ | ❌ | ✅ Polygon reflectors |
+| 🌐 Ray Tracing | 🚧 Candidate | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ |
 
 Legend: `✅` native support, `🟡` manual setup, `🚧` candidate (not yet implemented), `❌` unavailable
 
@@ -57,6 +57,14 @@ superposition error was reproduced in the inspected revision. `das-generator`
 implements a two-time ISM kernel, but moving-receiver RIR reuse and startup
 errors were reproduced (`*`). Feature availability does not establish numerical
 correctness; pinned revisions, equations, and CPU checks are documented below.
+
+TASCAR renders moving scenes through block-updated geometry and variable delay
+lines, rather than a batch of dynamic RIR tensors. Its fixed-IR convolution
+plugins, polygon reflectors, HRTF/HOA rendering, and diffuse reverberation are
+described in the
+[TASCAR implementation comparison](https://torchrir.readthedocs.io/en/latest/comparisons.html#tascar-implementation-comparison).
+The TASCAR entries are based on a source audit of release 0.239.2, not runtime
+parity or speed measurements.
 
 For detailed notes and equations, see
 [Documentation: Library Comparisons](https://torchrir.readthedocs.io/en/latest/comparisons.html).
@@ -770,22 +778,20 @@ acceptance criteria; unchecked items remain incomplete.
 ### P3: Acoustic models and spatial visualization
 
 The [acoustic model roadmap](docs/acoustic-roadmap.md) defines implementation
-order, initial scope, and validation gates. Start with gain- and energy-based
-path selection within the current shoebox ISM. Ray tracing is a later candidate,
-and FDTD remains deferred without a scheduled implementation milestone. The
-feature tasks below remain incomplete until their numerical and API acceptance
-criteria pass.
+order, initial scope, and validation gates. Energy-threshold-based path selection
+is deferred without a scheduled implementation milestone. Ray tracing is a
+later candidate, and FDTD remains deferred. The feature tasks below remain
+incomplete until their numerical and API acceptance criteria pass.
 
-- [ ] Add strongest-K and energy-threshold-based reflection/path selection.
-      Define ranking quantities, normalization, and deterministic tie handling
-      before implementation.
-      Motivation: [pyroomacoustics#338](https://github.com/LCAV/pyroomacoustics/issues/338).
+- [ ] Add energy-threshold-based reflection/path selection. This remains
+      deferred for the current development cycle. Define the energy quantity,
+      normalization, and threshold semantics before implementation.
 - [ ] Support time-varying source/microphone orientation on the scene schedule.
       Specify coordinate frames and orientation time references first; retain
       the current single-moving-side convolution scope for the initial stage.
 - [ ] Integrate 3D spatial response visualization, including array and
       directivity beam patterns.
-      Motivation: [pyroomacoustics#397](https://github.com/LCAV/pyroomacoustics/issues/397).
+      Motivation: [pyroomacoustics#394](https://github.com/LCAV/pyroomacoustics/issues/394).
 - [ ] Support simultaneous source/microphone motion for dataset reproduction.
       Specify a two-time retarded propagation model and validate direct sound
       before adding reflected paths.
@@ -793,14 +799,14 @@ criteria pass.
       and boundary handling. Start with static 2D convex polygons and direct/
       first-order specular paths; later stages address non-convex rooms and
       3D meshes.
-      Motivation: [pyroomacoustics#393](https://github.com/LCAV/pyroomacoustics/issues/393),
+      Motivation: [pyroomacoustics#392](https://github.com/LCAV/pyroomacoustics/issues/392),
       [pyroomacoustics#405](https://github.com/LCAV/pyroomacoustics/issues/405).
 - [ ] Evaluate a ray-tracing backend after non-shoebox geometry and boundary
       semantics are established. Require a target use case, a numerical
       reference, and CPU cost/convergence criteria before implementation.
 - [ ] Model microphone hardware frequency response, sensitivity, and self-noise.
       Specify physical units and calibration references before implementation.
-      Motivation: [pyroomacoustics#394](https://github.com/LCAV/pyroomacoustics/issues/394).
+      Motivation: [pyroomacoustics#393](https://github.com/LCAV/pyroomacoustics/issues/393).
 - [ ] Add near-field speech source modeling for close-talk scenarios. Specify
       the source model and its valid distance/frequency range first.
       Motivation: [pyroomacoustics#417](https://github.com/LCAV/pyroomacoustics/issues/417).
@@ -864,3 +870,4 @@ third-party recordings.
 - [rir-generator](https://github.com/audiolabs/rir-generator)
 - [dynamic-sound](https://github.com/vlsi-nanocomputing/dynamic-sound)
 - [das-generator](https://github.com/ehabets/das-generator)
+- [TASCAR](https://github.com/gisogrimm/tascar)

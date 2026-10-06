@@ -23,7 +23,8 @@ adds ray tracing, irregular boundaries, or a wave-equation solver.
 | Area | Status | Scope decision |
 |---|---|---|
 | Shoebox ISM | Implemented | Keep the current model as the numerical baseline for the extensions below. |
-| Gain/energy-based path selection, orientation trajectories, and joint motion | Planned | Develop incrementally within shoebox scenes, with separate acceptance gates. |
+| Orientation trajectories and joint motion | Planned | Develop incrementally within shoebox scenes, with separate acceptance gates. |
+| Energy-threshold path selection | Deferred | No scheduled implementation milestone; keep its acceptance criteria separate from the implementation sequence. |
 | First-K arrival selection | Not adopted | Excluded from the development plan. |
 | Non-shoebox geometry | Candidate | Begin with static 2D convex polygons and direct/first-order specular paths. |
 | Ray tracing | Later candidate | Evaluate after geometry and boundary contracts are defined; no backend is scheduled yet. |
@@ -38,25 +39,7 @@ runtime oracles in the test plan.
 
 ## Implementation order and acceptance gates
 
-### 1. Gain- and energy-based path selection within shoebox ISM
-
-Strongest-K and energy-threshold selection are separate planned policies for
-each source/microphone pair and each dynamic frame. Before implementation,
-define the candidate image set, ranking quantity, normalization, deterministic
-tie ordering, and treatment of paths outside the requested output horizon.
-Specify whether the direct path counts toward K and whether the energy threshold
-refers to individual path contributions or the accumulated waveform. Do not
-infer a waveform-energy guarantee from a path-gain ranking. The selection must
-be independent of image chunk size and enumeration order.
-
-Each policy must match direct sums of independently enumerated paths in small
-rooms. Selecting every eligible path must reproduce the current
-unfiltered ISM result within stated numerical tolerances. Cover asymmetric
-walls, non-omnidirectional endpoints, static/dynamic equivalence, and selections
-spanning chunk boundaries. Define how selection interacts with diffuse-tail
-level estimation before allowing those options together.
-
-### 2. Orientation trajectories and spatial response plots
+### 1. Orientation trajectories and spatial response plots
 
 Add orientation changes for sources and microphones on the same scene schedule
 as their positions. Specify world/local coordinates, rotation representation,
@@ -71,7 +54,7 @@ must use the same coordinate and directivity conventions. Validate static 3D
 response plots first, then scheduled orientation changes; plotted maxima/nulls
 must agree with the numerical gains.
 
-### 3. Simultaneous source and microphone motion
+### 2. Simultaneous source and microphone motion
 
 Define source geometry at emission time and receiver geometry at observation
 time, including delay solving, interpolation, gain, time support, and endpoint
@@ -88,7 +71,7 @@ State the conditions under which the limits match existing frame-based
 convolution; do not require sample equality between different approximations.
 Add reflected paths only after the direct-sound contract passes.
 
-### 4. Non-shoebox geometry
+### 3. Non-shoebox geometry
 
 The first geometric extension is a static 2D convex polygon with planar edges,
 per-edge scalar reflection coefficients, and direct/first-order specular paths.
@@ -104,7 +87,7 @@ higher orders, non-convex geometry, and 3D meshes in separate stages with
 explicit visibility and boundary tests. A geometry extension does not by
 itself provide ray tracing or full dataset-reproduction fidelity.
 
-### 5. Ray-tracing evaluation
+### 4. Ray-tracing evaluation
 
 Reconsider ray tracing after the non-shoebox geometry contract is usable and
 a concrete scene requires a model beyond the implemented ISM. An evaluation
@@ -117,6 +100,27 @@ implementation. Validate a simple room against independent analytic quantities
 and the established ISM baseline where their assumptions match. A hybrid must
 define how it avoids counting the same contribution twice. Only then decide
 whether a backend belongs in the public API.
+
+## Deferred energy-threshold path selection
+
+Energy-threshold selection remains a future candidate for shoebox ISM, outside
+the current implementation sequence. It has no scheduled implementation
+milestone.
+
+For each source/microphone pair and each dynamic frame, define the candidate
+image set, energy quantity, normalization, and treatment of paths outside the
+requested output horizon. Specify whether the threshold refers to individual
+path contributions or the accumulated waveform, and whether the direct path
+is always retained. Any waveform-error guarantee must account for interference
+between paths. Selection must be independent of image chunk size and enumeration
+order.
+
+Validation must match direct sums of independently enumerated paths in small
+rooms. Selecting every eligible path must reproduce the current unfiltered ISM
+result within stated numerical tolerances. Cover asymmetric walls,
+non-omnidirectional endpoints, static/dynamic equivalence, threshold boundaries,
+and selections spanning chunk boundaries. Define how selection interacts with
+diffuse-tail level estimation before allowing those options together.
 
 ## Features that require their own physical specification
 
@@ -133,8 +137,7 @@ items. They need identified target behavior before model parameters are added:
   source/microphone separation alone does not define the new model.
 
 These items can proceed independently once their specifications and references
-are available; they are not prerequisites for gain- or energy-based path
-selection.
+are available.
 
 ## FDTD reconsideration criteria
 

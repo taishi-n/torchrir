@@ -8,24 +8,25 @@ This page summarizes implementation-level differences between TorchRIR and relat
 - `pyroomacoustics`
 - `dynamic-sound`
 - `das-generator`
+- `TASCAR`
 
 ## Feature Comparison
 
-| Feature | `torchrir` | `gpuRIR` | `pyroomacoustics` | `rir-generator` | `dynamic-sound` | `das-generator` |
-|---|---|---|---|---|---|---|
-| 🎯 Dynamic Sources | ✅ Emission-time | 🟡 Single moving source | 🟡 Manual loop | ❌ | ✅ Retarded-time | ✅ Emission-time |
-| 🎤 Dynamic Microphones | ✅ Observation-time | ❌ | 🟡 Manual loop | ❌ | ✅ Observation-time | ✅ Observation-time* |
-| Source + Microphone Motion | ❌ Signal synthesis | ❌ | 🟡 Custom propagation | ❌ | ✅ Direct sound | ✅ Two-time kernel* |
-| Shoebox ISM | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ |
-| 🖥️ CPU | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ |
-| 🧮 CUDA | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
-| 🍎 MPS | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| 📊 Scene Plot | ✅ | ❌ | ✅ | ❌ | ✅ Paths/arrays | ❌ |
-| 🎞️ Dynamic Scene GIF | ✅ | ❌ | 🟡 Manual animation script | ❌ | 🟡 Manual animation script | ❌ |
-| 🗂️ Dataset Build | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ |
-| 🎛️ RIR Convolution | ✅ Static/dynamic | 🟡 Dynamic helper | ✅ | ❌ | ❌ Signal time warping | ✅ Internal dynamic RIR |
-| 🧱 Non-shoebox Geometry | 🚧 Candidate | ❌ | ✅ | ❌ | ❌ | ❌ |
-| 🌐 Ray Tracing | 🚧 Candidate | ❌ | ✅ | ❌ | ❌ | ❌ |
+| Feature | `torchrir` | `gpuRIR` | `pyroomacoustics` | `rir-generator` | `dynamic-sound` | `das-generator` | `TASCAR` |
+|---|---|---|---|---|---|---|---|
+| 🎯 Dynamic Sources | ✅ Emission-time | 🟡 Single moving source | 🟡 Manual loop | ❌ | ✅ Retarded-time | ✅ Emission-time | ✅ Delay lines |
+| 🎤 Dynamic Microphones | ✅ Observation-time | ❌ | 🟡 Manual loop | ❌ | ✅ Observation-time | ✅ Observation-time* | ✅ Delay lines |
+| Source + Microphone Motion | ❌ Signal synthesis | ❌ | 🟡 Custom propagation | ❌ | ✅ Direct sound | ✅ Two-time kernel* | ✅ Block geometry |
+| Shoebox ISM | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ Polygon faces |
+| 🖥️ CPU | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ C++ |
+| 🧮 CUDA | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| 🍎 MPS | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| 📊 Scene Plot | ✅ | ❌ | ✅ | ❌ | ✅ Paths/arrays | ❌ | ✅ GUI/SVG |
+| 🎞️ Dynamic Scene GIF | ✅ | ❌ | 🟡 Manual animation script | ❌ | 🟡 Manual animation script | ❌ | ❌ GIF API |
+| 🗂️ Dataset Build | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ Scene rendering only |
+| 🎛️ RIR Convolution | ✅ Static/dynamic | 🟡 Dynamic helper | ✅ | ❌ | ❌ Signal time warping | ✅ Internal dynamic RIR | ✅ Static IR plugins |
+| 🧱 Non-shoebox Geometry | 🚧 Candidate | ❌ | ✅ | ❌ | ❌ | ❌ | ✅ Polygon reflectors |
+| 🌐 Ray Tracing | 🚧 Candidate | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ |
 
 Legend:
 
@@ -49,7 +50,159 @@ Notes:
 - `das-generator` applies internally generated RIRs; it does not expose a public
   convolver for caller-supplied RIRs. `dynamic-sound` directly samples a source at
   its retarded emission time rather than generating and convolving room RIRs.
+- TASCAR motion entries describe its block-based path renderer. Its fixed-IR
+  convolution plugins are separate from that renderer. GUI animation is not a
+  dedicated GIF-export API, and offline scene rendering is not a corpus-building
+  API. The [TASCAR comparison](#tascar-implementation-comparison) records the
+  inspected revision and limitations.
 - Broader signal processing such as beamforming, DOA, BSS, adaptive filtering, STFT, and denoising remains out of scope for `torchrir`.
+
+## TASCAR Implementation Comparison
+
+This source audit was performed on 2026-10-06. TASCAR was cloned into
+`tmp/tascar/` and inspected at [release 0.239.2][tascar-release], commit
+[`4471e181a7c3a25e36a0cea9254c11edf9a9652c`][tascar-revision].
+The TorchRIR implementation was at `d5e80a0`. TASCAR was not built or executed;
+this comparison does not establish waveform parity or a runtime ranking.
+Candidate counts below are calculations from the inspected enumeration rules.
+
+TASCAR targets interactive acoustic scenes for hearing research and spatial
+audio reproduction. It combines a C++ propagation engine with JACK, XML scene
+definitions, OSC control, and receiver plugins. TorchRIR exposes RIR tensors
+and convolution through Python/PyTorch. See the [TASCAR project description][tascar-readme]
+and [real-time scene interface][tascar-jack].
+
+### Capabilities and output contracts
+
+| Aspect | TorchRIR | TASCAR at the inspected revision |
+|---|---|---|
+| Main output | Static `(source, microphone, sample)` or dynamic `(frame, source, microphone, sample)` RIR tensors; convolved signals | Live multichannel audio, offline WAV, or one input channel's scene IR through `tascar_renderir` |
+| Scene/API | Python scene models and `SimulationConfig` | XML `.tsc` scenes, C++ engine, CLI tools, and MATLAB helpers |
+| Moving endpoints | Emission-time convolution for moving sources or observation-time convolution for moving microphones; joint motion rejected | Both endpoints can move in the block-based renderer; no retarded emission-time solve in the inspected propagation loop |
+| Orientation | Fixed per-entity analytic directivity orientation | Scheduled or interactive orientation; Euler-angle interpolation in the inspected trajectory class |
+| Room geometry | 2D/3D shoebox ISM | Polygon reflectors, including a shoebox helper and imported face groups |
+| Reflection response | One frequency-independent amplitude coefficient per wall | Cascaded first-order reflection filters; material absorption bands are fitted to filter parameters |
+| Air absorption | Not implemented | Optional distance-dependent first-order low-pass filter |
+| Late reverberation | Seeded statistical diffuse RIR tail | FOA diffuse fields and optional FDN or recorded-IR convolution reverberation |
+| Binaural/microphone model | Point-microphone geometry and analytic directivity; no head/HRTF model | Parametric HRTF and hierarchical microphone/head models; SOFA HRIR convolution via virtual-speaker layouts |
+| Ambisonics | No native spherical-harmonic output | HOA encoding/decoding and loudspeaker rendering plugins |
+| Execution | PyTorch CPU/CUDA/MPS | C++ CPU audio processing; no CUDA/MPS propagation backend in the inspected core |
+| Differentiation | PyTorch autograd on supported simulation/convolution paths | No PyTorch/autograd interface in the inspected engine |
+| Interactive audio/control | No JACK/OSC scene renderer | JACK audio and OSC/module-based scene interaction |
+| Dataset workflow | Source loaders and builders with mixtures, stems, and metadata | Scene rendering and measurement scripts; no equivalent corpus-builder contract |
+
+Sources: [block renderer][tascar-render], [propagation and air filter][tascar-acoustics],
+[orientation tracks][tascar-tracks], [reflection/material and reverb definitions][tascar-manual],
+[parametric HRTF][tascar-hrtf], [microphone model][tascar-micarray],
+[SOFA convolution][tascar-sofa], and [HOA encoder][tascar-hoa].
+
+The `hrtf` receiver is a parametric filter model. The SOFA path loads measured
+HRIRs for virtual loudspeaker directions and convolves those speaker feeds;
+these are different binaural rendering paths. A two-point microphone layout in
+TorchRIR does not reproduce either head model.
+
+### Dynamic propagation and IR measurement
+
+The inspected TASCAR signal path is:
+
+```text
+for each audio block at session time t:
+    update source, receiver, and reflector geometry at t
+    for each receiver and primary/image-source path:
+        evaluate current image geometry, direction, delay, and gain
+        apply source directivity and cascaded reflection filters
+        ramp distance and gain from previous to current values over the block
+        read the source history through the variable delay line
+        apply the air filter and receiver rendering
+    process diffuse fields and reverberation
+```
+
+Changing the delay-line read position produces time warping and Doppler effects.
+The geometry update, however, uses both endpoints at the same block time. It
+does not solve `te = t - distance(source(te), receiver(t)) / c`.
+Native simultaneous motion therefore describes operational support, not an
+exact two-time propagation kernel. Its approximation and block interpolation
+must be considered when comparing against a retarded-time reference.
+See [geometry update][tascar-render], [path processing][tascar-acoustics],
+and [delay-line reads][tascar-delay].
+
+The propagation delay line defaults to `sincorder=0`: it reads an integer
+delay obtained by truncating the positive sample delay. A nonzero order uses
+a finite, lookup-table sinc sum. This differs from TorchRIR's default 81-tap
+Hann-windowed fractional-delay deposition. Shared use of ISM or `1/r` gain
+does not imply identical RIR samples.
+See [source defaults][tascar-source] and [delay interpolation][tascar-delay].
+
+`tascar_renderir` freezes the scene at `starttime`, runs a zero-input
+initialization block, then injects a unit impulse into the selected input
+channel and writes the receiver outputs. It uses the requested IR length as
+the block size and keeps session time unchanged. It measures the configured
+signal graph, including its filters and reverberation; it is not a dynamic RIR
+tensor export. See [IR rendering][tascar-ir].
+
+For offline moving scenes, `tascar_renderfile` defaults to dynamic time updates,
+but its default fragment covers the entire input/duration. An explicit
+`--fragsize` is needed for repeated geometry updates; `--static` freezes time.
+Also, the inspected MATLAB `tascar_renderscene` helper appends `-d` when its
+`dynamic` option is true, while the inspected CLI does not accept `-d`.
+This is a source-level interface mismatch; the helper was not executed.
+See [CLI options][tascar-file] and [MATLAB helper][tascar-matlab].
+
+### Computational structure and comparison boundary
+
+TASCAR builds a path graph for every receiver. With `W` reflectors and maximum
+order `q >= 1`, its constructor creates `W * (W-1)^(k-1)` candidate paths
+of order `k` per source/receiver, excluding consecutive reflection at the same
+surface. Visibility and activity are evaluated during processing. This is
+different from TorchRIR's unique shoebox L1 image-index enumeration.
+
+For six reflector faces and one source/receiver pair:
+
+| Maximum order | TASCAR candidate path nodes, including direct sound | TorchRIR 3D L1 image indices |
+|---|---|---|
+| 3 | 187 | 63 |
+| 5 | 4,687 | 231 |
+
+These counts are not equivalent sets of valid physical reflections and do not
+give a speed ratio. TASCAR's low-order early-reflection model plus separate
+late reverberation must not be equated to a high-order shoebox RIR calculation.
+See [path-graph construction][tascar-images] and TorchRIR's
+`src/torchrir/sim/ism/images.py::_image_source_count`.
+
+TASCAR retains delay-line, filter, and audio-block state per path. Its streaming
+renderer avoids storing a full frame/source/microphone/RIR cube, but memory
+still depends on path count, maximum delay, and fragment size. The IR command
+sets the maximum delay from the requested IR length. Consequently, CPU
+real-time design alone does not establish faster or smaller RIR generation.
+See [per-path state][tascar-path-state] and [IR allocation][tascar-ir].
+
+A numerical comparison would first need stationary omni endpoints, matched
+faces/orders, disabled air and reflection filtering, explicit gains/calibration,
+matched interpolation, and matched output support. Moving tests additionally
+need explicit block sizes and a stated propagation-time approximation.
+No TASCAR parity test or performance result is claimed here, and this comparison
+does not add a backend or an implementation milestone to TorchRIR.
+
+[tascar-release]: https://github.com/gisogrimm/tascar/releases/tag/release_0.239.2
+[tascar-revision]: https://github.com/gisogrimm/tascar/tree/4471e181a7c3a25e36a0cea9254c11edf9a9652c
+[tascar-readme]: https://github.com/gisogrimm/tascar/blob/4471e181a7c3a25e36a0cea9254c11edf9a9652c/README.md
+[tascar-jack]: https://github.com/gisogrimm/tascar/blob/4471e181a7c3a25e36a0cea9254c11edf9a9652c/libtascar/include/jackrender.h#L33-L55
+[tascar-render]: https://github.com/gisogrimm/tascar/blob/4471e181a7c3a25e36a0cea9254c11edf9a9652c/libtascar/src/render.cc#L235-L330
+[tascar-acoustics]: https://github.com/gisogrimm/tascar/blob/4471e181a7c3a25e36a0cea9254c11edf9a9652c/libtascar/src/acousticmodel.cc#L127-L278
+[tascar-tracks]: https://github.com/gisogrimm/tascar/blob/4471e181a7c3a25e36a0cea9254c11edf9a9652c/libtascar/src/dynamicobjects.cc#L156-L193
+[tascar-manual]: https://github.com/gisogrimm/tascar/blob/4471e181a7c3a25e36a0cea9254c11edf9a9652c/manual/manual.tex#L1395-L1557
+[tascar-hrtf]: https://github.com/gisogrimm/tascar/blob/4471e181a7c3a25e36a0cea9254c11edf9a9652c/manual/recgenhrtf.tex
+[tascar-micarray]: https://github.com/gisogrimm/tascar/blob/4471e181a7c3a25e36a0cea9254c11edf9a9652c/manual/recgenmicarray.tex
+[tascar-sofa]: https://github.com/gisogrimm/tascar/blob/4471e181a7c3a25e36a0cea9254c11edf9a9652c/libtascar/src/speakerarray.cc#L607-L645
+[tascar-hoa]: https://github.com/gisogrimm/tascar/blob/4471e181a7c3a25e36a0cea9254c11edf9a9652c/plugins/src/receivermod_hoa3d_enc.cc#L52-L103
+[tascar-delay]: https://github.com/gisogrimm/tascar/blob/4471e181a7c3a25e36a0cea9254c11edf9a9652c/libtascar/include/delayline.h#L90-L144
+[tascar-source]: https://github.com/gisogrimm/tascar/blob/4471e181a7c3a25e36a0cea9254c11edf9a9652c/libtascar/src/acousticmodel.cc#L1000-L1034
+[tascar-ir]: https://github.com/gisogrimm/tascar/blob/4471e181a7c3a25e36a0cea9254c11edf9a9652c/libtascar/src/irrender.cc#L282-L355
+[tascar-file]: https://github.com/gisogrimm/tascar/blob/4471e181a7c3a25e36a0cea9254c11edf9a9652c/apps/src/tascar_renderfile.cc#L43-L145
+[tascar-matlab]: https://github.com/gisogrimm/tascar/blob/4471e181a7c3a25e36a0cea9254c11edf9a9652c/scripts/tascar_renderscene.m#L33-L62
+[tascar-images]: https://github.com/gisogrimm/tascar/blob/4471e181a7c3a25e36a0cea9254c11edf9a9652c/libtascar/src/acousticmodel.cc#L315-L354
+[tascar-path-state]: https://github.com/gisogrimm/tascar/blob/4471e181a7c3a25e36a0cea9254c11edf9a9652c/libtascar/src/acousticmodel.cc#L90-L106
+[tascar-gain]: https://github.com/gisogrimm/tascar/blob/4471e181a7c3a25e36a0cea9254c11edf9a9652c/libtascar/src/acousticmodel.cc#L810-L860
 
 ## Dynamic-Sound and DAS-Generator Implementation Audit
 
@@ -452,6 +605,7 @@ $$
 | `pyroomacoustics` | Usually `1/r` in room ISM path | `build_rir_matrix` uses `1/(4πr)`, so scale depends on API path. |
 | `das-generator` | `1/(4πr)` | Internal dynamic ISM uses the C++ path gain in [DAS core][das-core]. |
 | `dynamic-sound` | `1/r` | [Direct-path scaling][ds-attenuations], not an ISM implementation; air absorption is applied separately. |
+| `TASCAR` | `1/max(nearfieldlimit, r)` by default | [Normal non-volumetric receiver][tascar-gain] with `gainmodel="1/r"`; filters and calibration add their own gains. |
 
 ### Practical implication for cross-library tests
 
