@@ -47,7 +47,7 @@ pip install "torchrir[all]"         # all optional features
 | 🗂️ Dataset Build | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ |
 | 🎛️ RIR Convolution | ✅ Static/dynamic | 🟡 Dynamic helper | ✅ | ❌ | ❌ Signal time warping | ✅ Internal dynamic RIR |
 | 🧱 Non-shoebox Geometry | 🚧 Candidate | ❌ | ✅ | ❌ | ❌ | ❌ |
-| 🌐 Geometric Acoustics | 🚧 Candidate | ❌ | ✅ | ❌ | ❌ | ❌ |
+| 🌐 Ray Tracing | 🚧 Candidate | ❌ | ✅ | ❌ | ❌ | ❌ |
 
 Legend: `✅` native support, `🟡` manual setup, `🚧` candidate (not yet implemented), `❌` unavailable
 
@@ -313,6 +313,11 @@ y = DynamicConvolver(time_reference="emission").convolve(signal, dynamic_result)
 ```
 
 ## Specification
+
+The implemented propagation model is shoebox ISM. Non-shoebox geometry and
+ray tracing are future candidates; FDTD is outside the active implementation
+sequence. Planned extensions and their acceptance criteria are listed in the
+[acoustic model roadmap](docs/acoustic-roadmap.md).
 
 ### Geometry and scenes
 
@@ -731,68 +736,14 @@ site.
 
 ## TODO
 
-Outstanding work identified in the 2026-10-05 audit of commit `9bea4ce`.
-P1 covers confirmed defects and required validation; P2 extends integration and
-hardware coverage; P3 tracks future capabilities. Follow the documentation-first
+P2 covers remaining hardware validation; P3 tracks future capabilities.
+Follow the documentation-first
 cycle in [Development Verification](#development-verification) for each item.
 The [test and CI plan](tests/README.md#test-and-ci-plan) contains the detailed CI
 acceptance criteria; unchecked items remain incomplete.
 
-### P1: Confirmed visualization defects
+### P2: Hardware validation
 
-- [x] Fix source annotations in 3D animations. The default
-      `annotate_sources=True` now uses XYZ text coordinates. Actual 2D/3D GIF and
-      MP4 rendering tests cover annotations enabled and disabled, frame counts,
-      decoding, and HD MP4 dimensions. See
-      [animation.py](src/torchrir/viz/animation.py) and
-      [rendering tests](tests/test_viz_animation.py).
-- [x] Align animation timestamps and playback duration with the exact sample
-      schedule. Animation callers now pass `schedule`, `fs`, and `stop_sample`.
-      Tests cover uniform/nonuniform schedules, retained sample starts under
-      subsampling, fractional MP4 FPS, cumulative GIF timing, invalid timelines,
-      and synchronized audio/video through the reverberation tail. See
-      [Visualization](#visualization) for the canonical timing contract.
-- [x] Define and enforce the audio level policy for MP4 muxing. Muxing preserves
-      gain in a DOUBLE intermediate WAV, validates selected stereo channels, and
-      rejects empty/non-finite/out-of-range audio before encoding. Tests cover
-      channel ordering, mono duplication, and sub-PCM-resolution amplitudes. See
-      [audio mux tests](tests/test_viz_audio.py).
-
-### P1: Distribution and automated validation
-
-- [x] Add a release validation gate. The release workflow reuses validation at
-      the event commit, checks tag/project/lock/distribution versions, and
-      publishes the tested artifact. The checker passes a real local build and
-      rejects inconsistent inputs; manual dispatch validates without publishing.
-- [x] Exercise the installed wheel outside the checkout in two clean environments.
-      Base dependencies pass direct-path arrival/gain and direct-sum checks for
-      static/emission/observation convolution. Audio/datasets/CLI extras pass FLOAT
-      multichannel WAV round trips and the installed builder command. See
-      [wheel smoke checks](scripts/smoke_wheel.py).
-- [x] Implement the CPU CI plan: separate quality, comparisons, and distribution;
-      Linux 3.11.4/3.12/3.13 plus macOS 3.13; actionlint; retained test/coverage
-      reports; one 75% coverage gate; explicit device markers; minimal dependency
-      groups; every-PR validation; complete workflow push filters; and cancellation
-      limited to superseded CI runs. Local CPU validation passes with zero skips.
-      See [ci.yml](.github/workflows/ci.yml).
-
-### P2: Integration and hardware coverage
-
-- [x] Run CLI/examples against small local synthetic speech fixtures. All three
-      modes, JSON/YAML save/reload, explicit overrides, standalone reference sums,
-      and a real builder subprocess are covered. WAV sample rates/counts/channels
-      and time-reference metadata are checked without downloading a corpus. See
-      [CLI integration tests](tests/test_cli_integration.py).
-- [x] Add encoded-media integration and failure handling. Pillow/ffmpeg/ffprobe
-      tests verify frame counts, dimensions, duration, decoding, and requested
-      stereo audio. Rendering/mux failures propagate; per-file atomic replacement
-      preserves existing outputs and cleans temporary files and owned Figures.
-      See [failure tests](tests/test_viz_failures.py).
-- [x] Extend publication recovery tests with actual process interruption.
-      Writers are killed at seven initialization/rename/manifest checkpoints;
-      fresh processes verify complete old/new trees, transaction cleanup, and
-      lock reacquisition. Existing exception/race/synthetic-state tests remain
-      in [publication recovery tests](tests/test_dataset_security.py).
 - [ ] Extend manual accelerator validation on actual hardware. Add static and
       observation-time convolution output/gradient parity, multiple sources and
       microphones, chunk boundaries, and CUDA eager/compiled accumulation with LUT
@@ -806,27 +757,40 @@ acceptance criteria; unchecked items remain incomplete.
 
 ### P3: Acoustic models and spatial visualization
 
-- [ ] Extend room geometry beyond shoebox rooms with irregular polygons/meshes
-      and boundary handling.
-      Motivation: [pyroomacoustics#393](https://github.com/LCAV/pyroomacoustics/issues/393),
-      [pyroomacoustics#405](https://github.com/LCAV/pyroomacoustics/issues/405).
+The [acoustic model roadmap](docs/acoustic-roadmap.md) defines implementation
+order, initial scope, and validation gates. Start with path selection within
+the current shoebox ISM. Ray tracing is a later candidate, and FDTD remains
+deferred without a scheduled implementation milestone. The feature tasks below
+remain incomplete until their numerical and API acceptance criteria pass.
+
 - [ ] Add reflection/path selection controls such as first-K, strongest-K, and
-      energy-threshold-based selection.
+      energy-threshold-based selection. Define deterministic arrival ordering
+      and implement first-K before gain- or energy-based policies.
       Motivation: [pyroomacoustics#338](https://github.com/LCAV/pyroomacoustics/issues/338).
-- [ ] Model microphone hardware frequency response, sensitivity, and self-noise.
-      Motivation: [pyroomacoustics#394](https://github.com/LCAV/pyroomacoustics/issues/394).
-- [ ] Add near-field speech source modeling for close-talk scenarios.
-      Motivation: [pyroomacoustics#417](https://github.com/LCAV/pyroomacoustics/issues/417).
+- [ ] Support time-varying source/microphone orientation on the scene schedule.
+      Specify coordinate frames and orientation time references first; retain
+      the current single-moving-side convolution scope for the initial stage.
 - [ ] Integrate 3D spatial response visualization, including array and
       directivity beam patterns.
       Motivation: [pyroomacoustics#397](https://github.com/LCAV/pyroomacoustics/issues/397).
-- [ ] Support simultaneous source/microphone motion and time-varying orientation
-      for dataset reproduction scenarios that require them. Specify propagation
-      and time-reference semantics before implementing these extensions.
-- [ ] Reconcile the ray-tracing/FDTD roadmap wording in
-      [the documentation overview](docs/index.md#limitations) with the current
-      acoustic-model TODOs. Decide their intended scope before implementation;
-      the retired placeholder classes do not need to be restored.
+- [ ] Support simultaneous source/microphone motion for dataset reproduction.
+      Specify a two-time retarded propagation model and validate direct sound
+      before adding reflected paths.
+- [ ] Extend room geometry beyond shoebox rooms with irregular polygons/meshes
+      and boundary handling. Start with static 2D convex polygons and direct/
+      first-order specular paths; later stages address non-convex rooms and
+      3D meshes.
+      Motivation: [pyroomacoustics#393](https://github.com/LCAV/pyroomacoustics/issues/393),
+      [pyroomacoustics#405](https://github.com/LCAV/pyroomacoustics/issues/405).
+- [ ] Evaluate a ray-tracing backend after non-shoebox geometry and boundary
+      semantics are established. Require a target use case, a numerical
+      reference, and CPU cost/convergence criteria before implementation.
+- [ ] Model microphone hardware frequency response, sensitivity, and self-noise.
+      Specify physical units and calibration references before implementation.
+      Motivation: [pyroomacoustics#394](https://github.com/LCAV/pyroomacoustics/issues/394).
+- [ ] Add near-field speech source modeling for close-talk scenarios. Specify
+      the source model and its valid distance/frequency range first.
+      Motivation: [pyroomacoustics#417](https://github.com/LCAV/pyroomacoustics/issues/417).
 
 ### P3: Dynamic dataset foundation
 
@@ -878,11 +842,6 @@ third-party recordings.
 - [ ] **trajectoRIR:** map the supplied audio, RIR, coordinate, speed, and array
       configuration records into torchrir. Add evaluation utilities that compare
       measured moving-microphone signals with observation-time convolution.
-
-The old `TODO.md` removed in `79946ba` had all entries checked. Removed APIs and
-compatibility wrappers are not outstanding work. Retain the current numerical,
-external-reference, and filesystem-recovery tests; the HPF changes in `4515a27`
-already include regression tests.
 
 ## Related Libraries
 

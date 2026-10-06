@@ -346,10 +346,16 @@ runner and successful manual verification.
 
 ### Implementation order
 
-Follow the checklist order in [README TODO](../README.md#todo): visualization
-correctness, release gate, installed distributions, CPU CI, CLI/examples, media
-failure handling, and process-interruption recovery. Commit each completed item.
-The accelerator extension remains unchecked until hardware is available.
+The remaining validation item in [README TODO](../README.md#todo) is the
+accelerator extension, which remains unchecked until hardware is available.
+Commit each completed implementation item.
+
+For subsequent P3 acoustic-model work, follow the
+[acoustic model roadmap](../docs/acoustic-roadmap.md): first path selection
+within shoebox ISM, then orientation trajectories and spatial response plots,
+joint motion, and staged non-shoebox geometry. Ray tracing requires a separate
+evaluation gate; FDTD remains deferred. The roadmap defines the CPU analytic,
+limiting-case, and convergence checks required before each feature is complete.
 
 Each step follows documentation first, failing tests for new behavior, minimal
 implementation, and final removal of unused code or contradictory documentation.

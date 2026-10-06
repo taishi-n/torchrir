@@ -25,7 +25,7 @@ This page summarizes implementation-level differences between TorchRIR and relat
 | 🗂️ Dataset Build | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ |
 | 🎛️ RIR Convolution | ✅ Static/dynamic | 🟡 Dynamic helper | ✅ | ❌ | ❌ Signal time warping | ✅ Internal dynamic RIR |
 | 🧱 Non-shoebox Geometry | 🚧 Candidate | ❌ | ✅ | ❌ | ❌ | ❌ |
-| 🌐 Geometric Acoustics | 🚧 Candidate | ❌ | ✅ | ❌ | ❌ | ❌ |
+| 🌐 Ray Tracing | 🚧 Candidate | ❌ | ✅ | ❌ | ❌ | ❌ |
 
 Legend:
 
@@ -43,6 +43,9 @@ Notes:
   `dynamic-sound` has no automatic room-reflection generator and its multiple-source
   output failed a superposition check. `das-generator` has moving-receiver reuse
   and startup errors (`*`); see the [implementation audit](#dynamic-sound-and-das-generator-implementation-audit).
+- TorchRIR's candidate markers refer to future work, not available APIs.
+  The [acoustic model roadmap](acoustic-roadmap.md) defines the initial
+  non-shoebox scope and ray-tracing evaluation gate; FDTD remains deferred.
 - `das-generator` applies internally generated RIRs; it does not expose a public
   convolver for caller-supplied RIRs. `dynamic-sound` directly samples a source at
   its retarded emission time rather than generating and convolving room RIRs.

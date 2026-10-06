@@ -32,7 +32,10 @@ needs a system `ffmpeg`.
 - Dataset utilities for building small mixtures from speech corpora.
 
 ### Limitations
-- Ray tracing and FDTD are roadmap items and are not exposed as APIs.
+- The implemented propagation model is shoebox ISM. Non-shoebox geometry and
+  ray tracing are future candidates; FDTD is outside the active implementation
+  sequence. See the [acoustic model roadmap](acoustic-roadmap.md) for their
+  scope and acceptance criteria.
 - Deterministic mode is best-effort and backend-dependent.
 - RIR simulation supports float32 and float64. Lower-precision geometry is
   rejected before the ISM kernel; convolution separately supports float16 and
@@ -99,6 +102,7 @@ See runnable examples and command-line usage: [Examples](examples.md).
 ## Documentation Pages
 - [Getting started](getting-started.md)
 - [Overview](overview.md)
+- [Acoustic model roadmap](acoustic-roadmap.md)
 - [Datasets](datasets.md)
 - [Related Dynamic Speech and Acoustic Datasets](related-datasets.md)
 - [Examples](examples.md)

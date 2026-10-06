@@ -1,5 +1,9 @@
 # Overview
 
+The capabilities below describe implemented behavior. Planned acoustic-model
+extensions, their order, and validation gates are described in the
+[acoustic model roadmap](acoustic-roadmap.md).
+
 ## Capabilities
 - ISM-based static and dynamic RIR simulation for 2D/3D shoebox rooms.
 - Directivity patterns (`omni`, `halfomni`, `subcardioid`, `cardioid`,
