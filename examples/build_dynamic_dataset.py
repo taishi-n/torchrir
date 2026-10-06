@@ -19,10 +19,10 @@ Outputs (per scene index k):
     - scene_k_static_2d.png / scene_k_dynamic_2d.png (and 3D variants when enabled)
 
 Run (CMU ARCTIC):
-    uv run python examples/build_dynamic_dataset.py --dataset cmu_arctic --num-scenes 4
+    uv run --extra datasets python examples/build_dynamic_dataset.py --dataset cmu_arctic --num-scenes 4
 
 Run (LibriSpeech):
-    uv run python examples/build_dynamic_dataset.py --dataset librispeech --subset train-clean-100
+    uv run --extra datasets python examples/build_dynamic_dataset.py --dataset librispeech --subset train-clean-100
 
 Notes:
     - Use --num-moving-sources to keep some sources fixed.
@@ -284,9 +284,6 @@ def main() -> None:
     # Fixed room and fixed microphone layout across all scenes.
     device = resolve_device(args.device)
     room_size = torch.tensor(args.room, dtype=torch.float32)
-    room = Room.shoebox(
-        size=args.room, fs=16000, beta=[0.9] * (6 if len(args.room) == 3 else 4)
-    )
 
     rng = random.Random(args.seed)
     mic_center = sampling.sample_positions(num=1, room_size=room_size, rng=rng).squeeze(
@@ -343,6 +340,9 @@ def main() -> None:
             rng=scene_rng,
         )
         signals = signals.to(device)
+        room = Room.shoebox(
+            size=args.room, fs=fs, beta=[0.9] * (6 if len(args.room) == 3 else 4)
+        )
 
         # Build random trajectories for each source; mics stay fixed.
         steps = max(2, args.steps)

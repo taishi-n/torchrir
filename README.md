@@ -74,18 +74,24 @@ For detailed notes and equations, see
 
 ## Examples
 
+Run these commands from the repository root. The `datasets` extra supplies
+audio I/O and visualization dependencies for the corpus-based examples; the
+unified CLI also selects the `cli` extra for YAML configuration.
+Corpus-based examples use the loaded audio's sample rate for both RIR
+simulation and WAV output.
+
 - `examples/static.py`: fixed sources and microphones with configurable mic count (default: binaural).  
-  `uv run python examples/static.py --plot`
+  `uv run --extra datasets python examples/static.py --plot`
 - `examples/dynamic_src.py`: moving sources, fixed microphones.  
-  `uv run python examples/dynamic_src.py --plot`
+  `uv run --extra datasets python examples/dynamic_src.py --plot`
 - `examples/dynamic_mic.py`: fixed sources, moving microphones.  
-  `uv run python examples/dynamic_mic.py --plot`
+  `uv run --extra datasets python examples/dynamic_mic.py --plot`
 - `examples/cli.py`: unified CLI for static/dynamic scenes with JSON/YAML configs.  
-  `uv run python examples/cli.py --mode static --plot`
+  `uv run --extra datasets --extra cli python examples/cli.py --mode static --plot`
 - `examples/build_dynamic_dataset.py`: small dynamic dataset generation script (CMU ARCTIC / LibriSpeech; fixed room/mics, randomized source motion).  
-  `uv run python examples/build_dynamic_dataset.py --dataset cmu_arctic --num-scenes 4 --num-sources 2`
+  `uv run --extra datasets python examples/build_dynamic_dataset.py --dataset cmu_arctic --num-scenes 4 --num-sources 2`
 - `torchrir.datasets.dynamic_cmu_arctic`: oobss-compatible dynamic CMU ARCTIC builder CLI.  
-  `python -m torchrir.datasets.dynamic_cmu_arctic --cmu-root datasets/cmu_arctic --n-scenes 2 --overwrite-dataset`
+  `uv run --extra datasets python -m torchrir.datasets.dynamic_cmu_arctic --cmu-root datasets/cmu_arctic --n-scenes 2 --overwrite-dataset`
 - `examples/benchmark_device.py`: CPU/GPU benchmark for RIR simulation.  
   `uv run python examples/benchmark_device.py --dynamic`
 
@@ -397,7 +403,10 @@ device=...)` and pass it as the keyword-only `progress` argument to
 - RIR simulation supports `torch.float32` and `torch.float64`; inherited or
   explicit lower-precision geometry is rejected because image positions,
   distances, delays, and gains are not numerically safe in float16/bfloat16.
-  MPS rejects `float64`; MPS resolves `use_lut=False`, and CPU resolves
+  A resolved MPS device rejects `float64`; if explicitly requested MPS is
+  unavailable, a warning is emitted and CPU fallback accepts `float64`.
+  `device="auto"` skips MPS for `float64`.
+  MPS resolves `use_lut=False`, and CPU resolves
   `use_compile=False`. These effective values are stored in `RIRResult.config`.
 
 ### Dynamic convolution time conventions
@@ -462,13 +471,17 @@ not implemented.
   and dataset utilities reject booleans, numeric strings, scalar Tensors, NaN,
   and infinity instead of coercing them. Integers too large to represent as a
   finite float raise `ValueError` at the API boundary.
-- Public count, index, sample-rate, and seed parameters accept non-boolean
-  integer scalars, including NumPy integer scalars, and normalize them to Python
-  `int`. Fractional values and booleans raise `TypeError`; operation-specific
-  bounds are checked before tensor allocation or arithmetic. Audio and dataset
-  sample rates are limited to `1..2**31-1`, simulation sample counts and frame
-  starts fit positive/non-negative `int64`, and random seeds fit non-negative
-  `int64`.
+- Simulation and frame-time conversion use positive finite real sample rates:
+  `Room.fs` and `FrameSchedule.from_seconds(sample_rate=...)` accept fractional
+  values and follow the finite-real contract above. A seconds-derived schedule
+  used with an `RIRResult` must match the room's sample rate.
+- Public count, index, and seed parameters, plus audio I/O and dataset sample
+  rates, accept non-boolean integer scalars, including NumPy integer scalars,
+  and normalize them to Python `int`. Fractional values and booleans raise
+  `TypeError`; operation-specific bounds are checked before tensor allocation
+  or arithmetic. Audio and dataset sample rates are limited to `1..2**31-1`,
+  simulation sample counts and frame starts fit positive/non-negative `int64`,
+  and random seeds fit non-negative `int64`.
 - Source and microphone FFT convolution is batched. `float16` and `bfloat16`
   inputs use `float32` FFT, source-sum, and overlap-add work buffers, then cast
   once on return; the implementation remains differentiable, including dynamic

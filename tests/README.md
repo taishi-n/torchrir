@@ -43,7 +43,10 @@ correctness for simulation or convolution kernels.
   scenarios, and the dataset builder in fresh Python processes against tiny
   local synthetic CMU-layout recordings. JSON/YAML configuration round trips,
   explicit option precedence, time-reference metadata, sample counts, and
-  mixture/reference sums are checked. No corpus downloads are needed.
+  mixture/reference sums are checked. The general dataset example also runs
+  against synthetic CMU ARCTIC and LibriSpeech trees at 8 kHz, checking that
+  the room, RIR length, metadata, and WAV output use the input audio's sample
+  rate. No corpus downloads are needed.
 - `test_util_contracts.py` exercises shared scalar/tensor boundaries, including
   max-scaled vector norms for extreme and subnormal `float64` vectors.
 - `test_outputs_logging.py` checks schema and output contracts, including

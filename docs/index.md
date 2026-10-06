@@ -36,8 +36,10 @@ needs a system `ffmpeg`.
 - Deterministic mode is best-effort and backend-dependent.
 - RIR simulation supports float32 and float64. Lower-precision geometry is
   rejected before the ISM kernel; convolution separately supports float16 and
-  bfloat16 through float32 work buffers. MPS rejects float64 and disables the
-  LUT path; CPU disables requested compilation.
+  bfloat16 through float32 work buffers. A resolved MPS device rejects float64
+  and disables the LUT path; CPU disables requested compilation. Unavailable
+  MPS falls back to CPU with a warning, including for float64 requests.
+  Automatic device selection skips MPS for float64.
 - No backward compatibility or data migration is provided during development.
   Regenerate generated data after relevant format or numerical changes.
 

@@ -1,5 +1,10 @@
 # Examples
 
+Run these commands from the repository root. Corpus-based examples select
+`--extra datasets` for audio I/O and visualization dependencies. Unified CLI
+examples also select `--extra cli` for YAML configuration. These dependencies
+are installed by `uv run`; the benchmark uses only the core dependencies.
+
 ## Choosing a dynamic time reference
 
 | Motion | `time_reference` | RIR frame boundary |
@@ -47,7 +52,7 @@ produces a multi-microphone output (default: binaural).
 ### Example runs
 
 ```bash
-uv run python examples/static.py --num-sources 1 --duration 5 --plot
+uv run --extra datasets python examples/static.py --num-sources 1 --duration 5 --plot
 ```
 
 Expected outputs:
@@ -60,7 +65,7 @@ Expected outputs:
 - `static.gif` (and `static_3d.gif` if 3D)
 
 ```bash
-uv run python examples/static.py --order 12 --tmax 0.6 --device auto
+uv run --extra datasets python examples/static.py --order 12 --tmax 0.6 --device auto
 ```
 
 Expected outputs:
@@ -89,7 +94,7 @@ The script uses `save_scene_plots` and `save_scene_gifs` for visualization outpu
 ### Example runs
 
 ```bash
-uv run python examples/dynamic_src.py --steps 24 --plot
+uv run --extra datasets python examples/dynamic_src.py --steps 24 --plot
 ```
 
 Expected outputs:
@@ -102,7 +107,7 @@ Expected outputs:
 - `dynamic_src.gif` (and `dynamic_src_3d.gif` if 3D)
 
 ```bash
-uv run python examples/dynamic_src.py --num-sources 3 --duration 8 --order 10
+uv run --extra datasets python examples/dynamic_src.py --num-sources 3 --duration 8 --order 10
 ```
 
 Expected outputs:
@@ -129,7 +134,7 @@ moving receiver.
 ### Example runs
 
 ```bash
-uv run python examples/dynamic_mic.py --steps 20 --plot
+uv run --extra datasets python examples/dynamic_mic.py --steps 20 --plot
 ```
 
 Expected outputs:
@@ -142,7 +147,7 @@ Expected outputs:
 - `dynamic_mic.gif` (and `dynamic_mic_3d.gif` if 3D)
 
 ```bash
-uv run python examples/dynamic_mic.py --order 12 --tmax 0.6 --device auto
+uv run --extra datasets python examples/dynamic_mic.py --order 12 --tmax 0.6 --device auto
 ```
 
 Expected outputs:
@@ -155,7 +160,9 @@ Expected outputs:
 ## Unified CLI (static/dynamic)
 
 The unified CLI wraps the three scenarios above and supports JSON/YAML configuration files.
-JSON uses the core installation. YAML requires `pip install "torchrir[cli]"`.
+JSON configuration needs no additional parser. YAML configuration requires the
+`cli` extra; running the corpus-based scenarios also requires the `datasets`
+extra shown in the commands below.
 
 ### Key arguments
 
@@ -168,7 +175,7 @@ JSON uses the core installation. YAML requires `pip install "torchrir[cli]"`.
 ### Example runs
 
 ```bash
-uv run python examples/cli.py --mode static --plot
+uv run --extra datasets --extra cli python examples/cli.py --mode static --plot
 ```
 
 Expected outputs:
@@ -179,7 +186,7 @@ Expected outputs:
 - `static_static_2d.png` (and 3D variant if room is 3D)
 
 ```bash
-uv run python examples/cli.py --mode dynamic_src --gif --steps 24
+uv run --extra datasets --extra cli python examples/cli.py --mode dynamic_src --gif --steps 24
 ```
 
 Expected outputs:
@@ -190,7 +197,7 @@ Expected outputs:
 - `dynamic_src.gif` (and 3D variant if room is 3D)
 
 ```bash
-uv run python examples/cli.py --mode dynamic_mic --gif --steps 24
+uv run --extra datasets --extra cli python examples/cli.py --mode dynamic_mic --gif --steps 24
 ```
 
 Expected outputs:
@@ -247,6 +254,9 @@ This example generates a small dynamic dataset inspired by Cross3D: the room
 and mic array are fixed, while source positions and trajectories are
 randomized per scene. Each scene produces a convolved mixture and metadata.
 You can choose CMU ARCTIC or LibriSpeech from the command line.
+Each scene uses the loaded audio's sample rate for its room, RIR simulation,
+frame schedule, WAV output, and metadata. No fixed simulation sample rate or
+resampling is applied.
 
 ### What it does
 
@@ -271,7 +281,7 @@ For each scene index `k`:
 ### Run (CMU ARCTIC)
 
 ```bash
-uv run python examples/build_dynamic_dataset.py \
+uv run --extra datasets python examples/build_dynamic_dataset.py \
   --dataset cmu_arctic \
   --num-scenes 4 \
   --num-sources 2 \
@@ -281,7 +291,7 @@ uv run python examples/build_dynamic_dataset.py \
 ### Run (LibriSpeech)
 
 ```bash
-uv run python examples/build_dynamic_dataset.py \
+uv run --extra datasets python examples/build_dynamic_dataset.py \
   --dataset librispeech \
   --subset train-clean-100 \
   --num-scenes 4 \
@@ -293,7 +303,7 @@ uv run python examples/build_dynamic_dataset.py \
 
 ```bash
 # CMU ARCTIC: only 1 moving source, plotting enabled
-uv run python examples/build_dynamic_dataset.py \
+uv run --extra datasets python examples/build_dynamic_dataset.py \
   --dataset cmu_arctic \
   --num-scenes 2 \
   --num-sources 3 \
@@ -303,7 +313,7 @@ uv run python examples/build_dynamic_dataset.py \
 
 ```bash
 # LibriSpeech: more steps, fewer scenes
-uv run python examples/build_dynamic_dataset.py \
+uv run --extra datasets python examples/build_dynamic_dataset.py \
   --dataset librispeech \
   --subset dev-clean \
   --num-scenes 2 \
@@ -366,7 +376,7 @@ The example is implemented in `examples/build_dynamic_dataset.py` and uses:
 ### Additional example
 
 ```bash
-uv run python examples/build_dynamic_dataset.py --dataset cmu_arctic --num-scenes 2 --out-dir outputs/ds_small
+uv run --extra datasets python examples/build_dynamic_dataset.py --dataset cmu_arctic --num-scenes 2 --out-dir outputs/ds_small
 ```
 
 Expected outputs:

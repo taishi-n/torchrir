@@ -77,14 +77,23 @@
   - Example outputs or benchmarks when touching performance-critical code
 
 ## Versioning & Releases
-- Use Commitizen for version bumps, tagging, and changelog updates.
-  - Run: `uv run cz bump --changelog --yes`
-  - Version comes from `pyproject.toml` (PEP 621) and tag format is `vX.Y.Z`.
-- Warning: on every version bump, ensure `uv.lock` is updated to the same project version and committed before pushing.
-  - Before `git push`, verify there is no leftover `uv.lock` diff and include it in the release-related commits when changed.
-- After bumping, push commits and tags (`git push origin main --tags`).
-- Signed tags are created manually by the user. Example:
-  - `git tag -s vX.Y.Z -m "vX.Y.Z"`
+- Version comes from `pyproject.toml` (PEP 621); tag format is `vX.Y.Z`.
+  Use Commitizen to update the version and changelog, then create the signed
+  tag manually after the release commit:
+  1. Run `uv run cz bump --changelog --yes --version-files-only`.
+     This updates the version and changelog without committing or creating a
+     tag. The configured `pre_bump_hooks` runs `uv lock` to synchronize the
+     project version in `uv.lock`.
+  2. Review and validate `pyproject.toml`, `CHANGELOG.md`, and `uv.lock`.
+     Stage those release files and use `uv run cz commit` to create the release
+     commit following the commit guidelines above.
+  3. The user creates the signed tag on that release commit:
+     `git tag -s vX.Y.Z -m "vX.Y.Z"`.
+  4. After the signed tag exists, push commits and tags:
+     `git push origin main --tags`.
+- Before pushing, verify that the tag and project/lock versions agree and
+  that there is no leftover `uv.lock` diff. Include any lockfile update in the
+  release commit.
 
 ## Security & Configuration Tips
 - Avoid committing large audio files or datasets; prefer documented download steps.

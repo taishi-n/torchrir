@@ -3,6 +3,7 @@
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 
@@ -10,6 +11,8 @@ import numpy as np
 import pytest
 import soundfile as sf
 import yaml
+
+from torchrir.datasets import cmu_arctic_speakers
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -164,6 +167,62 @@ def test_standalone_examples_save_consistent_references(tmp_path, corpus, mode):
         for item in meta["extra"]["reference_audio"]
     ]
     assert len(refs) == 2
+    np.testing.assert_allclose(audio, sum(refs), rtol=1e-5, atol=1e-7)
+
+
+@pytest.mark.parametrize("dataset", ["cmu_arctic", "librispeech"])
+def test_example_builder_uses_audio_sample_rate(tmp_path, corpus, dataset):
+    if dataset == "cmu_arctic":
+        for speaker in cmu_arctic_speakers():
+            destination = corpus / "ARCTIC" / f"cmu_us_{speaker}_arctic"
+            if not destination.exists():
+                shutil.copytree(corpus / "ARCTIC/cmu_us_bdl_arctic", destination)
+    else:
+        for speaker in ("103", "104"):
+            chapter = corpus / "LibriSpeech" / "dev-clean" / speaker / "1240"
+            chapter.mkdir(parents=True)
+            utterance = f"{speaker}-1240-0000"
+            (chapter / f"{speaker}-1240.trans.txt").write_text(
+                f"{utterance} SYNTHETIC FIXTURE\n"
+            )
+            sf.write(
+                chapter / f"{utterance}.flac",
+                np.linspace(-0.1, 0.1, 1000),
+                8000,
+            )
+    output = tmp_path / "output"
+    run_python(
+        tmp_path,
+        ROOT / "examples/build_dynamic_dataset.py",
+        "--dataset",
+        dataset,
+        "--dataset-dir",
+        corpus,
+        "--subset",
+        "dev-clean",
+        "--num-scenes",
+        1,
+        "--num-sources",
+        2,
+        "--duration",
+        0.08,
+        "--steps",
+        3,
+        "--order",
+        0,
+        "--tmax",
+        0.04,
+        "--device",
+        "cpu",
+        "--out-dir",
+        output,
+    )
+    audio, meta = check_outputs(output, "scene_000", "dynamic_src", 640)
+    assert meta["rir"]["sample_count"] == 320
+    refs = [
+        sf.read(output / item["filename"], always_2d=True)[0]
+        for item in meta["extra"]["reference_audio"]
+    ]
     np.testing.assert_allclose(audio, sum(refs), rtol=1e-5, atol=1e-7)
 
 

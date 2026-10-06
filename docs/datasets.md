@@ -106,7 +106,8 @@ final file descriptor instead of reopening a validated pathname.
 | Cached archive path is a symlink or another non-regular entry | A symlink is replaced only through a verified atomic exchange without following its target; any other non-regular cache entry is rejected. |
 | Corrupt/unsafe or excessive archive (path traversal, link/special-file entry, too many members, or declared size over a bound) | Raises `ValueError` before any member is extracted. |
 | Malformed or path-like `utterance_id` | Raises `ValueError` before filesystem access. |
-| `load_audio(utterance_id)` for missing or non-regular audio | Raises `FileNotFoundError` before SoundFile is called. |
+| `load_audio(utterance_id)` for missing audio or a directory/special file in place of audio | Raises `FileNotFoundError` before SoundFile is called. |
+| `load_audio(utterance_id)` detects a symlink at the speaker dataset root or final audio entry, or a resolved audio path outside the speaker tree | Raises `ValueError` during path validation, before SoundFile is called. |
 
 ## LibriSpeech
 
@@ -160,7 +161,8 @@ same descriptor obtained by a component-wise `O_NOFOLLOW` walk.
 | `load_audio(utterance_id)` with malformed ID (not numeric `spk-chapter-utt`) | Raises `ValueError` before filesystem access. |
 | `utterance_id` belongs to a different configured speaker | Raises `ValueError`. |
 | Transcript ID conflicts with its speaker/chapter directory | Raises `ValueError` while discovering sentences. |
-| `load_audio(utterance_id)` for missing or non-regular audio | Raises `FileNotFoundError` before SoundFile is called. |
+| `load_audio(utterance_id)` for missing audio or a directory/special file in place of audio | Raises `FileNotFoundError` before SoundFile is called. |
+| `load_audio(utterance_id)` detects a symlink at the subset, speaker, or chapter directory or final audio entry, or a resolved audio path outside the subset tree | Raises `ValueError` during path validation, before SoundFile is called. |
 | HTTP 408/429/5xx, transport, malformed/mismatched response length, or digest failure during download | Verifies the pinned subset MD5 and retries once by default before propagating the error. |
 | Declared or streamed body exceeds the 64 GiB safety limit | Raises `ValueError` without retrying. |
 | Local filesystem, extraction, validation, or publication failure | Propagates immediately without a download retry or re-downloading an already verified archive. |
@@ -433,10 +435,13 @@ quantization.
 
 ### CLI usage
 
+Run these commands from the repository root. The `datasets` extra supplies
+the builder's audio I/O and visualization dependencies.
+
 Module entrypoint:
 
 ```bash
-python -m torchrir.datasets.dynamic_cmu_arctic \
+uv run --extra datasets python -m torchrir.datasets.dynamic_cmu_arctic \
   --cmu-root datasets/cmu_arctic \
   --dataset-root outputs/cmu_arctic_torchrir_dynamic_dataset \
   --n-scenes 10 \
@@ -448,7 +453,7 @@ python -m torchrir.datasets.dynamic_cmu_arctic \
 Console script entrypoint:
 
 ```bash
-torchrir-build-dynamic-cmu-arctic \
+uv run --extra datasets torchrir-build-dynamic-cmu-arctic \
   --cmu-root datasets/cmu_arctic \
   --dataset-root outputs/cmu_arctic_torchrir_dynamic_dataset \
   --n-scenes 10 \

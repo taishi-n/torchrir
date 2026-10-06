@@ -106,13 +106,17 @@ and [TorchRIR motion validation](https://github.com/taishi-n/torchrir/blob/c1101
 | Propagation | Shoebox ISM snapshots | Direct path with retarded-time solve | Shoebox ISM with two-time geometry |
 | Motion input | Frame trajectories and explicit sample schedule | Time/position/quaternion knots; linear position and SLERP | Source `(3, N)`, receivers `(M, 3, N)`; position at every sample |
 | Multiple sources | Source axis and summation | Source list; shared FIR-history defect below | One source signal per call; sum separate calls manually |
-| Orientation | Source/receiver directivity and frame orientations | Source/array quaternion paths; local microphone quaternion is not used by renderer | Fixed receiver azimuth/elevation per call; omnidirectional source |
+| Orientation | Source/receiver directivity; per-entity orientation fixed over the trajectory | Source/array quaternion paths; local microphone quaternion is not used by renderer | Fixed receiver azimuth/elevation per call; omnidirectional source |
 | Geometric gain | `1/r` | `1/r`, plus air absorption | `1/(4πr)` |
 | Interpolation | Configurable odd-length Hann sinc; default 81 taps | Source-signal integer indexing/linear/sinc; linear by default | Hann sinc with `Tw = 2*round(0.004*fs)` and `Tw+1` taps |
 | Filtering | Optional configured RIR HPF | Per-distance 33-tap air-absorption FIR | 100 Hz Allen–Berkley RIR HPF, enabled by default |
 | Public output | RIR tensors and full convolution output | Clipped integer WAV over microphone-path duration | Floating waveform `(N, M)`, not an RIR tensor |
 | Tail | Convolver returns `N + L - 1` samples | No automatic FIR/propagation tail extension | Caller must zero-pad input and extend trajectories |
 | Execution | Batched PyTorch; CPU/CUDA/MPS | Python sample/channel/source loops; NumPy/SciPy CPU | C++ loops via CFFI; CPU, double precision |
+
+TorchRIR supports time-varying source and microphone positions, while each
+source and microphone keeps one fixed orientation throughout the trajectory.
+Time-varying orientation is not supported.
 
 The DAS image on each coordinate axis is `(1-2*q)*s + 2*m*room_size`.
 Its two wall gains are `beta_low**abs(m-q) * beta_high**abs(m)`;

@@ -56,9 +56,12 @@
 - `device=None`: inherit the common scene-tensor device
 
 All scene geometry Tensors must share one device and dtype. Explicit config
-overrides perform one conversion immediately before the kernel. An explicit
-MPS + `float64` request is rejected before execution because MPS does not
-support that dtype. RIR simulation supports `torch.float32` and `torch.float64`;
+overrides perform one conversion immediately before the kernel. When MPS is
+available, an explicit MPS + `float64` request is rejected before execution
+because MPS does not support that dtype. When MPS is unavailable, an explicit
+MPS request emits a warning and falls back to CPU, where `float64` is accepted.
+`device="auto"` skips MPS when resolving a `float64` request.
+RIR simulation supports `torch.float32` and `torch.float64`;
 explicit or inherited float16/bfloat16 geometry is rejected before a kernel
 starts because ISM position, distance, delay, and gain calculations are not
 numerically safe at those precisions. Generic tensor and convolution utilities
@@ -73,12 +76,17 @@ scalar values but reject booleans, numeric strings, scalar Tensors, NaN, and
 infinity rather than coercing them. An integer too large to convert to a finite
 float raises `ValueError` with the public parameter name.
 
-Count, index, sample-rate, and seed fields use a separate integer contract.
-Non-boolean integer scalars, including NumPy integers, are normalized to Python
-`int`; fractional values and booleans are rejected before allocation or index
-arithmetic. Audio and dataset sample rates must be in `1..2**31-1`, sample
-counts and frame starts fit their documented positive/non-negative `int64`
-domains, and random seeds fit non-negative `int64`.
+`Room.fs` and `FrameSchedule.from_seconds(sample_rate=...)` use that finite-real
+contract and accept positive finite sample rates, including fractional
+values. A seconds-derived schedule used with an `RIRResult` must match the
+room's sample rate.
+
+Count, index, and seed fields, plus audio I/O and dataset sample rates, use a
+separate integer contract. Non-boolean integer scalars, including NumPy
+integers, are normalized to Python `int`; fractional values and booleans are
+rejected before allocation or index arithmetic. Audio and dataset sample rates
+must be in `1..2**31-1`, sample counts and frame starts fit their documented
+positive/non-negative `int64` domains, and random seeds fit non-negative `int64`.
 
 ```python
 from torchrir.util import DeviceSpec
