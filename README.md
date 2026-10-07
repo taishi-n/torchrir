@@ -110,6 +110,12 @@ simulation and WAV output.
 
 ## Dataset API Quick Guide
 
+Corpus loaders provide individual speech utterances as source signals for RIR
+convolution. CMU ARCTIC and LibriSpeech are implemented; VCTK and WSJ0 are planned
+in the [source corpus roadmap](#p3-source-speech-corpus-loaders). Source corpus
+descriptions and their related acoustic datasets are documented in
+[Related dataset](https://torchrir.readthedocs.io/en/latest/related-dataset.html).
+
 - `torchrir.datasets.CmuArcticDataset(root, speaker=..., download=...)`
   - Accepted `speaker`: `aew`, `ahw`, `aup`, `awb`, `axb`, `bdl`, `clb`, `eey`, `fem`, `gka`, `jmk`, `ksp`, `ljm`, `lnh`, `rms`, `rxr`, `slp`, `slt`
   - A non-string `speaker` raises `TypeError`; an unsupported string raises
@@ -530,6 +536,10 @@ not implemented.
 - `AudioInfo` normalizes Python/NumPy integer metadata. Its sample rate is in
   `1..2**31-1`, frame count in non-negative `int64`, and channel count in
   positive `int32`; invalid types and out-of-range values fail separately.
+- Corpus loaders expose individual speech utterances as source audio. Scene
+  builders apply RIRs to these inputs and generate mixtures separately. Future
+  corpus integrations follow the
+  [source corpus roadmap](#p3-source-speech-corpus-loaders).
 - `DatasetItem` is keyword-only and requires finite, non-empty mono
   floating-point audio, a positive integer sample rate, and a non-empty
   utterance ID. `collate_dataset_items` revalidates shallow-mutable items,
@@ -792,7 +802,7 @@ incomplete until their numerical and API acceptance criteria pass.
 - [ ] Integrate 3D spatial response visualization, including array and
       directivity beam patterns.
       Motivation: [pyroomacoustics#394](https://github.com/LCAV/pyroomacoustics/issues/394).
-- [ ] Support simultaneous source/microphone motion for dataset reproduction.
+- [ ] Support simultaneous source/microphone motion in dynamic acoustic scenes.
       Specify a two-time retarded propagation model and validate direct sound
       before adding reflected paths.
 - [ ] Extend room geometry beyond shoebox rooms with irregular polygons/meshes
@@ -811,56 +821,23 @@ incomplete until their numerical and API acceptance criteria pass.
       the source model and its valid distance/frequency range first.
       Motivation: [pyroomacoustics#417](https://github.com/LCAV/pyroomacoustics/issues/417).
 
-### P3: Dynamic dataset foundation
+### P3: Source speech corpus loaders
 
-The external datasets surveyed in
-[Related Dynamic Speech and Acoustic Datasets](https://torchrir.readthedocs.io/en/latest/related-datasets.html)
-are not currently exposed through `torchrir.datasets`. Their integration roadmap
-was added in the documentation-only commit `7304a8a`. Keep corpus download and
-licensing decisions explicit, preserve provenance, and avoid redistributing
-third-party recordings.
+Extend `torchrir.datasets` with individual utterances that can serve as inputs
+to RIR convolution. Keep speaker identity, utterance identity, native sample
+rate, transcripts when available, and attribution explicit. Loader tests use
+small synthetic corpus trees; full external corpora remain optional.
 
-- [ ] Define a dynamic multichannel dataset manifest for mixtures, reverberant
-      stems, optional dry or close-talk references, sample rates, microphone-array
-      geometry, source and microphone trajectories, orientations, synchronization,
-      provenance, and license metadata.
-- [ ] Add manifest-backed multichannel dataset adapters that preserve channels
-      and expose validated timing and geometry records without forcing every
-      corpus into the current mono `DatasetItem` contract.
-- [ ] Add reusable dataset-building controls for resampling, source onset and
-      offset, relative source level, SIR/SNR, background-noise mixing, arbitrary
-      microphone arrays, and straight or piecewise-linear trajectories.
-- [ ] Add small synthetic fixtures and schema-validation tests. Full external
-      corpora must remain optional and must not be required by the normal test
-      suite.
-
-### P3: Dynamic dataset integrations
-
-- [ ] **SonicSet v2:** parse its audio, stem, trajectory, and JSON layout and map
-      its coordinate conventions into torchrir records. Exact regeneration also
-      depends on irregular mesh geometry, material-dependent propagation,
-      occlusion, and diffraction support.
-- [ ] **ASA_20k_4s_nspk2-4:** add an archive/manifest adapter. Reproduction requires
-      multi-corpus source loading, a four-channel tetrahedral array, source
-      onset/offset scheduling, diffuse background noise, and SNR-controlled mixing.
-- [ ] **WSJ0-Demand-6ch-Move:** implement the published generation recipe with
-      straight moving-source trajectories, a six-channel circular array, relative
-      speaker-level sampling, and DEMAND noise mixing. WSJ0 and DEMAND access must
-      be supplied and authorized by the user.
-- [ ] **LOCATA:** parse multichannel recordings, close-talk references, voice
-      activity, and OptiTrack position/orientation streams. Task 6 simulation also
-      requires simultaneous source and microphone motion plus time-varying
-      orientation.
-- [ ] **EasyCom:** synchronize the six-channel array, close-talk references, voice
-      activity, speaker identity, and pose metadata. Faithful simulation further
-      requires simultaneous motion, time-varying orientation, wearable-device
-      occlusion, near-field speech, and hardware response modeling.
-- [ ] **RealMAN:** add multichannel FLAC, source-position, direct-path target, and
-      transcript adapters. Multi-talker separation use also needs an explicit
-      mixture and reference-stem construction policy.
-- [ ] **trajectoRIR:** map the supplied audio, RIR, coordinate, speed, and array
-      configuration records into torchrir. Add evaluation utilities that compare
-      measured moving-microphone signals with observation-time convolution.
+- [ ] **VCTK:** add a speaker/utterance loader with explicit microphone selection
+      and validated audio/text indexing. Its individually recorded read speech
+      and varied accents expand the source material available for simulation.
+      See [VCTK and related corpora](https://torchrir.readthedocs.io/en/latest/related-dataset.html#vctk)
+      for the recording conditions and downstream acoustic datasets.
+- [ ] **WSJ0:** add a loader for individual utterances and transcripts from a
+      user-supplied, licensed local corpus. Its 16 kHz read speech provides
+      source material used in speech-separation experiments. See
+      [WSJ0 and related corpora](https://torchrir.readthedocs.io/en/latest/related-dataset.html#wsj0)
+      for the source corpus and its use in generated acoustic datasets.
 
 ## Related Libraries
 

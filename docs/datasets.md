@@ -4,9 +4,10 @@ This page documents the `torchrir.datasets` helpers for CMU ARCTIC and
 LibriSpeech, including accepted options, expected directory structures, and
 error handling for invalid inputs.
 
-For external corpora involving moving sources or microphone arrays, see
-[Related Dynamic Speech and Acoustic Datasets](related-datasets.md). Those
-datasets are research references and are not currently built-in integrations.
+Corpus loaders provide individual speech utterances for source selection and
+RIR convolution. The scene builders documented below use those inputs to
+generate acoustic recordings. Source corpus descriptions and external acoustic
+research references are collected on [Related dataset](related-dataset.md).
 
 ## Scope
 
@@ -18,6 +19,25 @@ Covered APIs:
 - `torchrir.datasets.collate_dataset_items`
 - `torchrir.datasets.DynamicCmuArcticBuildConfig`
 - `torchrir.datasets.build_dynamic_cmu_arctic`
+
+## Planned source corpora
+
+VCTK and WSJ0 are planned individual-utterance integrations:
+
+- **VCTK:** Extend the available speakers and accents with individually recorded
+  read speech. Select the microphone explicitly and validate the audio/text
+  index. See [VCTK and related corpora](related-dataset.md#vctk) for recording
+  conditions and downstream uses.
+- **WSJ0:** Load original 16 kHz read-speech utterances and transcripts from a
+  user-supplied, licensed local corpus for convolution and mixing experiments.
+  See [WSJ0 and related corpora](related-dataset.md#wsj0) for the corpus and its
+  use as source material.
+
+Both loaders will preserve speaker/utterance identity, native sample rates, and
+attribution. The
+[README source corpus roadmap](https://github.com/taishi-n/torchrir/blob/main/README.md#p3-source-speech-corpus-loaders)
+tracks their implementation. Loader tests use small synthetic corpus trees;
+full external corpora remain optional.
 
 ## Quick start (local data, no download)
 

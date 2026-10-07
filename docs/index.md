@@ -53,8 +53,10 @@ needs a system `ffmpeg`.
   macOS with the documented POSIX descriptor and atomic-rename primitives.
 - Dataset usage details (options, directory layouts, error handling):
   [Datasets](datasets.md)
-- Survey of external datasets with moving sources or microphone arrays:
-  [Related Dynamic Speech and Acoustic Datasets](related-datasets.md)
+- Planned source corpus loaders: VCTK and WSJ0. See
+  [Datasets](datasets.md#planned-source-corpora) for their scope.
+- Source corpus descriptions and related acoustic research datasets:
+  [Related dataset](related-dataset.md)
 - Dataset attribution and redistribution notes:
   [THIRD_PARTY_DATASETS.md](https://github.com/taishi-n/torchrir/blob/main/THIRD_PARTY_DATASETS.md)
 
@@ -104,7 +106,7 @@ See runnable examples and command-line usage: [Examples](examples.md).
 - [Overview](overview.md)
 - [Acoustic model roadmap](acoustic-roadmap.md)
 - [Datasets](datasets.md)
-- [Related Dynamic Speech and Acoustic Datasets](related-datasets.md)
+- [Related dataset](related-dataset.md)
 - [Examples](examples.md)
 - [Library Comparisons](comparisons.md)
 - [Changelog](changelog.md)
