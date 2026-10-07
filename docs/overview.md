@@ -352,8 +352,9 @@ the latest active trajectory record, including for nonuniform schedules.
 MP4 uses fractional FPS; GIF rounds cumulative boundaries to 10 ms, with at
 most 5 ms total error, and rejects sub-10 ms frame intervals.
 
-Audio muxing requires equal audio and display durations. To include the
-reverberation tail, pass the convolved audio sample count as `stop_sample`;
+Audio muxing requires equal audio and display durations and retains the full
+audio tail even when the video has fewer than one frame per second. To include
+the reverberation tail, pass the convolved audio sample count as `stop_sample`;
 the dynamic CMU builder does this automatically. GIF examples can instead use
 the dry signal's sample count when only the source-motion interval is wanted.
 

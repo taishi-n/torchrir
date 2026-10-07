@@ -187,8 +187,8 @@ reciprocity, static/dynamic equivalence, and both convolution time references.
 Extend those tests for concrete gaps rather than adding duplicate shape checks
 or introducing compatibility/migration tests.
 
-The table records the implemented CPU validation contract. Accelerator extensions
-remain deferred as noted in the README TODO.
+The table records the implemented CPU validation contract. Manual accelerator
+results are recorded below; they remain separate from automated CPU validation.
 
 ### Required automated jobs
 
@@ -238,19 +238,24 @@ must fail validation.
 3. **Exercise actual media output.**
    `test_viz_animation.py` exercises actual GIF/MP4 rendering for 2D/3D scenes
    with source annotations enabled and disabled, exact timing, decoding, HD
-   dimensions, and requested audio streams. Failure-injection tests cover missing
-   tools/inputs, encoder failures, atomic destination preservation, temporary-name
-   collisions, and Figure cleanup. CPU jobs provide Pillow and ffmpeg/ffprobe;
+   dimensions, and requested audio streams. Low-FPS MP4 cases verify complete
+   decoded audio sample coverage and channel correlation through the tail.
+   Failure-injection tests cover missing tools/inputs, encoder failures, atomic
+   destination preservation, temporary-name collisions, and Figure cleanup.
+   CPU jobs provide Pillow and ffmpeg/ffprobe;
    inputs are synthetic, with no pixel hashes or wall-clock performance thresholds.
-4. **Complete manual CUDA validation when hardware is available.**
+4. **Retain manual accelerator validation.**
    Existing device tests cover basic static/dynamic RIR parity and both dynamic
-   convolution conventions' gradients. Complete static and observation-time
-   output/gradient parity, multi-source/microphone and chunk-boundary cases,
-   and CUDA eager/compiled accumulation parity with LUT enabled/disabled.
+   convolution conventions' gradients. Extended checks cover static and
+   observation-time output/gradient parity, multi-source/microphone and
+   chunk-boundary cases, and CUDA eager/compiled accumulation parity with LUT
+   enabled/disabled.
    Use float32/float64 on CUDA. Verify the actual output/config device; silent CPU
    fallback must not count as a device pass. Compilation validation needs an
-   actual supported backend, not only a mocked flag. Repeat float32 MPS checks
-   when accelerator paths change. These checks remain manual.
+   actual supported backend, not only a mocked flag. The
+   [CUDA validation record](#cuda-validation-record) closes the current P2 item;
+   repeat CUDA validation and float32 MPS checks when accelerator paths change.
+   These checks remain manual.
 
 ### Release validation
 
@@ -330,9 +335,9 @@ and the pytest summary. An unavailable accelerator fails the preflight; it must
 not be recorded as a successful GPU check.
 
 ```bash
-# CUDA: RIR parity, sample schedules, and emission-time convolution/autograd.
+# CUDA: RIR parity, schedules, both convolution gradients, and mixed-device collate.
 uv run --no-sync python -c 'import torch; assert torch.cuda.is_available(), "CUDA unavailable"'
-uv run --no-sync pytest -q -rs tests/test_device_parity.py tests/test_signal.py -m cuda
+uv run --no-sync pytest -q -rs tests/test_device_parity.py tests/test_signal.py tests/test_datasets.py -m cuda
 
 # MPS: run separately on an environment with an available MPS device.
 uv run --no-sync python -c 'import torch; assert torch.backends.mps.is_available(), "MPS unavailable"'
@@ -349,8 +354,11 @@ emission/observation convolution gradients, and mixed-device collate validation.
 Extended validation also requires static convolution output and
 gradient parity, multiple sources/microphones, and image/accumulation and
 convolution frame-chunk boundaries. Compare against CPU results and use
-independent direct sums for convolution outputs and gradients. CUDA eager/compiled
-and LUT validation remains deferred until CUDA is available.
+independent direct sums for convolution outputs and gradients. CUDA validation
+also checks float32/float64 eager/compiled accumulation with LUT enabled/disabled,
+including execution through a real supported compiler backend.
+
+#### MPS validation record
 
 MPS was validated on 2026-10-06 at commit `0ccdbf2` on an Apple M3 Max with
 macOS 15.7.7, Python 3.11.11, and PyTorch 2.10.0. With CPU fallback disabled,
@@ -370,6 +378,79 @@ and `rtol=1e-3, atol=1e-4` for RIRs/position gradients. This records numerical
 validation on the tested fixtures; it does not establish bitwise equality,
 CUDA coverage, or a performance improvement.
 
+#### CUDA validation record
+
+CUDA was validated on 2026-10-07 at commit
+`b8bcc5dc21d5606db634c47b1d7ee164d4ca0da5` (TorchRIR 3.0.3), with a clean
+working tree during the accelerator runs. The environment was Ubuntu 22.04.5
+LTS, x86_64, kernel `5.15.0-198-generic`, Python 3.11.11, NumPy 2.4.2, and
+PyTorch `2.10.0+cu128` (CUDA runtime 12.8). The NVIDIA open kernel driver was
+`580.178.04`. Both GPUs were RTX A4000s with 16 GiB memory, at PCI bus IDs
+`00000000:C1:00.0` and `00000000:C2:00.0`.
+
+Each physical GPU ran in a separate process with `CUDA_DEVICE_ORDER=PCI_BUS_ID`
+and `CUDA_VISIBLE_DEVICES=0` or `1`. In either process the selected GPU appeared
+as logical `cuda:0`. A preliminary computation/autograd check passed float32
+and float64 on both devices.
+
+| Validation | GPU 0 | GPU 1 |
+| --- | --- | --- |
+| Marked CUDA suite: RIR parity, schedules, both dynamic convolution gradients, mixed-device collate | 6 passed, 0 skipped | 6 passed, 0 skipped |
+| Extended eager harness | 58 passed, 0 skipped | 58 passed, 0 skipped |
+| Extended compiled harness | 16 passed, 0 skipped | 16 passed, 0 skipped |
+
+The extended harness had SHA-256
+`3b2491b9b1e7832d500a5a2fcef4d95ce8a12c0467beff76b06a4b5c6be85b20`.
+Its eager phase covered both dtypes with 18 FFT/static/emission/observation
+convolution cases, 36 static/moving-source/moving-microphone RIR cases, and
+4 static source/microphone position-gradient cases. Convolution outputs and
+signal/RIR gradients were compared with CPU results and independent float64
+direct sums and analytic gradients. Cases included source broadcasting,
+nonuniform schedules, the eight-frame batch boundary, FFT-size changes, and
+frames active only in the convolution tail.
+
+RIR fixtures used two sources, three microphones, four dynamic frames, order 3,
+512 output samples, and LUT enabled/disabled. Eager image/accumulation chunk
+pairs were `(2048, 4096)`, `(11, 4)`, and `(1, 1)`. The compiled phase used
+`(11, 4)` for 12 RIR and 4 position-gradient cases and compared with CPU and
+CUDA eager results. Outputs, resolved configs, and gradients were asserted to
+remain on the selected CUDA device with the requested dtype and effective
+LUT/compile settings. Finite, nonzero outputs/gradients were required.
+
+Compilation used the actual Inductor backend with compiler error suppression
+disabled and `torch._dynamo.config.recompile_limit=64` for the fixture matrix.
+Each compiled case required execution of an Inductor graph containing scatter
+accumulation. Both GPUs recorded 20 such compiled graphs and 96 graph executions;
+a requested compile flag alone did not count as a pass.
+
+All comparisons passed the predefined `rtol, atol` pairs:
+
+| Comparison | float32 | float64 |
+| --- | --- | --- |
+| Convolution outputs/gradients | `3e-4, 3e-5` | `1e-10, 1e-11` |
+| RIR outputs | `1e-4, 1e-5` | `1e-9, 1e-11` |
+| Position-gradient cases, including RIR outputs | `1e-3, 1e-4` | `1e-8, 1e-9` |
+
+Both GPUs reported maximum absolute errors of `3.40e-6` (float32) and `7.11e-15`
+(float64) for eager convolution outputs/gradients, and `4.90e-6` and `9.05e-15`
+for eager/compiled RIR outputs. Position-gradient case summaries include their
+RIR comparisons and are not isolated gradient-error measurements.
+These results establish numerical agreement on the listed fixtures, with each
+GPU exercised individually.
+
+The server reports were `/tmp/torchrir_cuda_eager_gpu0.json`,
+`/tmp/torchrir_cuda_eager_gpu1.json`, `/tmp/torchrir_cuda_compile_gpu0.json`,
+and `/tmp/torchrir_cuda_compile_gpu1.json`.
+
+A subsequent full-suite run on the server, after applying the MP4 audio-tail
+fix to the same base revision, passed 893 tests with 20 skips. The skips were
+14 unavailable external-reference cases (pyroomacoustics, gpuRIR, rir-generator)
+and 6 unavailable MPS cases; none were CUDA skips. This full-suite result is
+distinct from the zero-skip accelerator runs and does not complete the skipped
+external comparisons.
+
+#### External CUDA reference checks
+
 Run gpuRIR separately only when the pinned reference revision is installed and
 the CUDA preflight has passed:
 
@@ -386,8 +467,10 @@ runner and successful manual verification.
 
 ### Implementation order
 
-The remaining validation item in [README TODO](../README.md#todo) is the
-CUDA extension, which remains unchecked until CUDA hardware is available.
+The P2 CUDA validation item in [README TODO](../README.md#todo) was completed
+on 2026-10-07 for the environment and fixtures in the
+[CUDA validation record](#cuda-validation-record). Repeat manual validation
+when accelerator paths change.
 Commit each completed implementation item.
 
 For subsequent P3 acoustic-model work, follow the

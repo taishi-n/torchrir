@@ -436,7 +436,6 @@ def _add_stereo_audio_to_mp4(
             "copy",
             "-c:a",
             "aac",
-            "-shortest",
             str(tmp_video),
         ]
         result = subprocess.run(cmd, check=False, capture_output=True, text=True)

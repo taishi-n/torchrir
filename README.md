@@ -576,8 +576,9 @@ not implemented.
 - MP4 keeps fractional FPS. GIF rounds cumulative frame boundaries to its 10 ms
   clock, limiting total-duration error to 5 ms; schedules requiring a GIF frame
   shorter than 10 ms are rejected. Muxed audio must have the same duration as
-  the display timeline. The dynamic CMU builder renders the complete convolved
-  mixture duration and holds the final geometry through its tail.
+  the display timeline and retain its full tail, including when the video has
+  fewer than one frame per second. The dynamic CMU builder renders the complete
+  convolved mixture duration and holds the final geometry through its tail.
 - MP4 audio muxing preserves the selected channels' gain and rejects empty,
   non-finite, or out-of-range (`abs(sample) > 1`) stereo samples. It does not
   normalize automatically. A mono input is duplicated to stereo before channel
@@ -767,7 +768,7 @@ site.
 
 ## TODO
 
-P2 covers remaining hardware validation; P3 tracks future capabilities.
+P2 records hardware validation; P3 tracks future capabilities.
 Follow the documentation-first
 cycle in [Development Verification](#development-verification) for each item.
 The [test and CI plan](tests/README.md#test-and-ci-plan) contains the detailed CI
@@ -775,15 +776,14 @@ acceptance criteria; unchecked items remain incomplete.
 
 ### P2: Hardware validation
 
-- [ ] Complete manual CUDA validation on actual hardware. Check static and
-      observation-time convolution output/gradient parity, multiple sources and
-      microphones, chunk boundaries, and CUDA eager/compiled accumulation with LUT
-      enabled/disabled. Assert the actual output/config device and record runtime
-      versions and skips. Follow the
-      [manual accelerator checks](tests/README.md#manual-accelerator-checks);
-      unavailable hardware does not close this item, and a replacement GPU workflow
-      is not required. This remains deferred for this development cycle because a
-      CUDA environment is unavailable.
+- [x] Complete manual CUDA validation on actual hardware (2026-10-07).
+      Both RTX A4000 GPUs individually passed 6 marked tests, 58 extended eager
+      cases, and 16 compiled cases with zero skips. Validation covered
+      float32/float64 output and gradient parity, multiple sources/microphones,
+      chunk boundaries, and CUDA eager/Inductor accumulation with LUT on/off.
+      Actual output, resolved-config, and gradient devices were checked.
+      See the [CUDA validation record](tests/README.md#cuda-validation-record)
+      for the tested revision, environment, scope, and full-suite result.
 
 ### P3: Acoustic models and spatial visualization
 

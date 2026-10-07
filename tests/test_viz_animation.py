@@ -194,12 +194,13 @@ def test_gif_rounds_cumulative_boundaries(tmp_path):
 
 
 @pytest.mark.parametrize("mux_audio", [False, True])
-def test_mp4_audio_and_video_cover_full_tail(tmp_path, mux_audio):
+@pytest.mark.parametrize("fps,frames", [(None, 2), (1 / 3, 1), (2, 6)])
+def test_mp4_audio_and_video_cover_full_tail(tmp_path, mux_audio, fps, frames):
     import numpy as np
     import soundfile as sf
 
-    if not shutil.which("ffmpeg"):
-        pytest.skip("ffmpeg unavailable")
+    if not all(shutil.which(command) for command in ("ffmpeg", "ffprobe")):
+        pytest.skip("MP4 rendering requires ffmpeg and ffprobe")
     audio = tmp_path / "mixture.wav"
     t = np.arange(24000) / 8000
     samples = np.stack(
@@ -217,6 +218,7 @@ def test_mp4_audio_and_video_cover_full_tail(tmp_path, mux_audio):
         schedule=FrameSchedule.from_samples([0, 8000]),
         fs=8000,
         stop_sample=24000,
+        fps=fps,
         mixture_path=audio,
         mux_audio=mux_audio,
     )
@@ -231,7 +233,9 @@ def test_mp4_audio_and_video_cover_full_tail(tmp_path, mux_audio):
     }
     assert set(streams) == ({"audio", "video"} if mux_audio else {"video"})
     assert (streams["video"]["width"], streams["video"]["height"]) == (1280, 720)
-    assert int(streams["video"]["nb_frames"]) == 2
+    assert int(streams["video"]["nb_frames"]) == frames
+    for stream in streams.values():
+        assert float(stream["duration"]) == pytest.approx(3.0, abs=0.01)
     subprocess.run(
         ["ffmpeg", "-v", "error", "-i", str(path), "-f", "null", "-"],
         check=True,
@@ -255,13 +259,18 @@ def test_mp4_audio_and_video_cover_full_tail(tmp_path, mux_audio):
             check=True,
             capture_output=True,
         )
-        actual = np.frombuffer(decoded.stdout, dtype=np.float32).reshape(-1, 2)[
-            : len(samples)
-        ]
+        actual = np.frombuffer(decoded.stdout, dtype=np.float32).reshape(-1, 2)
+        assert len(actual) >= len(samples), (
+            f"Audio truncated: decoded {len(actual)} samples; expected at least "
+            f"{len(samples)}"
+        )
+        actual = actual[: len(samples)]
         for channel in range(2):
             assert np.corrcoef(actual[:, channel], samples[:, channel])[0, 1] > 0.95
-    for stream in streams.values():
-        assert float(stream["duration"]) == pytest.approx(3.0, abs=0.01)
+            assert (
+                np.corrcoef(actual[-8000:, channel], samples[-8000:, channel])[0, 1]
+                > 0.95
+            )
 
 
 @pytest.mark.parametrize(
